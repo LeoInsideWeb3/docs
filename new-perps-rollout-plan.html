@@ -100,7 +100,7 @@ a{color:var(--accent)}
 <a href="#verify" data-tab="verify"><span class="n">9</span>上线验证</a>
 <a href="#rollback" data-tab="rollback"><span class="n">10</span>回滚</a>
 </nav>
-<div class="side-foot">2026-09-18 · v4<br>PR #1703 (neodax) 待审<br>PR #150 (apps-value) 待审<br>min_sources = 1 锁定</div>
+<div class="side-foot">2026-09-18 · v5<br>含 PR 变更明细<br>#1703 · #150 待审<br>min_sources = 1 锁定</div>
 </aside>
 
 <div class="main">
@@ -144,6 +144,27 @@ a{color:var(--accent)}
 <tr><td class="mono-c"><b>#150</b></td><td>neodax-apps-value → staging</td><td>7 个文件：finex shard ×3 + quote + ledger + trading-api + kafka-topic-provision</td><td class="dim">后合并——ArgoCD sync 后立即生效（见下方热加载警告）</td></tr>
 </tbody>
 </table></div>
+
+<h2>PR 变更明细（供 owner 审核对应用）</h2>
+<h3>PR #1703 · neodax → master · seeds</h3>
+<p class="dim">链接：<code>https://github.com/layer-3/neodax/pull/1703</code> · 3 个文件，+210 行</p>
+<pre><span class="c"># 变更文件</span>
+A  portfolio_manager_perp/seeds/20260918120000_perps_markets.sql       <span class="c"># 13 资产 + 13 市场 + 1000PEPE 启用</span>
+A  portfolio_manager_perp/seeds/20260918120100_perps_market_risk_tiers.sql <span class="c"># 49 档位行</span>
+M  portfolio_manager_perp/seeds/README.md                              <span class="c"># 文件表 + 市场清单更新</span></pre>
+<div class="call"><p class="call-t">审核要点</p><p>① 参数全部来自 Binance fapi 实测（2026-09-18）——LOT_SIZE / PRICE_FILTER / MIN_NOTIONAL / PERCENT_PRICE 逐项对齐；资金费周期按 fundingInfo（XAU/XAG/CL 4h、TSLA 现为 8h）。② 杠杆/利率按官方公告（XAU/XAG 50x、CL 100x、股票 10x、TradFi 利率 0%；crypto 沿用平台模板 0.003）。③ depth_level 以 tick_size 为首级再 ×10（仓库既有约定，同 HYPE seed）。④ <b>min_sources = 1 全部锁定</b>。⑤ 1000PEPE 只改 status（定向 UPDATE，其余列不动，档位也不动）。⑥ 文件名匹配 Makefile glob（<code>[0-9]*_perps_markets.sql</code> / <code>[0-9]*_perps_market_risk_tiers.sql</code>），本地 <code>make seed</code> 自动按时间序并入，无需改 Makefile。⑦ 13 个新 base 资产放在 markets 文件顶部（DO NOTHING）——因为 <code>make seed-perp-assets</code> 硬编码指向旧的 collateral-only 文件，放这里保证 seed-perp-markets 自包含。⑧ 全部幂等可重跑；markets/tiers 用 ON CONFLICT DO UPDATE（重跑刷新配置列，13 个符号均为新增，不覆盖现有市场）。</p></div>
+
+<h3>PR #150 · neodax-apps-value → staging · Nacos 配置</h3>
+<p class="dim">链接：<code>https://github.com/layer-3/neodax-apps-value/pull/150</code> · 7 个文件，+196 行（全部为追加）</p>
+<pre><span class="c"># 变更文件（全部 add-only，零删除）</span>
+M  neodax-nacos/staging/finex/finex_perp_1.yaml     <span class="c"># +4: NVDA TSLA XAU NEAR</span>
+M  neodax-nacos/staging/finex/finex_perp_2.yaml     <span class="c"># +4: ARB UNI ADA AAVE</span>
+M  neodax-nacos/staging/finex/finex_perp_3.yaml     <span class="c"># +5: XAG CL GOOGL MSTR CRCL</span>
+M  neodax-nacos/staging/quote/quote.yaml            <span class="c"># 11 处 × 13 市场 = +143 行</span>
+M  neodax-nacos/staging/ledger/ledger.yaml          <span class="c"># markets + perp_markets 两列表 ×13</span>
+M  neodax-nacos/staging/trading_api/trading_api.yaml <span class="c"># enabled_futures_markets +13</span>
+M  neodax-kafka-topic-provision/staging/values.yaml <span class="c"># -perp-markets 列表 +13（同 HYPE 先例 #98）</span></pre>
+<div class="call"><p class="call-t">审核要点</p><p>① shard 分配 add-only：现有 12 市场零改动，程序化校验过每个新市场恰好出现在 1 个 shard（无跨实例重复——重复会导致双重撮合）。② quote 11 处插入完整：mark_price_oracle.symbols、symbol_aliases_perp、binance_perp.markets、4 个 mark_oracle 源的 symbols、4 组 symbol_mappings；每个市场恰好 11 次出现。③ OKX 映射 <code>XAU-USDT-SWAP</code> 格式 / Bybit <code>XAUUSDT</code> 格式——两家 API 实测确认合约存在（2026-09-18）。④ 不加 market_source_weights——新市场走全局默认（binance 0.97 主导），min_sources 判定线永远 1。⑤ OKX 的 1000PEPE 映射指向不存在的合约（现状死源）——<b>有意保持原样不动</b>。⑥ trading-api 热加载 enabled_futures_markets——合并 sync 瞬间市场即暴露（见下方热加载矩阵，重启顺序必须 finex → quote → ledger）。⑦ kafka-topic-provision 是 ArgoCD Sync-hook Job 的市场清单，13 个新市场并入后 sync 时自动建 topic。</p></div>
 
 <h2>操作员执行序列（不可乱序）</h2>
 <ol class="steps n">

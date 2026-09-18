@@ -1,0 +1,509 @@
+<title>NeoDAX · TAOUSDT-PERP Security Incident · 2026-09-18</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{--ground:#F5F7F5;--surface:#FFF;--surface-sunk:#ECEFEC;--code-bg:#161E1C;--code-ink:#D6E2DD;--ink:#151E1B;--ink-soft:#4A5854;--ink-faint:#798883;--rule:#DCE2DF;--rule-strong:#C3CCC8;--accent:#0E6A58;--accent-soft:#E0EFEA;--warn:#A15A08;--warn-soft:#F7EBDA;--danger:#973030;--danger-soft:#F7E4E2;--shadow:0 1px 2px rgba(21,30,27,.06)}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--ground:#0F1513;--surface:#171F1C;--surface-sunk:#121917;--code-bg:#0A0F0E;--code-ink:#C9D8D2;--ink:#E8EEEB;--ink-soft:#A5B3AE;--ink-faint:#7A8983;--rule:#263230;--rule-strong:#35433F;--accent:#4FC2A6;--accent-soft:#14312A;--warn:#D9964A;--warn-soft:#302315;--danger:#DE7E77;--danger-soft:#2E1918;--shadow:0 1px 2px rgba(0,0,0,.3)}}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{background:var(--ground);color:var(--ink);font-family:"IBM Plex Sans",-apple-system,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.62;-webkit-font-smoothing:antialiased}
+.shell{max-width:1240px;margin:0 auto;padding-inline:20px;padding-block:28px 76px;display:grid;grid-template-columns:224px minmax(0,1fr);gap:40px;align-items:start}
+.side{position:sticky;top:20px}
+.brand{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:6px}
+.brand-t{font-family:"Bricolage Grotesque","IBM Plex Sans",sans-serif;font-weight:700;font-size:19px;letter-spacing:-.01em;line-height:1.15;margin:0 0 18px}
+nav.tabs{display:grid;gap:2px}
+nav.tabs .grp{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);font-weight:600;margin:14px 0 4px 10px}
+nav.tabs .grp:first-child{margin-top:0}
+nav.tabs a{display:flex;align-items:baseline;gap:8px;padding:7px 10px;border-radius:4px;color:var(--ink-soft);text-decoration:none;font-size:13.5px;line-height:1.3;border-left:2px solid transparent}
+nav.tabs a .n{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--ink-faint);width:16px;flex:none}
+nav.tabs a:hover{background:var(--surface);color:var(--ink)}
+nav.tabs a.on{background:var(--accent-soft);color:var(--accent);border-left-color:var(--accent);font-weight:600}
+nav.tabs a.on .n{color:var(--accent)}
+.side-foot{margin-top:22px;font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink-faint);line-height:1.6;padding-left:10px}
+.main{min-width:0}
+.panel>header{margin-bottom:30px}
+.eyebrow{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
+h1{font-family:"Bricolage Grotesque","IBM Plex Sans",sans-serif;font-weight:700;font-size:clamp(26px,4vw,36px);line-height:1.1;letter-spacing:-.02em;margin:0 0 14px;text-wrap:balance}
+.standfirst{font-size:16px;color:var(--ink-soft);max-width:65ch;margin:0}
+.standfirst strong{color:var(--ink);font-weight:600}
+.assume{margin-top:18px;padding:13px 18px;background:var(--warn-soft);border-left:3px solid var(--warn);font-size:13.5px;color:var(--ink-soft);max-width:78ch}
+.assume b{color:var(--ink);font-weight:600}
+section{margin-top:46px;scroll-margin-top:20px}
+.panel>header+section{margin-top:0}
+h2{font-family:"Bricolage Grotesque","IBM Plex Sans",sans-serif;font-weight:700;font-size:21px;letter-spacing:-.01em;margin:0 0 6px;text-wrap:balance}
+.section-note{color:var(--ink-soft);margin:0 0 20px;max-width:68ch}
+h3{font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);margin:30px 0 12px}
+h4{font-size:15px;font-weight:600;margin:24px 0 8px}
+p{max-width:70ch}
+code,.mono{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.87em}
+p code,td code,li code{color:var(--accent)}
+pre{background:var(--code-bg);color:var(--code-ink);padding:16px 18px;overflow-x:auto;margin:12px 0;font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12.5px;line-height:1.6;border-radius:3px}
+pre .c{color:#6E8A80}pre .k{color:#7FD1B9}pre .t{color:#E3B778}
+.layers{display:grid;gap:10px}
+.layer{background:var(--surface);border:1px solid var(--rule);box-shadow:var(--shadow);padding:16px 20px;display:grid;grid-template-columns:158px minmax(0,1fr);gap:20px}
+.layer.hi{border-color:var(--accent)}
+.layer-n{font-family:"Bricolage Grotesque",sans-serif;font-weight:600;font-size:15px}
+.layer-n small{display:block;font-family:"IBM Plex Mono",monospace;font-weight:400;font-size:10.5px;color:var(--ink-faint);letter-spacing:.06em;margin-top:3px;text-transform:uppercase}
+.layer-d{margin:0;font-size:13.5px;color:var(--ink-soft)}
+.layer-d b{color:var(--ink);font-weight:600}
+.arrow{text-align:center;color:var(--ink-faint);font-size:11.5px;line-height:1;font-family:"IBM Plex Mono",monospace}
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:520px}
+th{text-align:left;font-weight:600;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);padding:0 14px 8px 0;border-bottom:1px solid var(--rule-strong);white-space:nowrap}
+td{padding:9px 14px 9px 0;border-bottom:1px solid var(--rule);vertical-align:top}
+tr:last-child td{border-bottom:none}
+td.dim{color:var(--ink-soft)}
+td.mono-c{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12px}
+td b{color:var(--ink);font-weight:600}
+.pill{display:inline-block;font-size:10.5px;font-weight:500;padding:1px 7px;border-radius:100px;white-space:nowrap;line-height:1.6}
+.pill.ok{background:var(--accent-soft);color:var(--accent)}
+.pill.gap{background:var(--warn-soft);color:var(--warn)}
+.pill.no{background:var(--danger-soft);color:var(--danger)}
+.call{background:var(--surface);border:1px solid var(--rule);border-left:3px solid var(--accent);padding:16px 20px;margin:16px 0;box-shadow:var(--shadow);max-width:80ch}
+.call.warn{border-left-color:var(--warn)}
+.call-t{font-weight:600;font-size:14px;margin:0 0 6px}
+.call p{margin:0;font-size:13.5px;color:var(--ink-soft)}
+.call p+p{margin-top:8px}
+.call b{color:var(--ink);font-weight:600}
+ul.plain{padding-left:0;list-style:none;margin:0;display:grid;gap:0;font-size:14px}
+ul.plain li{padding:11px 0;border-top:1px solid var(--rule);color:var(--ink-soft);max-width:72ch}
+ul.plain li:last-child{border-bottom:1px solid var(--rule)}
+ul.plain b{color:var(--ink);font-weight:600}
+ol.steps{padding-left:0;list-style:none;margin:0;counter-reset:s}
+ol.steps li{counter-increment:s;position:relative;padding:15px 0 15px 46px;border-top:1px solid var(--rule)}
+ol.steps li:last-child{border-bottom:1px solid var(--rule)}
+ol.steps li::before{content:counter(s);position:absolute;left:0;top:17px;font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--accent)}
+ol.steps b{display:block;color:var(--ink);font-weight:600;margin-bottom:3px;max-width:70ch}
+ol.steps span{display:block;color:var(--ink-soft);font-size:13.5px;max-width:70ch}
+.pager{margin-top:54px;padding-top:16px;border-top:1px solid var(--rule);display:flex;justify-content:space-between;gap:16px;font-size:13.5px}
+.pager a{color:var(--accent);text-decoration:none}
+.pager a:hover{text-decoration:underline}
+a{color:var(--accent)}
+a:hover{text-decoration:underline}
+.pr-meta{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11px;color:var(--ink-faint);margin:0 0 10px}
+a.btn{display:inline-block;font-size:12px;font-weight:600;color:var(--accent);background:var(--accent-soft);padding:5px 14px;border-radius:100px;text-decoration:none;line-height:1.5}
+a.btn:hover{text-decoration:underline}
+ol.pts{padding-left:0;list-style:none;margin:6px 0 0;counter-reset:p}
+ol.pts li{counter-increment:p;position:relative;padding:5px 0 5px 26px;font-size:13.5px;color:var(--ink-soft);max-width:74ch}
+ol.pts li::before{content:counter(p);position:absolute;left:2px;top:8.5px;font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--accent)}
+ol.pts b{color:var(--ink);font-weight:600}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media(max-width:860px){.shell{grid-template-columns:minmax(0,1fr);gap:20px}.side{position:static}.brand-t{margin-bottom:10px}nav.tabs{display:flex;overflow-x:auto;gap:4px;padding-bottom:6px}nav.tabs .grp{display:none}nav.tabs a{white-space:nowrap;border-left:0;border-bottom:2px solid transparent;border-radius:4px 4px 0 0}nav.tabs a.on{border-bottom-color:var(--accent)}.side-foot{display:none}.layer{grid-template-columns:minmax(0,1fr);gap:8px}}
+.call.danger{border-left-color:var(--danger)}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin:18px 0}
+.stat{background:var(--surface);border:1px solid var(--rule);box-shadow:var(--shadow);padding:14px 16px}
+.stat .v{font-family:"Bricolage Grotesque","IBM Plex Sans",sans-serif;font-weight:700;font-size:21px;letter-spacing:-.01em;line-height:1.1}
+.stat .v small{font-size:12px;font-weight:500;color:var(--ink-faint)}
+.stat .k{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--ink-faint);margin-top:5px}
+.stat.bad{border-color:var(--danger)}
+.stat.bad .v{color:var(--danger)}
+.stat.warn{border-color:var(--warn)}
+.stat.warn .v{color:var(--warn)}
+.stat.ok .v{color:var(--accent)}
+.tl td:first-child{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11.5px;white-space:nowrap;color:var(--accent)}
+.phase{display:inline-block;font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.08em;text-transform:uppercase;padding:1px 8px;border-radius:100px;background:var(--surface-sunk);color:var(--ink-soft);white-space:nowrap}
+.phase.p1{background:var(--warn-soft);color:var(--warn)}
+.phase.p2{background:var(--danger-soft);color:var(--danger)}
+.phase.p3{background:var(--accent-soft);color:var(--accent)}
+</style>
+<div class="shell">
+<aside class="side">
+<div class="brand">NeoDAX · Security Incident · IR-2026-09-18</div>
+<p class="brand-t">TAOUSDT-PERP Exploit &amp; Asset Drain</p>
+<nav class="tabs" id="tabs">
+<div class="grp">Summary</div>
+<a href="#verdict" data-tab="verdict"><span class="n">1</span>Verdict</a>
+<a href="#what" data-tab="what"><span class="n">2</span>What Happened</a>
+<a href="#why" data-tab="why"><span class="n">3</span>Why It Is Theft</a>
+<div class="grp">Analysis</div>
+<a href="#timeline" data-tab="timeline"><span class="n">4</span>Timeline</a>
+<a href="#method" data-tab="method"><span class="n">5</span>Attack Method</a>
+<a href="#money" data-tab="money"><span class="n">6</span>Money &amp; Losses</a>
+<a href="#accounts" data-tab="accounts"><span class="n">7</span>Attacker Accounts</a>
+<div class="grp">Reference</div>
+<a href="#evidence" data-tab="evidence"><span class="n">8</span>Evidence</a>
+<a href="#actions" data-tab="actions"><span class="n">9</span>Action List</a>
+<a href="#open" data-tab="open"><span class="n">10</span>Open Questions</a>
+</nav>
+<div class="side-foot">2026-09-18 · v1<br>DB snapshot 08:03 UTC<br>CONFIDENTIAL — do not<br>publish externally</div>
+</aside>
+
+<div class="main">
+
+<!-- ═══ 1 Verdict ═══ -->
+<article class="panel" id="p-verdict">
+<header>
+<div class="eyebrow">1 · Verdict</div>
+<h1>This was a hack, not customer withdrawals</h1>
+<p class="standfirst">At least <strong>15 coordinated attacker accounts</strong> exploited a flaw in the <strong>TAOUSDT-PERP liquidation / take-over mechanism</strong> to create profit out of thin air, converted it to YELLOW tokens, and withdrew it on-chain overnight. The drop in the custody-contract balance that customer service noticed is the on-chain footprint of that theft.</p>
+</header>
+<section>
+<div class="call danger"><p class="call-t">Confirmed theft — funds are still moving</p><p><b>~$251,020 USDT was extracted from the perpetuals system</b> into attacker accounts. Part of it (~424k YELLOW + ~17k USDT + small ETH/WBTC) <b>has already left the platform on-chain</b>. A further <b>221,831 YELLOW is still sitting in an attacker account, available to withdraw at any moment</b> — withdrawal processing must stay paused and that account must stay frozen.</p></div>
+
+<div class="stats">
+<div class="stat bad"><div class="v">$251,020</div><div class="k">extracted from perps (12 transfers)</div></div>
+<div class="stat bad"><div class="v">424,354 <small>YELLOW</small></div><div class="k">already withdrawn on-chain</div></div>
+<div class="stat warn"><div class="v">221,831 <small>YELLOW</small></div><div class="k">still inside · not yet withdrawn</div></div>
+<div class="stat"><div class="v">15+</div><div class="k">coordinated attacker accounts</div></div>
+</div>
+
+<h2>Three questions, three answers</h2>
+<div class="tw"><table>
+<thead><tr><th>Question</th><th>Answer</th><th>Basis</th></tr></thead>
+<tbody>
+<tr><td><b>Big customer withdrawing funds?</b></td><td><b>No.</b> The biggest "customers" were brand-new accounts opened 70 minutes apart, funded with ~$1,100 each</td><td class="dim">All 5 withdrawal-whale accounts opened 2026-09-17 18:15–19:26 UTC</td></tr>
+<tr><td><b>Was money stolen from us?</b></td><td><b>Yes.</b> Profit was manufactured through the liquidation/take-over path, not earned by trading</td><td class="dim">Different accounts "earned" identical amounts to 4 decimal places — impossible by trading</td></tr>
+<tr><td><b>Is it over?</b></td><td><b>No.</b> Unwithdrawn loot remains inside; the mechanism is not yet fixed</td><td class="dim">221,831 YELLOW available in attacker account 0x42Cb…46f at snapshot time</td></tr>
+</tbody>
+</table></div>
+
+<h2>Who should read what</h2>
+<ul class="plain">
+<li><b>Everyone</b> — pages 1–3 (verdict, what happened, why we are sure)</li>
+<li><b>Ops / on-call</b> — page 9 action list (pause status, freeze list on page 7)</li>
+<li><b>Engineers</b> — pages 4–6 (timeline, method, money trail) and page 8 evidence</li>
+<li><b>Management / legal</b> — page 6 losses and page 10 open questions</li>
+</ul>
+</section>
+</article>
+
+<!-- ═══ 2 What happened ═══ -->
+<article class="panel" id="p-what" hidden>
+<header>
+<div class="eyebrow">2 · What Happened</div>
+<h1>The alert, in plain words</h1>
+<p class="standfirst">No prior knowledge of the trading system is needed for this page. It explains what "platform balance on the smart contract" means and what actually moved overnight.</p>
+</header>
+<section>
+<h2>The alert</h2>
+<ul class="plain">
+<li><b>When</b> — overnight, 2026-09-17 → 2026-09-18 (all times in this report are UTC)</li>
+<li><b>Who raised it</b> — customer service: "platform balance on smart contract went down during this night a lot"</li>
+<li><b>Which contract</b> — the custody vault <code>0x3a9624f9BB2Dc43E90c0699DDc4A9b6BEc147Cde</code> — the on-chain safe that holds customer assets backing platform balances</li>
+</ul>
+
+<h2>Two very different stories that fit the same symptom</h2>
+<div class="layers">
+<div class="layer">
+<div class="layer-n">Story A<small>innocent — large customer withdrawal</small></div>
+<p class="layer-d">A real user who deposited and traded for a long time asks to withdraw a large balance. The vault pays out, the balance drops. Everything the platform's books say matches the chain. Nobody lost anything.</p>
+</div>
+<div class="layer">
+<div class="layer-n">Story B<small>criminal — funds manufactured then drained</small></div>
+<p class="layer-d">Someone tricks the trading system into <b>creating balances that were never earned or deposited</b>, converts them to tokens, and withdraws. The vault pays out exactly the same way — the difference is that the money being paid out <b>was never real</b>. The loss lands on the platform (insurance pool), not on any customer.</p>
+</div>
+</div>
+
+<h2>How we tell them apart</h2>
+<p class="section-note">One accounting identity decides it: every legitimate withdrawal has a matching record of <b>where the money came from</b> — a deposit, a trade, a transfer, a reward. We traced every large withdrawal of the night back through the platform's ledgers.</p>
+<div class="call"><p class="call-t">What we found</p><p>Every big withdrawal of the night traced back to the same dead end: a <b>perpetual-futures account opened minutes earlier</b>, funded with ~$1,100, that "earned" $23,400–$24,082 within minutes — <b>in identical amounts across unrelated accounts</b> — then handed the money to a fresh spot account that bought YELLOW and withdrew. That is Story B, executed by a coordinated group.</p></div>
+</section>
+</article>
+
+<!-- ═══ 3 Why It Is Theft ═══ -->
+<article class="panel" id="p-why" hidden>
+<header>
+<div class="eyebrow">3 · Why We Are Sure</div>
+<h1>Five fingerprints of the attack</h1>
+<p class="standfirst">Each one alone is suspicious. Together they are conclusive. Every claim links to ledger evidence on page 8.</p>
+</header>
+<section>
+<div class="tw"><table>
+<thead><tr><th>#</th><th>Fingerprint</th><th>What a real customer looks like</th><th>What we found</th></tr></thead>
+<tbody>
+<tr><td class="mono-c">1</td><td><b>Brand-new accounts</b></td><td class="dim">Months-old accounts with history</td><td>All 5 withdrawal whales opened 2026-09-17, 18:15–19:26 — within 70 minutes of each other</td></tr>
+<tr><td class="mono-c">2</td><td><b>Nothing deposited, fortunes withdrawn</b></td><td class="dim">Withdrawals ≤ what was deposited/earned</td><td>~$1,100 deposited each; $23,400–$24,082 withdrawn each; <b>YELLOW was never deposited on-chain by anyone</b></td></tr>
+<tr><td class="mono-c">3</td><td><b>Identical "profits"</b></td><td class="dim">Trading PnL differs per account</td><td>0x83C6 earned 24,082.868308; 0xb0f3 earned 24,082.8765; 0xE9e6 24,082.8765; 0xdeF0 24,082.8765; two more earned exactly 23,400.00 — <b>deterministic payouts, not trading</b></td></tr>
+<tr><td class="mono-c">4</td><td><b>Trades against the zero address</b></td><td class="dim">Trades only between real users</td><td>23 TAOUSDT-PERP trades where the maker is <code>0x000…000</code> (the system itself): ~910 TAO sold to the system at market price, plus repeated <b>price-0 probe trades</b></td></tr>
+<tr><td class="mono-c">5</td><td><b>Withdrawal pattern built to evade limits</b></td><td class="dim">One or few large withdrawals</td><td>109 YELLOW withdrawals of 6,000–8,888 each, seconds apart, peak hour = 132 withdrawals</td></tr>
+</tbody>
+</table></div>
+
+<h2>The one-line proof</h2>
+<div class="call warn"><p class="call-t">Money does not behave like this by accident</p><p>Fifteen accounts, opened the same evening, each depositing ~$1,100, each "winning" the <b>same amount to four decimal places</b> on the <b>same market</b> (TAOUSDT-PERP) within minutes, each converting to the <b>same token</b> (YELLOW) at an unusually favourable price, then withdrawing in <b>identical-size chunks</b> under the per-transaction cap. That is a machine, not a trader.</p></div>
+</section>
+</article>
+
+<!-- ═══ 4 Timeline ═══ -->
+<article class="panel" id="p-timeline" hidden>
+<header>
+<div class="eyebrow">4 · Timeline</div>
+<h1>Twelve hours, four phases</h1>
+<p class="standfirst">All times UTC, 2026-09-17 → 09-18. Four phases: probe the flaw → exploit it → convert the loot → drain the vault.</p>
+</header>
+<section>
+<div class="tw"><table class="tl">
+<thead><tr><th>Time (UTC)</th><th>Phase</th><th>Event</th><th>Evidence ref</th></tr></thead>
+<tbody>
+<tr><td>14:22:10</td><td><span class="phase p1">PROBE</span></td><td>First micro-sell (0.0003 TAO) against the system's take-over counterparty — testing the mechanism</td><td class="dim">trade 69950fd1… maker 0x000…000</td></tr>
+<tr><td>14:22–15:39</td><td><span class="phase p2">EXPLOIT</span></td><td>Three large sells — 291 / 326 / 293 TAO at ~$228–229 — forced onto the system counterparty (~$210k notional taken over)</td><td class="dim">perps_trades, takers 0x535c… / 0x7152…</td></tr>
+<tr><td>17:30–19:35</td><td><span class="phase p1">PROBE</span></td><td>≥6 accounts run repeated price-0 micro-sells against the same counterparty — refining the trigger</td><td class="dim">12+ zero-price trades</td></tr>
+<tr><td>18:01</td><td><span class="phase p1">PREP</span></td><td>Separate cluster (0x3030… / 0x5E1c… / 0x1b7B…) bounces YELLOW between accounts at millisecond intervals — suspicious price preparation on the YELLOW market</td><td class="dim">spot_sends, 18:01:03–18:01:25</td></tr>
+<tr><td>18:15–19:26</td><td><span class="phase p3">LAUNDER</span></td><td>Five fresh accounts opened (18:15 / 19:02 / 19:21 ×2 / 19:26) — the future withdrawal whales</td><td class="dim">spot_accounts.opened_at</td></tr>
+<tr><td>18:54–18:57</td><td><span class="phase p2">EXTRACT</span></td><td>First perps→spot transfers: two accounts cash out exactly 23,400.00 each; 30,000 moved in by the main exploiter</td><td class="dim">perps account_transfers</td></tr>
+<tr><td>19:09–19:12</td><td><span class="phase p2">EXTRACT</span></td><td>Three more accounts cash out 24,082.87 each</td><td class="dim">perps account_transfers</td></tr>
+<tr><td>19:31–19:36</td><td><span class="phase p2">EXTRACT</span></td><td>The five whales transfer out 24,082.87 / 24,082.87 / 21,889 + 4,642 … — <b>12 transfers totalling $251,020.94</b></td><td class="dim">perps account_transfers</td></tr>
+<tr><td>19:42</td><td><span class="phase p3">CONVERT</span></td><td>Whale buys 24,101 YELLOW for 857.92 USDT (≈ 0.0356 each) — favourable price; buys continue in bulk</td><td class="dim">ledger txn 296756893</td></tr>
+<tr><td>19:39–01:40</td><td><span class="phase p3">DRAIN</span></td><td>Chunked withdrawals: 109 × YELLOW (6,000–8,888 each), plus USDT/ETH/WBTC</td><td class="dim">cage.pending_withdrawals</td></tr>
+<tr><td>01:00–01:59</td><td><span class="phase p3">DRAIN</span></td><td>Peak hour: <b>132 withdrawals, 411,757 YELLOW</b></td><td class="dim">cage.pending_withdrawals</td></tr>
+<tr><td>07:14</td><td><span class="phase p3">DRAIN</span></td><td>Last withdrawal of the night recorded</td><td class="dim">cage.pending_withdrawals</td></tr>
+<tr><td>08:03</td><td><span class="phase">REVIEW</span></td><td>Investigation snapshot — this report's data cut</td><td class="dim">DB replica read</td></tr>
+</tbody>
+</table></div>
+<div class="call warn"><p class="call-t">The mechanism was probed for hours before the money moved</p><p>First probe at 14:22, first extraction at 18:54. The four-hour gap is the attackers learning exactly how to trigger the payout. Any monitoring on "trades with the zero-address counterparty" or "price-0 fills" would have caught this before a dollar left.</p></div>
+</section>
+</article>
+
+<!-- ═══ 5 Method ═══ -->
+<article class="panel" id="p-method" hidden>
+<header>
+<div class="eyebrow">5 · Attack Method</div>
+<h1>How the money was manufactured</h1>
+<p class="standfirst">A plain-language walkthrough of the exploit chain. Terms are explained as they appear; the technical record is on page 8.</p>
+</header>
+<section>
+<h2>Background you need (30 seconds)</h2>
+<ul class="plain">
+<li><b>Perpetuals ("perps")</b> — futures-style contracts with leverage; profit and loss settle in USDT</li>
+<li><b>Liquidation / take-over</b> — when a leveraged trader cannot cover their losses, the system seizes and closes the position; the system itself becomes the counterparty (it appears in trade records as the <b>zero address 0x000…000</b>); normally the seized trader is closed at a penalty price and the difference is covered by the <b>insurance pool</b></li>
+<li><b>Custody vault</b> — the on-chain safe (the contract from the CS report); on-chain withdrawals are paid from it</li>
+</ul>
+
+<h2>The chain, step by step</h2>
+<ol class="steps n">
+<li><b>Find the flaw</b><span>Probe accounts sell tiny amounts while deliberately triggering the take-over path. Some probes execute at <b>price 0</b> — trades that a healthy system would never match. The system counterparty accepts them, which reveals the flaw: the take-over settlement can be made to pay out at attacker-chosen prices.</span></li>
+<li><b>Force the system to buy</b><span>The exploiters sell ~910 TAO (~$210k notional) onto the system counterparty at market price. The system's side of these trades is funded from the insurance pool — real platform money leaves the system here.</span></li>
+<li><b>Collect as "trading profit"</b><span>The perp accounts of the freshly-opened whale accounts register large gains and transfer them to their spot accounts — <b>12 transfers, $251,020.94</b>. The identical amounts (24,082.87 ×4, 23,400.00 ×2 …) show a fixed formula, not market outcomes.</span></li>
+<li><b>Convert to YELLOW</b><span>The loot buys YELLOW at ~0.0356 USDT — a price made favourable by a separate cluster churning the YELLOW market an hour earlier. Converting to YELLOW moves the value into a token the vault pays out on-chain.</span></li>
+<li><b>Drain the vault</b><span>109 withdrawals of 6,000–8,888 YELLOW each (sized to stay under per-transaction limits), 52 small ETH withdrawals, 14 USDT withdrawals. This is the balance drop customer service saw.</span></li>
+</ol>
+
+<h2>Division of labour</h2>
+<div class="tw"><table>
+<thead><tr><th>Group</th><th>Addresses</th><th>Role</th><th>Withdrew?</th></tr></thead>
+<tbody>
+<tr><td><b>Probers / main exploiters</b></td><td class="mono-c">0x535c…f283 · 0x7152…fDFf · 0x82AB…62A0 · 0xfA11…1B0E</td><td>Ran the zero-address trades: the big ~$210k sells and the price-0 probes</td><td class="dim">Not yet at snapshot (loot likely moved on to the whale accounts)</td></tr>
+<tr><td><b>Withdrawal whales</b></td><td class="mono-c">0x83C6…1654 · 0x4762…9090 · 0xb0f3…b165 · 0xdeF0…71a7 · 0x1e18…9802</td><td>Fresh accounts that "earned" the deterministic profits, bought YELLOW, drained the vault</td><td><b>Yes — fully drained</b></td></tr>
+<tr><td><b>Price preparation</b></td><td class="mono-c">0x3030…0180 · 0x5E1c…3CB1 · 0x1b7B…9696</td><td>Millisecond YELLOW wash-sends at 18:01, one hour before the whales bought</td><td class="dim">Not directly (preparation role)</td></tr>
+<tr><td><b>Holding account</b></td><td class="mono-c">0x42Cb…146f</td><td>Extracted 23,400 at 18:56, converted, still holds <b>221,831 YELLOW</b></td><td><b>No — the biggest unwithdrawn loot</b></td></tr>
+<tr><td><b>Unknown status</b></td><td class="mono-c">0xe1ae…59Bb</td><td><b>Old account (March 2026) holding $229,563 USDT</b> that also ran a price-0 probe — compromised legitimate account or insider</td><td class="dim">No — under investigation</td></tr>
+</tbody>
+</table></div>
+
+<div class="call"><p class="call-t">Important nuance for engineers</p><p>The <b>withdrawal system worked correctly</b> — every withdrawal was properly reserved, debited, and finalized; withdrawals-vs-ledger reconciliation matches. The theft happened one layer earlier: the <b>liquidation / take-over settlement paid out money it should never have paid</b>, and those balances were then withdrawn quite legitimately. This is why withdrawal monitoring alone cannot catch this class of attack — the take-over settlement path is the control that failed.</p></div>
+</section>
+</article>
+
+<!-- ═══ 6 Money ═══ -->
+<article class="panel" id="p-money" hidden>
+<header>
+<div class="eyebrow">6 · Money &amp; Losses</div>
+<h1>Where every dollar went</h1>
+<p class="standfirst">The full money trail, from manufacture to on-chain exit. Figures are exact ledger values at the 08:03 UTC snapshot.</p>
+</header>
+<section>
+<h2>The trail</h2>
+<div class="layers">
+<div class="layer">
+<div class="layer-n">Insurance / system side<small>the source of the loss</small></div>
+<p class="layer-d"><b>~$210k notional</b> TAO exposure forced onto the system counterparty (zero-address take-overs, 14:22–15:39) + settlement flows funding the deterministic payouts. Net system loss booked here — exact insurance-pool impact pending (see page 10).</p>
+</div>
+<div class="arrow">↓ 12 perps→spot transfers, $251,020.94</div>
+<div class="layer">
+<div class="layer-n">Whale spot accounts<small>transit</small></div>
+<p class="layer-d">24,082.87 × 4 · 23,400.00 × 2 · 21,889.44 + 4,642.94 + 928.59 + 185.71 (0x1e18) · 30,000 in/out (0x535c). Each account deposited only ~$1,100.</p>
+</div>
+<div class="arrow">↓ buy YELLOW @ ~0.0356 · wash-cluster price prep at 18:01</div>
+<div class="layer">
+<div class="layer-n">YELLOW conversions<small>transit</small></div>
+<p class="layer-d">Example: 24,101.874 YELLOW for 857.92 USDT (whale 0x83C6, 19:42:42). Bulk buys continue through the evening; ~$15k of USDT bought ~420k YELLOW.</p>
+</div>
+<div class="arrow">↓ 177 withdrawal requests, 19:39 → 07:14</div>
+<div class="layer hi">
+<div class="layer-n">On-chain exit<small>what customer service saw</small></div>
+<p class="layer-d"><b>YELLOW 424,354.185</b> (109 wd) · <b>USDT 17,196.10</b> (14 wd) · <b>ETH 6.05</b> (52 wd) · <b>WBTC 0.037</b> (2 wd) — paid out from custody vault 0x3a96…47Cd. Recipient addresses are in the withdrawal records for on-chain tracing.</p>
+</div>
+</div>
+
+<h2>Exposure at snapshot</h2>
+<div class="stats">
+<div class="stat bad"><div class="v">$251,020</div><div class="k">total manufactured (perps→spot)</div></div>
+<div class="stat bad"><div class="v">~$232k</div><div class="k">already converted &amp; gone (est. YELLOW + USDT + ETH + WBTC out)</div></div>
+<div class="stat warn"><div class="v">221,831 <small>YELLOW</small></div><div class="k">0x42Cb… available · single largest unwithdrawn loot</div></div>
+<div class="stat warn"><div class="v">$229,563</div><div class="k">0xe1ae… USDT · status unknown (old account, probed)</div></div>
+</div>
+
+<div class="call warn"><p class="call-t">Why the withdrawn YELLOW looks "small" in USDT</p><p>424k YELLOW at the attackers' buy price (~0.0356) is ~$15k — but they spent only part of the extracted USDT on YELLOW. The remaining extracted USDT either sits in attacker accounts, was used in the wash cluster, or awaits conversion. The <b>$251k extraction number, not the YELLOW count, is the true loss measure</b> — plus whatever the insurance pool absorbed in the take-overs.</p></div>
+</section>
+</article>
+
+<!-- ═══ 7 Accounts ═══ -->
+<article class="panel" id="p-accounts" hidden>
+<header>
+<div class="eyebrow">7 · Attacker Accounts</div>
+<h1>Freeze list</h1>
+<p class="standfirst">Every account linked to the attack, with role and balance at snapshot. Treat as one actor. All balances are frozen-pending — freeze spot AND perps sides, plus withdrawal blacklist.</p>
+</header>
+<section>
+<div class="tw"><table>
+<thead><tr><th>Address</th><th>Opened</th><th>Role</th><th>Balance at snapshot</th><th>Action</th></tr></thead>
+<tbody>
+<tr><td class="mono-c">0x42Cb0366aEDEcf22C9849Cde1b5d91d3B485146f</td><td class="dim">09-17 18:48</td><td>Extractor, holding loot</td><td><b>221,831.64 YELLOW</b> + 183.45 USDT — fully available</td><td><span class="pill no">FREEZE — top priority</span></td></tr>
+<tr><td class="mono-c">0x535c651a1f77b1Fa53268C5df604ea0C2E36f283</td><td class="dim">—</td><td>Main exploiter (big zero-address sells, 30k moved)</td><td class="dim">&lt;100 USDT visible on spot</td><td><span class="pill no">FREEZE</span></td></tr>
+<tr><td class="mono-c">0x7152241C09FB00d49195274a0C4A99b7e178fDFf</td><td class="dim">—</td><td>Exploiter (first probe + big sells)</td><td class="dim">&lt;100 USDT visible</td><td><span class="pill no">FREEZE</span></td></tr>
+<tr><td class="mono-c">0x82AB8aA2870a319554cb70372474827E5eF362A0</td><td class="dim">—</td><td>Prober (price-0 + half-price fills)</td><td class="dim">&lt;100 USDT visible</td><td><span class="pill no">FREEZE</span></td></tr>
+<tr><td class="mono-c">0xfA113f1A6c42Db00454cB82d7fcF205bff251B0E</td><td class="dim">—</td><td>Prober (price-0 + half-price fills)</td><td class="dim">&lt;100 USDT visible</td><td><span class="pill no">FREEZE</span></td></tr>
+<tr><td class="mono-c">0xA22ae3Fa55819d78d4eb903618F6F23aadE8cb1e</td><td class="dim">09-17 18:47</td><td>Extractor (23,400)</td><td>194.44 USDT — converted &amp; withdrawn</td><td><span class="pill no">FREEZE</span></td></tr>
+<tr><td class="mono-c">0xE9e66833bFd8B380b706b1911A06f847ffC83f9c</td><td class="dim">—</td><td>Extractor (24,082.87)</td><td class="dim">drained</td><td><span class="pill no">FREEZE</span></td></tr>
+<tr><td class="mono-c">0x83C64f15B531e4625a38aED0E24fa12651dC1654</td><td class="dim">09-17 19:21</td><td>Whale #1 — 72 wd, 312k YELLOW</td><td class="dim">drained</td><td><span class="pill no">FREEZE</span></td></tr>
+<tr><td class="mono-c">0x4762d025dd6e82633bA4962a6B2F0879C48b9090</td><td class="dim">09-17 18:15</td><td>Whale #2 — 51,948 YELLOW</td><td class="dim">drained</td><td><span class="pill no">FREEZE</span></td></tr>
+<tr><td class="mono-c">0xb0f35539C34BB879c6F32cffFB0f3940Aa73b165</td><td class="dim">09-17 19:26</td><td>Whale #3 — 49,950 YELLOW</td><td class="dim">drained</td><td><span class="pill no">FREEZE</span></td></tr>
+<tr><td class="mono-c">0xdeF0d7d1c12229aCC150327a35E86B36be8171a7</td><td class="dim">09-17 19:02</td><td>Whale #4 — 7,000 YELLOW</td><td class="dim">drained</td><td><span class="pill no">FREEZE</span></td></tr>
+<tr><td class="mono-c">0x1e18C78F57B931F3845be47641f2802c26069802</td><td class="dim">09-17 19:21</td><td>Whale #5 — multi-asset wd</td><td class="dim">drained</td><td><span class="pill no">FREEZE</span></td></tr>
+<tr><td class="mono-c">0x169a8Aa84Dee8580d9B29211AC342b6AB1739f89</td><td class="dim">09-17 17:44</td><td>Funding mule (deposits)</td><td>1,000 USDT</td><td><span class="pill no">FREEZE</span></td></tr>
+<tr><td class="mono-c">0xB01593fbC2Bf9eCD92A2891C80c197Fca8aa7928</td><td class="dim">—</td><td>Funding mule (repeated 1,100 deposits + transfers)</td><td class="dim">small</td><td><span class="pill no">FREEZE</span></td></tr>
+<tr><td class="mono-c">0x05Ccf74e71eE70674FC4192D56e4d7aF5E151bA7</td><td class="dim">—</td><td>Funding mule</td><td class="dim">small</td><td><span class="pill no">FREEZE</span></td></tr>
+<tr><td class="mono-c">0xB67765060554B304Ca07B3B0F997CC6a67D5BaD2</td><td class="dim">—</td><td>Funding mule</td><td class="dim">small</td><td><span class="pill no">FREEZE</span></td></tr>
+<tr><td class="mono-c">0x0037929280C5803eF5b9CB13849906B3D822D656</td><td class="dim">—</td><td>Funding mule</td><td class="dim">small</td><td><span class="pill no">FREEZE</span></td></tr>
+<tr><td class="mono-c">0xe23FC513D1d83CF823411Bd7c124b5b0E83f5604</td><td class="dim">—</td><td>Funding mule</td><td class="dim">small</td><td><span class="pill no">FREEZE</span></td></tr>
+<tr><td class="mono-c">0x4f47CF6e8A9CC61483aeB0c9BCEcf99121D5b2D2</td><td class="dim">—</td><td>Funding mule</td><td class="dim">small</td><td><span class="pill no">FREEZE</span></td></tr>
+<tr><td class="mono-c">0x303029E75C94A3F75bdAe9a0129232EAf09f0180</td><td class="dim">old</td><td>YELLOW wash cluster</td><td class="dim">YELLOW holder (2.5M+ cluster member 0x1b7B separately)</td><td><span class="pill gap">FREEZE pending review</span></td></tr>
+<tr><td class="mono-c">0x5E1cA31B28a5750823F660cDFF71567835D13CB1</td><td class="dim">old</td><td>YELLOW wash cluster</td><td class="dim">—</td><td><span class="pill gap">FREEZE pending review</span></td></tr>
+<tr><td class="mono-c">0x1b7Bb48D02C012C7fFe503484319d1EAdEAd9696</td><td class="dim">2026-03-30</td><td>YELLOW wash cluster · holds 2.5M YELLOW</td><td>2,500,267 YELLOW</td><td><span class="pill gap">INVESTIGATE — may be pre-existing holder used as liquidity</span></td></tr>
+<tr><td class="mono-c">0xe1ae2Bff86D3dF8D7f7f4B37E44Bc686a68859Bb</td><td class="dim"><b>2026-03-07</b></td><td><b>Old account that ran a price-0 probe</b></td><td><b>229,563.85 USDT</b> (225,016 available)</td><td><span class="pill gap">INVESTIGATE — freeze until cleared</span></td></tr>
+</tbody>
+</table></div>
+<div class="call"><p class="call-t">How to use this list</p><p>Freeze = block deposits-in-credit, trading, transfers, and withdrawals for both the spot and perps sides of each address, and add to the cage withdrawal blacklist. "Pending review" entries need ownership investigation before freezing — 0x1b7B holds 2.5M YELLOW from long before the incident (possible legitimate holder whose liquidity the attackers used).</p></div>
+</section>
+</article>
+
+<!-- ═══ 8 Evidence ═══ -->
+<article class="panel" id="p-evidence" hidden>
+<header>
+<div class="eyebrow">8 · Evidence</div>
+<h1>The ledger record</h1>
+<p class="standfirst">For engineers and auditors: the exact records behind every claim. All from the production read replica, snapshot 2026-09-18 08:03 UTC. Schema references: <code>cage.*</code>, <code>portfolio_manager.*</code>, <code>portfolio_manager_perp.*</code>.</p>
+</header>
+<section>
+<h3>E1 · Withdrawals of the night (cage.pending_withdrawals, 24h)</h3>
+<pre>asset_symbol | n   | total
+YELLOW       | 109 | 424,354.185
+USDT         | 14  | 17,196.1043
+ETH          | 52  | 6.05
+WBTC         | 2   | 0.037
+hour peak: 01:00–01:59 UTC → 132 withdrawals, 411,757.78 YELLOW
+top owners: 0x83C6… (72 wd) · 0xb0f3… (25) · 0x4762… (10) · 0x1e18… (4) · 0xdeF0… (3)</pre>
+
+<h3>E2 · Deterministic extraction (portfolio_manager_perp.account_transfers)</h3>
+<pre>18:56  0xA22ae3…  perps→spot  23,400.000000000000000000
+18:56  0x42Cb03…  perps→spot  23,400.000000000000000000
+19:12  0xE9e668…  perps→spot  24,082.876500000000000000
+19:12  0xdeF0d7…  perps→spot  24,082.876500000000000000
+19:35  0x83C64f…  perps→spot  24,082.868308000000000000
+19:36  0xb0f355…  perps→spot  24,082.876500000000000000
+19:35  0x1e18C7…  perps→spot  21,889.445642  (+4,642.94 +928.59 +185.71)
+       TOTAL (12 transfers >5k) = 251,020.943450 USDT</pre>
+
+<h3>E3 · Zero-address (system-counterparty) trades (perps_trades, TAOUSDT-PERP)</h3>
+<pre>14:22:47  sell 291.468 TAO @ 228.61   taker 0x535c651a…
+14:23:48  sell 326.047 TAO @ 229.11   taker 0x535c651a…
+15:39:35  sell 293.421 TAO @ 228.50   taker 0x535c651a…
+          (≈ $210k notional taken over by the system)
+17:30→19:35  12+ sells @ price 0.0000, sizes 0.0001–0.0009
+          takers: 0x7152… · 0x535c… · 0xe1ae… · 0xfA11… · 0x82AB… · 0x4762…
+18:56:30  sells @ 108.73 (≈ half market) takers 0xfA11… · 0x82AB…
+23 trades total · 950.42 TAO volume · maker_owner = 0x0000000000000000000000000000000000000000</pre>
+
+<h3>E4 · Whale #1 origin trace (spot_ledger_entries, account 0x83C6…)</h3>
+<pre>19:21:04  account opened
+19:23:01  on-chain deposit confirmed: 1,100 USDT (cage tx 0xc49c532b…)
+19:35:33  transfer_in +24,082.87 USDT  (from own perps account, txn 296755034)
+19:36–19:42  micro wash-trades (ETH/WBTC buys, 0.001 units)
+19:42:42  trade: BUY 24,101.874 YELLOW for 857.92 USDT @ 0.03558  (txn 296756893)
+19:43:09  withdrawal_reserve: 29,970 YELLOW locked  (txn 296757010)
+…         bulk YELLOW buys → chunked withdrawals through 01:40
+          YELLOW on-chain deposits by this account: NONE (never)</pre>
+
+<h3>E5 · YELLOW wash preparation (spot_sends, 18:01)</h3>
+<pre>18:01:03–18:01:25  ~20 YELLOW sends between 0x3030… / 0x5E1c… / 0x1b7B…
+sizes 154–2,565 YELLOW, alternating directions, millisecond spacing
+hour before the whales' YELLOW buys — consistent with price preparation</pre>
+
+<h3>E6 · Unwithdrawn loot (spot_account_balances @ snapshot)</h3>
+<pre>0x42Cb0366…  YELLOW 221,831.64 (all available) + USDT 183.45   ← FREEZE FIRST
+0xe1ae2Bff…  USDT  229,563.85 (225,016 available)   ← old account, probed price-0
+0x169a8Aa8…  USDT  1,000.00                          ← funding mule</pre>
+
+<div class="call"><p class="call-t">Ledger sign convention (for anyone reading raw rows)</p><p>In these ledgers <b>debit = balance increase, credit = balance decrease</b> (verified against a known on-chain deposit). A <code>withdrawal_reserve</code> pair is: credit AVAILABLE + debit LOCKED. Quoted amounts above are already normalized to plain reading.</p></div>
+</section>
+</article>
+
+<!-- ═══ 9 Actions ═══ -->
+<article class="panel" id="p-actions" hidden>
+<header>
+<div class="eyebrow">9 · Action List</div>
+<h1>What must happen now</h1>
+<p class="standfirst">Ordered by urgency. Owners to be assigned; tick only when verified done.</p>
+</header>
+<section>
+<h3>Immediate (hours)</h3>
+<ol class="steps n">
+<li><b>Keep withdrawal processing paused</b><span>Cage withdrawal pipeline stays off until the freeze list is applied and the take-over mechanism is disabled or guarded. Every minute of uptime is exposure for the 221,831 YELLOW still inside.</span></li>
+<li><b>Apply the freeze list</b><span>All 19 FREEZE addresses from page 7 — spot + perps sides + withdrawal blacklist. Freeze before unfreezing withdrawals for everyone else.</span></li>
+<li><b>Disable or guard the TAOUSDT-PERP take-over path</b><span>At minimum halt TAOUSDT-PERP trading; ideally disable the settlement path that paid the zero-address trades until patched. Check every other perp market for the same pattern (query E3 across markets).</span></li>
+<li><b>Measure the insurance pool damage</b><span>Query the insurance/settlement accounts for the 14:22–15:39 take-over window — establishes the true platform-side loss (may exceed the $251k extracted).</span></li>
+<li><b>Preserve evidence</b><span>Snapshot: finex TAOUSDT WAL + order book state, PM-perp logs (14:00–02:00), taken_over_positions full export, cage logs, this report's queries. Freeze the replica snapshot if possible.</span></li>
+</ol>
+<h3>Short term (1–2 days)</h3>
+<ol class="steps n" start="6">
+<li><b>On-chain tracing of withdrawn funds</b><span>424k YELLOW + USDT/ETH/WBTC recipient addresses from cage records → follow hops, exchange deposits, mixers; prepare exchange freeze requests with tx hashes.</span></li>
+<li><b>Root-cause the settlement flaw</b><span>How did price-0 and take-over trades settle at attacker-favourable prices? Where is the price-band / risk check that should have rejected them? (finex matching + PM-perp take-over settlement code paths.)</span></li>
+<li><b>Sweep for missed patterns</b><span>Same queries across ALL markets and a longer window — establish the full attacker footprint and whether earlier/smaller runs happened before 09-17.</span></li>
+<li><b>Investigate 0xe1ae2Bff</b><span>Old account with $229k that probed the flaw — determine compromised vs. complicit before any funds move.</span></li>
+<li><b>Customer communication</b><span>No customer funds are affected (loss is platform/insurance side); withdrawals paused platform-wide as a precaution. CS should have the one-paragraph version from page 2.</span></li>
+</ol>
+<h3>Follow-up</h3>
+<ol class="steps n" start="11">
+<li><b>Monitoring on the signature of this attack</b><span>Alert on: any trade with zero-address counterparty · any fill at price ≤ 1% of mark · new account withdrawing &gt; 5× its total deposits · N withdrawals same-size within an hour.</span></li>
+<li><b>Post-mortem &amp; control fixes</b><span>After root cause: price sanity checks in settlement, take-over payout limits, exploit-resistant insurance drawdown caps.</span></li>
+</ol>
+</section>
+</article>
+
+<!-- ═══ 10 Open Questions ═══ -->
+<article class="panel" id="p-open" hidden>
+<header>
+<div class="eyebrow">10 · Open Questions</div>
+<h1>What we do not know yet</h1>
+<p class="standfirst">Honest gaps at report time v1 — each with the next query or log needed to close it.</p>
+</header>
+<section>
+<ul class="plain">
+<li><b>Exact settlement flaw mechanics</b> — which code path allowed price-0 fills and market-price take-over payouts? <span class="dim">Needs: finex TAOUSDT WAL replay + PM-perp take-over settlement logs; taken_over_positions export (query blocked by replica recovery conflict at snapshot — rerun).</span></li>
+<li><b>True insurance-pool loss</b> — the $251k is what reached attacker accounts; system-side take-over losses may be larger. <span class="dim">Needs: insurance/settlement account ledger for 09-17 14:00–16:00.</span></li>
+<li><b>0xe1ae2Bff status</b> — legitimate holder gone rogue, or a compromised long-standing account? <span class="dim">Needs: its auth/session history, IP logs, historical trading pattern.</span></li>
+<li><b>Attacker funding source</b> — the ~$1,100 × N on-chain deposits came from which addresses? <span class="dim">Needs: on-chain trace of the deposit tx hashes (cage.deposits).</span></li>
+<li><b>Wash-cluster relationship</b> — are 0x3030/0x5E1c/0x1b7B part of the attack, or legitimate holders whose market was used? <span class="dim">Needs: their full YELLOW send/trade history vs. the attack timeline.</span></li>
+<li><b>Any earlier runs</b> — was 09-17 the first attempt? <span class="dim">Needs: zero-address trade query extended back weeks (same E3 query, wider window).</span></li>
+<li><b>Remaining loot total</b> — beyond 0x42Cb's 221,831 YELLOW and 0xe1ae's $229k, how much extracted value sits in other accounts? <span class="dim">Needs: full balance sweep of every address that touched the exploit cluster (graph query over transfers).</span></li>
+</ul>
+<div class="call"><p class="call-t">Report status</p><p>v1 — 2026-09-18, from production read-replica data (snapshot 08:03 UTC). Prepared during active incident; numbers are ledger-exact, interpretations marked. Update cadence: after freeze confirmation, insurance measurement, and root cause.</p></div>
+</section>
+</article>
+
+</div><!-- main -->
+</div><!-- shell -->
+
+<script>
+(function(){
+  var tabs=document.querySelectorAll('nav.tabs a');
+  var panels=document.querySelectorAll('article.panel');
+  function show(id){
+    panels.forEach(function(p){p.hidden=p.id!=='p-'+id;});
+    tabs.forEach(function(a){a.classList.toggle('on',a.getAttribute('href')==='#'+id);});
+    window.scrollTo({top:0,behavior:'instant'});
+  }
+  tabs.forEach(function(a){
+    a.addEventListener('click',function(e){e.preventDefault();show(this.getAttribute('href').slice(1));});
+  });
+  show('verdict');
+})();
+</script>

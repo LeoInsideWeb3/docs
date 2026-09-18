@@ -124,7 +124,7 @@ ol.pts b{color:var(--ink);font-weight:600}
 <a href="#actions" data-tab="actions"><span class="n">10</span>Action List</a>
 <a href="#open" data-tab="open"><span class="n">11</span>Open Questions</a>
 </nav>
-<div class="side-foot">2026-09-18 · v4<br>two bugs code-confirmed<br>send network mapped<br>CONFIDENTIAL</div>
+<div class="side-foot">2026-09-18 · v5<br>three bugs confirmed<br>replay loop measured<br>CONFIDENTIAL</div>
 </aside>
 
 <div class="main">
@@ -234,6 +234,7 @@ ol.pts b{color:var(--ink);font-weight:600}
 <div class="tw"><table class="tl">
 <thead><tr><th>Time (UTC)</th><th>Phase</th><th>Event</th><th>Evidence ref</th></tr></thead>
 <tbody>
+<tr><td>14:11→23:13</td><td><span class="phase p2">REPLAY</span></td><td>Disposal retry loop runs 9 hours — pool executes 1,878 IOC fills vs one maker (0x535c), ~2,820 TAO swept vs ~950 taken over (~3× duplication) — extraction transfers move out mid-loop</td><td class="dim">E15 · perps_trades taker=0x000</td></tr>
 <tr><td>14:22:10</td><td><span class="phase p1">PROBE</span></td><td>First micro-sell (0.0003 TAO) against the system's take-over counterparty — testing the mechanism</td><td class="dim">trade 69950fd1… maker 0x000…000</td></tr>
 <tr><td>14:22–15:39</td><td><span class="phase p2">EXPLOIT</span></td><td>Three large sells — 291 / 326 / 293 TAO at ~$228–229 — forced onto the system counterparty (~$210k notional taken over)</td><td class="dim">perps_trades, takers 0x535c… / 0x7152…</td></tr>
 <tr><td>17:30–19:35</td><td><span class="phase p1">PROBE</span></td><td>≥6 accounts run repeated price-0 micro-sells against the same counterparty — refining the trigger</td><td class="dim">12+ zero-price trades</td></tr>
@@ -268,17 +269,17 @@ ol.pts b{color:var(--ink);font-weight:600}
 <li><b>Custody vault</b> — the on-chain safe (the contract from the CS report); on-chain withdrawals are paid from it</li>
 </ul>
 
-<h2>The flaw, confirmed (v4 — two bugs, code-verified)</h2>
-<div class="call danger"><p class="call-t">Bug #1 drains the margin (no negative-balance validation) · Bug #2 turns the broken price into 0</p>
-<p>Five facts; bugs #1 and #2 are confirmed in code, the rest in evidence E7/E10/E11:</p>
+<h2>The flaw, confirmed (v5 — three bugs, code + data verified)</h2>
+<div class="call danger"><p class="call-t">Bug #1 writes the negative balance · Bug #2 turns the broken price into 0 · Bug #3 replays the payout</p>
+<p>Five facts; all three bugs verified, payout and replay verified in ledger data (E7/E10/E11/E14/E15):</p>
 <ol class="pts">
-<li><b>All exploit take-overs are CROSS margin</b> (12 of 14 records) — the cross formula is <code>bankr = entry + account_equity / size</code> with equity = balance + worst-case stress uPnL (<code>calculator/cross.go:206</code>).</li>
-<li><b>Bug #1 — the margin goes back to Spot</b> — the attacker transfers the position's margin out after opening. Raft.Apply accepts <code>BalanceChangeTypeTransfer</code> with <b>no negative-balance validation</b> (<code>fsm/balance.go:503</code> — the switch returns nil for Transfer while every other balance type validates). The account balance goes negative.</li>
-<li><b>Bug #2 — the broken price is clamped to 0</b> — with negative equity, bankr computes ≤ 0, and <code>clampSettlementPrice</code> (<code>stage1/cross/flow.go:165</code>, called at :732) <b>clamps non-positive settlement prices to 0.000</b>. 11 records show exactly 0.000; the 123-TAO record shows 108.73 (positive but out-of-band — reverse-computes equity of <b>−$14,889</b>).</li>
-<li><b>Short settles AT 0 = artificial profit</b> — a short closing at price 0 books <b>≈ entry × quantity as realized profit</b> for the attacker, paid by the settlement pool / insurance.</li>
-<li><b>The payout side was pre-positioned</b> — the whales were the maker side of TAOUSDT-PERP: 860–1,382 TAO of maker volume each at 230.5→284, placed <b>1–2 minutes before each take-over</b>. The pool's stage-2 disposal swept into those orders: ~860 TAO × ~$28/unit = <b>the deterministic ~$24,082.87 per whale</b>.</li>
+<li><b>All exploit take-overs are CROSS margin</b> (12 of 14) — <code>bankr = entry + account_equity / size</code>, equity = balance + worst-case stress uPnL (<code>calculator/cross.go:206</code>).</li>
+<li><b>Bug #1 — the settlement itself writes a negative balance</b> — the liquidation settles the mule's short at the <b>worst-case stress price first</b>: 0x05Cc booked <b>REALIZED_PNL −$15,413.89</b> against a ~$900 balance (E14). Raft.Apply accepts the resulting negative balance — <code>BalanceChangeTypeTransfer</code> and settlement debits pass with <b>no negative-balance validation</b> (<code>fsm/balance.go:503</code>). Note: the mules never transferred anything out (E12) — the earlier "margin transferred back to Spot" reading is corrected: the negative balance was written by the settlement's own stress-price accounting.</li>
+<li><b>Bug #2 — the broken price is clamped to 0</b> — with negative equity, bankr computes ≤ 0 and <code>clampSettlementPrice</code> (<code>flow.go:165/:732</code>) clamps it to <b>0.000</b> (11 records) or leaves it out-of-band (108.73; equity −$14,889). The short then rebooks at that price: artificial profit ≈ entry × qty.</li>
+<li><b>Bug #3 — FSM missing the settlement account → disposal replay</b> — the FSM has <b>no account 00000000-…-0005</b> (the settlement pool). Stage-2 disposal fails on every path ("IOC execution timeout", "failed to handle liquidation trade settlement", "ADL recovery failed: account not found" — ops logs). The retry logic <b>re-sends the FULL-size IOC order</b> each cycle: the pool executed <b>1,878 fills against one maker (0x535c) over 9 hours</b>, total swept ~2,820 TAO vs ~950 TAO actually taken over — <b>~3× duplication</b> (E15).</li>
+<li><b>Every replay pays the pre-positioned book</b> — the counterparty side settles normally (their accounts exist) while the pool's side never books: the cluster's maker asks were filled again on every retry (~$24,082.87 per whale, deterministic). The perps→spot extraction ($251,020, 12 transfers) moved out <b>during the loop</b> (18:54→19:36 vs loop running 14:11→23:13).</li>
 </ol>
-<p>Remaining detail for Raft logs: which caller submitted the unvalidated Transfer balance-change (the usecase-level transfer cap in <code>margin_manager/transfer.go</code> exists — the exploit reached the FSM through a path that bypasses it and writes no saga row).</p></div><h2>The chain, step by step (plain language)</h2>
+<p>Remove any one of the three bugs and the attack collapses: no negative balance → sane bankruptcy price; no clamp → settlement rejects price 0; no replay → a single disposal instead of a 9-hour payout machine.</p></div><h2>The chain, step by step (plain language)</h2>
 <ol class="steps n">
 <li><b>Find the flaw</b><span>Probe accounts sell tiny amounts while deliberately triggering the take-over path. Some probes execute at <b>price 0</b> — trades that a healthy system would never match. The system counterparty accepts them, which reveals the flaw: the take-over settlement can be made to pay out at attacker-chosen prices.</span></li>
 <li><b>Force the system to buy</b><span>The exploiters sell ~910 TAO (~$210k notional) onto the system counterparty at market price. The system's side of these trades is funded from the insurance pool — real platform money leaves the system here.</span></li>
@@ -573,12 +574,37 @@ maker orders placed 1–2 minutes BEFORE each take-over, price range brackets th
   0x05Cc…  IN 4,200 · 0x4f47…  IN 2,000 · 0xe23F…  IN 1,100
 ZERO perps→spot rows in the saga table.
 
-v3 read this as "no transfers happened" — WRONG. v4 correction:
-the margin drain reached Raft.Apply as a BalanceChangeTypeTransfer that
-WRITES NO SAGA ROW (Bug #1 path bypasses the capped saga in
-margin_manager/transfer.go). The empty saga table is itself evidence
-of the bypass, not of absence. The debit will appear in
-perps_transactions / Raft logs (pending credentials/replica access).</pre>
+v3 read this as "no transfers happened" and v4 as "bypassed saga" —
+v5 final: NO margin drain occurred at all. perps_transactions confirms
+zero TRANSFER_OUT for every mule. The negative balance was written by
+the liquidation settlement itself (stress-price accounting, E14);
+Bug #1 is the missing negative-balance validation that let it persist.</pre>
+
+<h3>E14 · 0x05Cc settlement ledger — the negative balance, written by the settlement (perps_ledger_entries)</h3>
+<pre>18:54:27  TRANSFER_IN            +900.00
+18:55:24  open 123-TAO short     allocated 953.67 · fees −38.15
+18:56:28  REALIZED_PNL           −15,413.89   ← short settled at STRESS price 355.09 first
+18:56:29  fees                   −32.53 · −410.88 (dust leg)
+18:56:29  LIQUIDATION_COMPLETE   +14,895.22   ← rebooked at bankr 108.73 = (229.8−108.73)×123
+──────────────────────────────────────────────
+final TOTAL balance ≈ −100.23 (NEGATIVE) · zero TRANSFER_OUT all night
+⇒ the settlement's two-step accounting (stress close, then bankr rebook)
+  wrote the negative balance; Raft.Apply accepted it (Bug #1)</pre>
+
+<h3>E15 · The disposal replay loop — pool as taker (perps_trades, taker_owner = 0x000)</h3>
+<pre>maker_owner        n      volume(TAO)   price range   window (UTC)
+0x535c…f283        1,878  1,907.31       225.8→231.8   14:11:28 → 23:13:59  (9 hours, ~1 fill/17s)
+0x82AB…62A0            4    617.52       226.6→229.1   14:11:15 → 14:42:59
+0x05De…98A3            2    296.50       228.5→230.0   14:42:53 → 15:40:57
++ takeover-settlement fills vs the mules (bankr prices 0 / 108.72)
+
+total swept ~2,820 TAO vs ~950 TAO actually taken over ⇒ ~3× duplication
+ops logs for the same window: "IOC liquidation order execution timeout" ·
+"failed to handle liquidation trade settlement" ·
+"ADL recovery failed account 00000000-0000-0000-0000-000000000005: account not found"
+perps_trade_failure_entries: only 2 rows persisted (14:22:45 settlement ·
+18:56:29 validation) — most failures stayed log-only
+extraction transfers 18:54→19:36 all INSIDE the loop window</pre>
 
 <div class="call"><p class="call-t">Ledger sign convention (for anyone reading raw rows)</p><p>In these ledgers <b>debit = balance increase, credit = balance decrease</b> (verified against a known on-chain deposit). A <code>withdrawal_reserve</code> pair is: credit AVAILABLE + debit LOCKED. Quoted amounts above are already normalized to plain reading.</p></div>
 </section>
@@ -597,7 +623,7 @@ perps_transactions / Raft logs (pending credentials/replica access).</pre>
 <li><b>Keep withdrawal processing paused</b><span>Cage withdrawal pipeline stays off until the freeze list is applied and the take-over mechanism is disabled or guarded. Every minute of uptime is exposure for the 221,831 YELLOW still inside.</span></li>
 <li><b>Apply the freeze list</b><span>All FREEZE addresses from page 8 — spot + perps sides + withdrawal blacklist. Freeze before unfreezing withdrawals for everyone else.</span></li>
 <li><b>Stop the YELLOW send machine</b><span>The 09-15 send network (page 6) was still running at snapshot. Disable spot sends feature-wide during the freeze and freeze the hub accounts (0x1b7B, 0x5E1c, 0x3030, 0xfbbB, 0x7d45, 0xf57d, 0x713f).</span></li>
-<li><b>Guard the three broken controls</b><span>① Raft.Apply must validate that BalanceChangeTypeTransfer (and every debit) cannot push total balance negative — the primary fix (Bug #1)<br>② clampSettlementPrice must reject/floor out-of-band liquidation prices at a sane band of entry/mark instead of clamping to 0 (Bug #2)<br>③ audit every caller that can submit balance changes to the FSM — close the bypass around the capped saga path<br>Until patched: TAOUSDT-PERP (and ideally all perps) trading halted.</span></li>
+<li><b>Guard the three broken controls</b><span>① Raft.Apply must validate that BalanceChangeTypeTransfer (and every debit) cannot push total balance negative — the primary fix (Bug #1)<br>② clampSettlementPrice must reject/floor out-of-band liquidation prices at a sane band of entry/mark instead of clamping to 0 (Bug #2)<br>③ audit every caller that can submit balance changes to the FSM — close the bypass around the capped saga path<br>④ FSM must fail-fast on missing system accounts (0005 settlement pool) at startup and on use — a missing system account must halt liquidation, not trigger a retry loop<br>⑤ disposal retries must be idempotent (dedupe by taken-over UUID / fill tracker) — never re-send a full-size IOC for a position already disposed<br>Until patched: TAOUSDT-PERP (and ideally all perps) trading halted.</span></li>
 <li><b>Measure the insurance pool damage</b><span>Query the insurance/settlement accounts for the 14:22→01:40 window — the pool-side mirror losses (E7 realized_pnl column) establish the true platform loss.</span></li>
 <li><b>Preserve evidence</b><span>Snapshot: finex TAOUSDT WAL + order book state, PM-perp Raft logs (14:00→02:00 — pins the exact margin-drain call site), taken_over_positions full export, cage logs, this report's queries. Freeze the replica snapshot if possible.</span></li>
 <li><b>Audit agent-subaccount provisioning</b><span>Who approved/provisioned the 13 agent accounts 09-10→09-16 (auth provisioning records)? Two owners are confirmed attackers. Suspend the agent-send feature for the other 11 pending review.</span></li>
@@ -627,7 +653,7 @@ perps_transactions / Raft logs (pending credentials/replica access).</pre>
 </header>
 <section>
 <ul class="plain">
-<li><b>✅ RESOLVED — Exact settlement flaw mechanics (v4, code-confirmed)</b> — Bug #1: Raft.Apply accepts BalanceChangeTypeTransfer with no negative-balance validation (<code>fsm/balance.go:503</code>) → attacker transfers the position's margin back to Spot, balance goes negative. Bug #2: <code>clampSettlementPrice</code> (<code>flow.go:165/732</code>) clamps the resulting negative bankruptcy price to 0 → the short settles at 0 → artificial profit ≈ entry × qty, collected via the whales' pre-positioned maker book (~860 TAO × ~$28 = $24,082.87 each). <span class="dim">Remaining: the exact caller that submitted the unvalidated Transfer, and per-leg arithmetic — Raft logs (action 9).</span></li>
+<li><b>✅ RESOLVED — Exact settlement flaw mechanics (v4, code-confirmed)</b> — Bug #1: Raft.Apply accepts BalanceChangeTypeTransfer with no negative-balance validation (<code>fsm/balance.go:503</code>) → attacker transfers the position's margin back to Spot, balance goes negative. Bug #2: <code>clampSettlementPrice</code> (<code>flow.go:165/732</code>) clamps the resulting negative bankruptcy price to 0 → the short settles at 0 → artificial profit ≈ entry × qty, collected via the whales' pre-positioned maker book (~860 TAO × ~$28 = $24,082.87 each). <span class="dim">The v4 "unvalidated Transfer caller" question is closed: no transfer ever occurred (E12/E14) — the settlement's stress-price accounting wrote the negative balance. Remaining: why the FSM lacked account 0005 (snapshot/load path), and the retry call site — Raft logs (action 9).</span></li>
 <li><b>✅ RESOLVED — spot_sends account list</b> — 33 addresses + PLATFORM; 13 agent-enabled owners (09-10→09-16 provisioning), wash machine mapped since 09-15, still running. <span class="dim">Page 6, evidence E8/E9.</span></li>
 <li><b>True insurance-pool loss</b> — the $251k is what reached attacker accounts; pool-side mirror losses may be larger. <span class="dim">Needs: insurance/settlement account ledger for 09-17 14:00→09-18 02:00.</span></li>
 <li><b>Who provisioned the 13 agent accounts</b> — auth provisioning audit trail: self-service, ops-approved, or automated? Two owners are confirmed attackers; the other 11 pending KYC. <span class="dim">Needs: auth service provisioning records 09-08→09-16.</span></li>
@@ -638,9 +664,10 @@ perps_transactions / Raft logs (pending credentials/replica access).</pre>
 <li><b>Any earlier runs</b> — was 09-17 the first attempt? <span class="dim">Needs: zero-address trade query extended back weeks (E3 query, wider window) + send machine history back to 09-15 start.</span></li>
 <li><b>Remaining loot total</b> — beyond 0x42Cb's 221,831 YELLOW and 0xe1ae's $229k, how much sits in other network accounts? <span class="dim">Needs: full balance sweep of all 33 send-network + 19 freeze-list addresses.</span></li>
 </ul>
-<div class="call"><p class="call-t">Report status</p><p>v4 — 2026-09-18, production read-replica data (snapshot 08:03 UTC) + code verification. Numbers are ledger-exact; interpretations marked.</p>
-<p>v4 finalizes the root cause as two code-confirmed bugs: missing negative-balance validation for BalanceChangeTypeTransfer in Raft.Apply (fsm/balance.go:503) and clampSettlementPrice turning negative bankruptcy prices into 0 (flow.go:165). The v3 "transfer refuted" reading is corrected in E12 — the drain bypassed the saga table.</p>
-<p>Next update: after freeze confirmation, insurance measurement, and the Raft-log replay that pins the unvalidated-Transfer caller.</p></div>
+<div class="call"><p class="call-t">Report status</p><p>v5 — 2026-09-18, production read-replica data + code verification + ops logs. Numbers are ledger-exact; interpretations marked.</p>
+<p>v5 adds the third bug and the payout engine: the FSM was missing settlement account 0005 → stage-2 disposal failed → retries re-sent full-size IOC orders for 9 hours, sweeping ~3× the taken-over volume into the cluster's asks (E15).</p>
+<p>The v4 "margin transferred back to Spot" reading is corrected in E12/E14: no transfer occurred — the settlement's stress-price accounting wrote the negative balance.</p>
+<p>Next update: after freeze confirmation, insurance measurement, and the Raft-log review of the 0005 account-load failure and retry call site.</p></div>
 </section>
 </article>
 

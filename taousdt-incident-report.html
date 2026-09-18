@@ -115,15 +115,16 @@ ol.pts b{color:var(--ink);font-weight:600}
 <a href="#why" data-tab="why"><span class="n">3</span>Why It Is Theft</a>
 <div class="grp">Analysis</div>
 <a href="#timeline" data-tab="timeline"><span class="n">4</span>Timeline</a>
-<a href="#method" data-tab="method"><span class="n">5</span>Attack Method</a>
-<a href="#money" data-tab="money"><span class="n">6</span>Money &amp; Losses</a>
-<a href="#accounts" data-tab="accounts"><span class="n">7</span>Attacker Accounts</a>
+<a href="#method" data-tab="method"><span class="n">5</span>Root Cause</a>
+<a href="#agents" data-tab="agents"><span class="n">6</span>Send Network</a>
+<a href="#money" data-tab="money"><span class="n">7</span>Money &amp; Losses</a>
+<a href="#accounts" data-tab="accounts"><span class="n">8</span>Freeze List</a>
 <div class="grp">Reference</div>
-<a href="#evidence" data-tab="evidence"><span class="n">8</span>Evidence</a>
-<a href="#actions" data-tab="actions"><span class="n">9</span>Action List</a>
-<a href="#open" data-tab="open"><span class="n">10</span>Open Questions</a>
+<a href="#evidence" data-tab="evidence"><span class="n">9</span>Evidence</a>
+<a href="#actions" data-tab="actions"><span class="n">10</span>Action List</a>
+<a href="#open" data-tab="open"><span class="n">11</span>Open Questions</a>
 </nav>
-<div class="side-foot">2026-09-18 · v1<br>DB snapshot 08:03 UTC<br>CONFIDENTIAL — do not<br>publish externally</div>
+<div class="side-foot">2026-09-18 · v2<br>root cause confirmed<br>send network mapped<br>CONFIDENTIAL</div>
 </aside>
 
 <div class="main">
@@ -158,9 +159,9 @@ ol.pts b{color:var(--ink);font-weight:600}
 <h2>Who should read what</h2>
 <ul class="plain">
 <li><b>Everyone</b> — pages 1–3 (verdict, what happened, why we are sure)</li>
-<li><b>Ops / on-call</b> — page 9 action list (pause status, freeze list on page 7)</li>
-<li><b>Engineers</b> — pages 4–6 (timeline, method, money trail) and page 8 evidence</li>
-<li><b>Management / legal</b> — page 6 losses and page 10 open questions</li>
+<li><b>Ops / on-call</b> — page 9 action list (pause status, freeze list on page 8)</li>
+<li><b>Engineers</b> — pages 4–5 and 7 (timeline, root cause, money trail) and page 9 evidence</li>
+<li><b>Management / legal</b> — page 7 losses and page 11 open questions</li>
 </ul>
 </section>
 </article>
@@ -255,9 +256,9 @@ ol.pts b{color:var(--ink);font-weight:600}
 <!-- ═══ 5 Method ═══ -->
 <article class="panel" id="p-method" hidden>
 <header>
-<div class="eyebrow">5 · Attack Method</div>
+<div class="eyebrow">5 · Root Cause</div>
 <h1>How the money was manufactured</h1>
-<p class="standfirst">A plain-language walkthrough of the exploit chain. Terms are explained as they appear; the technical record is on page 8.</p>
+<p class="standfirst">The flaw is now confirmed in code and data: a <strong>position whose allocated margin was drained to zero/negative while still open</strong> produced an <strong>absurd bankruptcy price (0 or half of market)</strong>, and the liquidation settlement paid the attacker's short as if it had closed at that price.</p>
 </header>
 <section>
 <h2>Background you need (30 seconds)</h2>
@@ -267,7 +268,18 @@ ol.pts b{color:var(--ink);font-weight:600}
 <li><b>Custody vault</b> — the on-chain safe (the contract from the CS report); on-chain withdrawals are paid from it</li>
 </ul>
 
-<h2>The chain, step by step</h2>
+<h2>The flaw, confirmed (v2)</h2>
+<div class="call danger"><p class="call-t">Negative-margin positions → fake bankruptcy price → short settles near-free</p><p>The liquidation records tell the whole story. Every exploit-period take-over is a <b>100x SHORT with margin shown as 0.00</b> and <b>bankruptcy_price = 0.000</b> (11 records), or half of market (108.73). Reverse-computing the 108.73 record requires <b>allocated margin of −14,889 USDT</b> — while the persisted margin says +282.72. One minute before that liquidation, the main exploiter transferred 30,000 USDT <b>out</b> of their perps account. The margin-withdrawal validation does not stop a transfer that sends allocated margin negative, and the bankruptcy calculator has <b>no floor</b>: <code>bankr = entry + margin/size</code> with negative margin lands at 0 or any attacker-chosen low price. The settlement then closes the attacker's SHORT at that price — a short closing at ~0 books <b>(entry − 0) × size as pure profit</b>, paid by the settlement pool / insurance fund. The pool inherits the short with basis 0 and ADL-closes it at mark — its ledger shows the mirror loss (−$22,549 "realized PnL" on a 0.001 TAO position: the amounts themselves are internally inconsistent, more Raft-log evidence to preserve).</p></div>
+<ol class="pts">
+<li><b>Open</b> — 100x SHORT on TAOUSDT-PERP with normal margin (e.g. 123 TAO @ 229.8, margin 282.72… stored, actual higher)</li>
+<li><b>Drain</b> — transfer margin out of the perps account while the position is open (validation gap; 0x535c moved 30,000 out at 18:55, liquidation hit at 18:56)</li>
+<li><b>Trigger</b> — the scanner liquidates the now under-margined position; bankruptcy price computes to 0.000 / 108.730 with no sanity floor</li>
+<li><b>Collect</b> — settlement closes the SHORT at that price: short PnL = (entry − 0.000/108.73) × size, booked as profit to the attacker — the deterministic ~24k payouts</li>
+<li><b>ADL wash</b> — the settlement pool inherits the short at basis 0, ADLs it at mark ~230 against the attackers' own long accounts → pool realizes the mirror loss, insurance drained</li>
+</ol>
+<div class="call"><p class="call-t">Code references (neodax repo)</p><p><code>calculator/isolated.go:48</code> — bankruptcy formula; zero-margin branch returns entry, but the <b>negative-margin path has no floor</b> · <code>stage1/isolated/flow.go:171</code> — settlement at bankruptcyPrice · <code>stage1/cross/flow.go:961 BuildTakeoverTradeEvent</code> — the zero-address trades in perps_trades (price = bankruptcy price; explains the price-0 fills) · <code>adl/adl.go:251 recoverPosition</code> + <code>adl/pricing.go PlanADLExecution</code> — pool pays counterparties at mark · margin-withdrawal validation gap: perps account transfer path (needs the exact call site — Raft logs will pin it).</p></div>
+
+<h2>The chain, step by step (plain language)</h2>
 <ol class="steps n">
 <li><b>Find the flaw</b><span>Probe accounts sell tiny amounts while deliberately triggering the take-over path. Some probes execute at <b>price 0</b> — trades that a healthy system would never match. The system counterparty accepts them, which reveals the flaw: the take-over settlement can be made to pay out at attacker-chosen prices.</span></li>
 <li><b>Force the system to buy</b><span>The exploiters sell ~910 TAO (~$210k notional) onto the system counterparty at market price. The system's side of these trades is funded from the insurance pool — real platform money leaves the system here.</span></li>
@@ -292,10 +304,58 @@ ol.pts b{color:var(--ink);font-weight:600}
 </section>
 </article>
 
+<!-- ═══ 6 Send Network ═══ -->
+<article class="panel" id="p-agents" hidden>
+<header>
+<div class="eyebrow">6 · Send Network</div>
+<h1>The YELLOW send machine (restricted feature)</h1>
+<p class="standfirst">Response to the CS question: <em>"identify the exact list of accounts doing spot_sends — this functionality is restricted for regular users and needs specific configuration."</em> The answer uncovered a second, larger machine running since 09-15.</p>
+</header>
+<section>
+<h2>How the restriction works (code)</h2>
+<ul class="plain">
+<li><b>Spot sends</b> (<code>SendSpotFunds</code>, <code>portfolio_manager/spot/spot_service.go:4271</code>) is not exposed on the regular user API surface — it ships with the <b>agent-subaccount</b> feature (provisioning a subaccount yields <code>account_kind = agent</code>, <code>spot/provision.go:16</code>)</li>
+<li><b>The ledger layer only checks ownership</b>: sender account's owner must match the caller. It does <b>not</b> check account_kind — so an owner with an agent subaccount can send from <b>any of their accounts, including old "normal" ones</b></li>
+<li><b>13 owners obtained agent subaccounts between 2026-09-10 and 09-16</b> — days before the exploit. Several of those owners are the main exploiters (0x535c…, 0xe1ae…) and hold large old accounts from March</li>
+</ul>
+
+<h2>The machine (still running at snapshot)</h2>
+<div class="stats">
+<div class="stat warn"><div class="v">34.6M <small>YELLOW</small></div><div class="k">churned through sends since 09-15</div></div>
+<div class="stat warn"><div class="v">51,000+</div><div class="k">send transactions</div></div>
+<div class="stat"><div class="v">09-15 00:29</div><div class="k">UTC — machine started (2 days pre-exploit)</div></div>
+<div class="stat bad"><div class="v">STILL ON</div><div class="k">last send 08:05 UTC = snapshot minute</div></div>
+</div>
+<div class="tw"><table>
+<thead><tr><th>Pair (both directions)</th><th>Sends</th><th>YELLOW volume</th><th>Paired USDT</th><th>Window</th></tr></thead>
+<tbody>
+<tr><td class="mono-c">0x5E1c…3CB1 ↔ 0x1b7B…9696</td><td>27,432</td><td>34.66M</td><td>1.06M</td><td class="dim">09-15 00:29 → 09-18 08:05 (continuous)</td></tr>
+<tr><td class="mono-c">0x3030…0180 ↔ 0x1b7B…9696</td><td>5,492</td><td>14.29M</td><td>0.43M</td><td class="dim">09-15 05:51 → 09-18 08:05</td></tr>
+<tr><td class="mono-c">0x1b7B…9696 ↔ 0xfbbB…21aD</td><td>465</td><td>3.35M</td><td>0.095M</td><td class="dim">09-15 12:31 → 09-18 07:51</td></tr>
+<tr><td class="mono-c">0x1b7B…9696 ↔ 0x7d45…c5BfF</td><td>141</td><td>2.13M</td><td>0.043M</td><td class="dim">09-15 18:49 → 09-18 08:05</td></tr>
+<tr><td class="mono-c">0x1b7B…9696 ↔ 0xf57d…2F1F</td><td>84</td><td>0.70M</td><td class="dim">—</td><td class="dim">09-18 01:15 → 08:01 (drain night)</td></tr>
+<tr><td class="mono-c">0x713f…3b659 → hub + 6 others</td><td>1,044</td><td>5.36M</td><td class="dim">—</td><td class="dim">09-15 00:12 → 09-18 08:03 (the 4.86M YELLOW holder distributing)</td></tr>
+</tbody>
+</table></div>
+<div class="call"><p class="call-t">Pattern</p><p>Paired YELLOW↔USDT sends between the same accounts at 1–15 second intervals, around the clock, for three days. This is a machine, not people. <b>0x1b7B is the hub</b> (holds 2.5M YELLOW). The machine was running <b>during the exploit and the withdrawal drain</b> — the 18:01 "price preparation" burst on page 4 was this machine's output. Its purpose: consistent with YELLOW price suppression before the whales' cheap buys, and/or points/activity farming. Confirmation against leaderboard/competition scoring is an open question (page 11).</p></div>
+
+<h2>Full participant list (33 addresses + PLATFORM)</h2>
+<div class="tw"><table>
+<thead><tr><th>Group</th><th>Addresses</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td><b>Agent-enabled owners (13)</b></td><td class="mono-c">0xb915…32b1 · 0x6BE4…6E68 · 0xBae1…94f1 · 0xe1ae…59Bb · 0xDa4A…fc68 · 0x55d1…b924 · 0xd12c…8444 · 0x8475…8351 · 0x4091…274E · 0xC573…9252 · 0xD47D…BFB1C · <b>0x535c…f283</b> · 0x7791…5176</td><td>agent subaccounts opened 09-10 → 09-16; <b>0x535c = main exploiter, 0xe1ae = $229k prober</b>; each also holds an older normal account (Mar–Jul)</td></tr>
+<tr><td><b>Wash hub &amp; pairs (normal accounts)</b></td><td class="mono-c">0x1b7B…9696 (hub, 2.5M YELLOW) · 0x5E1c…3CB1 · 0x3030…0180 · 0xfbbB…21aD · 0x7d45…c5BfF · 0xf57d…2F1F · 0x323A…eAE1 · 0x713f…3b659 (4.86M YELLOW)</td><td>March–May vintage; sending via their owners' agent sessions (owner-level check, page 6 top)</td></tr>
+<tr><td><b>Other participants</b></td><td class="mono-c">0x0cdf…4e72 · 0x3441…0357 · 0x572d…6485 · 0x6073…0717 · 0x8657…2a7e · 0xC808…3A21 · 0xdD34…3AD2 · 0xE5c3…932f · 0xf6DA…f008 · 0xf7D3…Ac52 · 0x6eF5…Df4b</td><td class="dim">lower volume; full per-address detail in the evidence pack query E8</td></tr>
+</tbody>
+</table></div>
+<div class="call warn"><p class="call-t">Immediate follow-ups this raises</p><p>① <b>Stop the machine</b> — it was still sending at snapshot time. ② <b>Audit the agent provisioning</b> — who approved 13 agent subaccounts in the week before the exploit (auth provisioning records)? Self-service or ops-approved? ③ <b>KYC the 13 owners</b> — at least two are confirmed attackers; the rest are now presumptively linked. ④ Decide whether the send feature stays enabled platform-wide during the freeze.</p></div>
+</section>
+</article>
+
 <!-- ═══ 6 Money ═══ -->
 <article class="panel" id="p-money" hidden>
 <header>
-<div class="eyebrow">6 · Money &amp; Losses</div>
+<div class="eyebrow">7 · Money &amp; Losses</div>
 <h1>Where every dollar went</h1>
 <p class="standfirst">The full money trail, from manufacture to on-chain exit. Figures are exact ledger values at the 08:03 UTC snapshot.</p>
 </header>
@@ -338,7 +398,7 @@ ol.pts b{color:var(--ink);font-weight:600}
 <!-- ═══ 7 Accounts ═══ -->
 <article class="panel" id="p-accounts" hidden>
 <header>
-<div class="eyebrow">7 · Attacker Accounts</div>
+<div class="eyebrow">8 · Freeze List</div>
 <h1>Freeze list</h1>
 <p class="standfirst">Every account linked to the attack, with role and balance at snapshot. Treat as one actor. All balances are frozen-pending — freeze spot AND perps sides, plus withdrawal blacklist.</p>
 </header>
@@ -378,7 +438,7 @@ ol.pts b{color:var(--ink);font-weight:600}
 <!-- ═══ 8 Evidence ═══ -->
 <article class="panel" id="p-evidence" hidden>
 <header>
-<div class="eyebrow">8 · Evidence</div>
+<div class="eyebrow">9 · Evidence</div>
 <h1>The ledger record</h1>
 <p class="standfirst">For engineers and auditors: the exact records behind every claim. All from the production read replica, snapshot 2026-09-18 08:03 UTC. Schema references: <code>cage.*</code>, <code>portfolio_manager.*</code>, <code>portfolio_manager_perp.*</code>.</p>
 </header>
@@ -432,6 +492,48 @@ hour before the whales' YELLOW buys — consistent with price preparation</pre>
 0xe1ae2Bff…  USDT  229,563.85 (225,016 available)   ← old account, probed price-0
 0x169a8Aa8…  USDT  1,000.00                          ← funding mule</pre>
 
+<h3>E7 · Liquidation take-over records — the smoking gun (taken_over_positions, TAOUSDT-PERP)</h3>
+<pre>19 records since 09-17 12:00. Exploit period (17:30→19:35), all 100x SHORT:
+
+17:30:30  amt=0.0001  entry=229.502  bankr=0.000  liq=0.000  margin=0.00     pnl=  -5,962.73
+18:11:42  amt=36.4018 entry=229.692  bankr=0.000  liq=0.000  margin=83.61    pnl= -21,503.10
+18:26:38  amt=0.0008  entry=230.419  bankr=0.000  liq=0.000  margin=0.00     pnl=  -1,590.62
+18:42:29  amt=0.0008  entry=229.709  bankr=0.000  liq=0.000  margin=0.00     pnl= -14,453.92
+18:42:29  amt=0.0010  entry=229.424  bankr=0.000  liq=0.000  margin=0.00     pnl= -22,549.15
+18:56:30  amt=123.029 entry=229.800  bankr=108.730 liq=108.190 margin=282.72 pnl= -15,824.77
+19:12:02  amt=73.7357 entry=230.500  bankr=0.000  liq=0.000  margin=169.96   pnl= -19,060.02
+… (11 bankr=0 records total)
+
+Normal records for contrast (14:22–15:39, proper margin):
+14:22:47  amt=291.468 entry=226.347  bankr=228.610 liq=227.470 margin=659.73  pnl=0
+14:23:48  amt=326.047 entry=226.839  bankr=229.107 liq=227.970 margin=739.60  pnl=0
+
+Anomalies: ① bankr=0.000 requires NEGATIVE allocated margin (calculator has no floor)
+② 18:56 record: bankr=108.73 reverse-computes margin = −14,889 while stored = +282.72
+③ realized_pnl magnitudes inconsistent with amounts (0.001 TAO → −$22,549)
+④ 0x535c… transferred 30,000 USDT OUT of perps at 18:55 — 60s before the 18:56 liquidation</pre>
+
+<h3>E8 · Spot send machine aggregates (spot_sends, since 09-15)</h3>
+<pre>top pairs (both directions):
+0x5E1c…3CB1 ↔ 0x1b7B…9696   27,432 sends · 34.66M YELLOW · 1.06M USDT paired
+0x3030…0180 ↔ 0x1b7B…9696    5,492 sends · 14.29M YELLOW · 0.43M USDT
+0x1b7B…9696 ↔ 0xfbbB…21aD      465 sends ·  3.35M YELLOW · 0.095M USDT
+0x1b7B…9696 ↔ 0x7d45…c5BfF     141 sends ·  2.13M YELLOW · 0.043M USDT
+0x1b7B…9696 ↔ 0xf57d…2F1F       84 sends ·  0.70M YELLOW            (drain night only)
+0x713f…3b659 → hub + 6 others 1,044 sends ·  5.36M YELLOW
+first send 2026-09-15 00:29:15 UTC · last 2026-09-18 08:05:19 UTC (= snapshot)
+33 distinct participant addresses + PLATFORM (fee-distribution flows)</pre>
+
+<h3>E9 · Agent subaccount provisioning timeline (spot_accounts)</h3>
+<pre>13 agent accounts (account_kind='agent') opened 2026-09-10 → 09-16, all principal_kind=wallet:
+09-10 0xb915…32b1 · 0x6BE4…6E68 · 0xBae1…94f1 · 0xe1ae…59Bb · 0xDa4A…fc68
+09-11 0x55d1…b924 · 0xd12c…8444
+09-12 0x8475…8351 · 0x4091…274E
+09-14 0xC573…9252 · 0xD47D…BFB1C · 0x535c…f283   ← main exploiter
+09-16 0x7791…5176
+each owner also holds an older normal account (opened 2026-03 → 07)
+send machine started 09-15 — between the 09-14 and 09-16 provisioning batches</pre>
+
 <div class="call"><p class="call-t">Ledger sign convention (for anyone reading raw rows)</p><p>In these ledgers <b>debit = balance increase, credit = balance decrease</b> (verified against a known on-chain deposit). A <code>withdrawal_reserve</code> pair is: credit AVAILABLE + debit LOCKED. Quoted amounts above are already normalized to plain reading.</p></div>
 </section>
 </article>
@@ -439,7 +541,7 @@ hour before the whales' YELLOW buys — consistent with price preparation</pre>
 <!-- ═══ 9 Actions ═══ -->
 <article class="panel" id="p-actions" hidden>
 <header>
-<div class="eyebrow">9 · Action List</div>
+<div class="eyebrow">10 · Action List</div>
 <h1>What must happen now</h1>
 <p class="standfirst">Ordered by urgency. Owners to be assigned; tick only when verified done.</p>
 </header>
@@ -447,23 +549,25 @@ hour before the whales' YELLOW buys — consistent with price preparation</pre>
 <h3>Immediate (hours)</h3>
 <ol class="steps n">
 <li><b>Keep withdrawal processing paused</b><span>Cage withdrawal pipeline stays off until the freeze list is applied and the take-over mechanism is disabled or guarded. Every minute of uptime is exposure for the 221,831 YELLOW still inside.</span></li>
-<li><b>Apply the freeze list</b><span>All 19 FREEZE addresses from page 7 — spot + perps sides + withdrawal blacklist. Freeze before unfreezing withdrawals for everyone else.</span></li>
-<li><b>Disable or guard the TAOUSDT-PERP take-over path</b><span>At minimum halt TAOUSDT-PERP trading; ideally disable the settlement path that paid the zero-address trades until patched. Check every other perp market for the same pattern (query E3 across markets).</span></li>
-<li><b>Measure the insurance pool damage</b><span>Query the insurance/settlement accounts for the 14:22–15:39 take-over window — establishes the true platform-side loss (may exceed the $251k extracted).</span></li>
-<li><b>Preserve evidence</b><span>Snapshot: finex TAOUSDT WAL + order book state, PM-perp logs (14:00–02:00), taken_over_positions full export, cage logs, this report's queries. Freeze the replica snapshot if possible.</span></li>
+<li><b>Apply the freeze list</b><span>All FREEZE addresses from page 8 — spot + perps sides + withdrawal blacklist. Freeze before unfreezing withdrawals for everyone else.</span></li>
+<li><b>Stop the YELLOW send machine</b><span>The 09-15 send network (page 6) was still running at snapshot. Disable spot sends feature-wide during the freeze and freeze the hub accounts (0x1b7B, 0x5E1c, 0x3030, 0xfbbB, 0x7d45, 0xf57d, 0x713f).</span></li>
+<li><b>Guard the three broken controls</b><span>① perps margin withdrawal must reject transfers that send allocated margin negative (the drain step) · ② bankruptcy price must have a sanity floor and reject non-positive / out-of-band results · ③ settlement must reject price-0 liquidation prices. Until patched: TAOUSDT-PERP (and ideally all perps) trading halted.</span></li>
+<li><b>Measure the insurance pool damage</b><span>Query the insurance/settlement accounts for the 14:22→01:40 window — the pool-side mirror losses (E7 realized_pnl column) establish the true platform loss.</span></li>
+<li><b>Preserve evidence</b><span>Snapshot: finex TAOUSDT WAL + order book state, PM-perp Raft logs (14:00→02:00 — pins the exact margin-drain call site), taken_over_positions full export, cage logs, this report's queries. Freeze the replica snapshot if possible.</span></li>
+<li><b>Audit agent-subaccount provisioning</b><span>Who approved/provisioned the 13 agent accounts 09-10→09-16 (auth provisioning records)? Two owners are confirmed attackers. Suspend the agent-send feature for the other 11 pending review.</span></li>
 </ol>
 <h3>Short term (1–2 days)</h3>
-<ol class="steps n" start="6">
+<ol class="steps n" start="8">
 <li><b>On-chain tracing of withdrawn funds</b><span>424k YELLOW + USDT/ETH/WBTC recipient addresses from cage records → follow hops, exchange deposits, mixers; prepare exchange freeze requests with tx hashes.</span></li>
-<li><b>Root-cause the settlement flaw</b><span>How did price-0 and take-over trades settle at attacker-favourable prices? Where is the price-band / risk check that should have rejected them? (finex matching + PM-perp take-over settlement code paths.)</span></li>
-<li><b>Sweep for missed patterns</b><span>Same queries across ALL markets and a longer window — establish the full attacker footprint and whether earlier/smaller runs happened before 09-17.</span></li>
-<li><b>Investigate 0xe1ae2Bff</b><span>Old account with $229k that probed the flaw — determine compromised vs. complicit before any funds move.</span></li>
+<li><b>Pin the exact payout arithmetic</b><span>Replay one whale cycle from Raft logs (open → drain → liquidate → settle) to produce the court-ready step-by-step money movement for the $24,082.87 payouts.</span></li>
+<li><b>Sweep for missed patterns</b><span>Same queries across ALL markets and a longer window — establish the full attacker footprint and whether earlier/smaller runs happened before 09-17. Include the send machine across its full 09-15 → present history.</span></li>
+<li><b>Investigate the remaining unknowns</b><span>0xe1ae2Bff ($229k, agent-enabled, probed) — compromised or complicit. The 11 other agent owners — KYC and history. The 0x1b7B hub's 2.5M YELLOW origin.</span></li>
 <li><b>Customer communication</b><span>No customer funds are affected (loss is platform/insurance side); withdrawals paused platform-wide as a precaution. CS should have the one-paragraph version from page 2.</span></li>
 </ol>
 <h3>Follow-up</h3>
-<ol class="steps n" start="11">
-<li><b>Monitoring on the signature of this attack</b><span>Alert on: any trade with zero-address counterparty · any fill at price ≤ 1% of mark · new account withdrawing &gt; 5× its total deposits · N withdrawals same-size within an hour.</span></li>
-<li><b>Post-mortem &amp; control fixes</b><span>After root cause: price sanity checks in settlement, take-over payout limits, exploit-resistant insurance drawdown caps.</span></li>
+<ol class="steps n" start="13">
+<li><b>Monitoring on the signature of this attack</b><span>Alert on: any trade with zero-address counterparty · any fill at price ≤ 1% of mark · new account withdrawing &gt; 5× its total deposits · N withdrawals same-size within an hour · margin transfer that would leave allocated margin negative · send-volume anomalies between account pairs.</span></li>
+<li><b>Post-mortem &amp; control fixes</b><span>After root cause: price sanity checks in settlement, take-over payout limits, exploit-resistant insurance drawdown caps, margin-drain validation, agent-send governance (provisioning approval + per-account send limits).</span></li>
 </ol>
 </section>
 </article>
@@ -471,21 +575,24 @@ hour before the whales' YELLOW buys — consistent with price preparation</pre>
 <!-- ═══ 10 Open Questions ═══ -->
 <article class="panel" id="p-open" hidden>
 <header>
-<div class="eyebrow">10 · Open Questions</div>
+<div class="eyebrow">11 · Open Questions</div>
 <h1>What we do not know yet</h1>
 <p class="standfirst">Honest gaps at report time v1 — each with the next query or log needed to close it.</p>
 </header>
 <section>
 <ul class="plain">
-<li><b>Exact settlement flaw mechanics</b> — which code path allowed price-0 fills and market-price take-over payouts? <span class="dim">Needs: finex TAOUSDT WAL replay + PM-perp take-over settlement logs; taken_over_positions export (query blocked by replica recovery conflict at snapshot — rerun).</span></li>
-<li><b>True insurance-pool loss</b> — the $251k is what reached attacker accounts; system-side take-over losses may be larger. <span class="dim">Needs: insurance/settlement account ledger for 09-17 14:00–16:00.</span></li>
-<li><b>0xe1ae2Bff status</b> — legitimate holder gone rogue, or a compromised long-standing account? <span class="dim">Needs: its auth/session history, IP logs, historical trading pattern.</span></li>
+<li><b>✅ RESOLVED — Exact settlement flaw mechanics</b> — confirmed: margin drained to negative while position open (validation gap) → bankruptcy price with no floor (0.000 / 108.73) → short settles near-free → pool/insurance absorbs the mirror loss. <span class="dim">Code refs on page 5. Remaining: the exact margin-drain call site (Raft logs) and per-cycle payout arithmetic (action 9).</span></li>
+<li><b>✅ RESOLVED — spot_sends account list</b> — 33 addresses + PLATFORM; 13 agent-enabled owners (09-10→09-16 provisioning), wash machine mapped since 09-15, still running. <span class="dim">Page 6, evidence E8/E9.</span></li>
+<li><b>True insurance-pool loss</b> — the $251k is what reached attacker accounts; pool-side mirror losses may be larger. <span class="dim">Needs: insurance/settlement account ledger for 09-17 14:00→09-18 02:00.</span></li>
+<li><b>Who provisioned the 13 agent accounts</b> — auth provisioning audit trail: self-service, ops-approved, or automated? Two owners are confirmed attackers; the other 11 pending KYC. <span class="dim">Needs: auth service provisioning records 09-08→09-16.</span></li>
+<li><b>0xe1ae2Bff status</b> — legitimate holder gone rogue, or a compromised long-standing account? It holds $229,563 USDT, is agent-enabled, and ran price-0 probes. <span class="dim">Needs: session/IP history, trading pattern.</span></li>
+<li><b>Send machine's purpose</b> — YELLOW price suppression for the whales' cheap buys, points/leaderboard farming, or both? <span class="dim">Needs: leaderboard/competition scoring config vs. send activity; YELLOW market price series 09-15→09-18 vs. send bursts.</span></li>
 <li><b>Attacker funding source</b> — the ~$1,100 × N on-chain deposits came from which addresses? <span class="dim">Needs: on-chain trace of the deposit tx hashes (cage.deposits).</span></li>
-<li><b>Wash-cluster relationship</b> — are 0x3030/0x5E1c/0x1b7B part of the attack, or legitimate holders whose market was used? <span class="dim">Needs: their full YELLOW send/trade history vs. the attack timeline.</span></li>
-<li><b>Any earlier runs</b> — was 09-17 the first attempt? <span class="dim">Needs: zero-address trade query extended back weeks (same E3 query, wider window).</span></li>
-<li><b>Remaining loot total</b> — beyond 0x42Cb's 221,831 YELLOW and 0xe1ae's $229k, how much extracted value sits in other accounts? <span class="dim">Needs: full balance sweep of every address that touched the exploit cluster (graph query over transfers).</span></li>
+<li><b>Wash-network boundary</b> — are the March-vintage hub accounts (0x1b7B, 0x713f…) part of the attack group, or legitimate holders whose liquidity/feature was used? <span class="dim">Needs: their full YELLOW origin and send history vs. attack timeline.</span></li>
+<li><b>Any earlier runs</b> — was 09-17 the first attempt? <span class="dim">Needs: zero-address trade query extended back weeks (E3 query, wider window) + send machine history back to 09-15 start.</span></li>
+<li><b>Remaining loot total</b> — beyond 0x42Cb's 221,831 YELLOW and 0xe1ae's $229k, how much sits in other network accounts? <span class="dim">Needs: full balance sweep of all 33 send-network + 19 freeze-list addresses.</span></li>
 </ul>
-<div class="call"><p class="call-t">Report status</p><p>v1 — 2026-09-18, from production read-replica data (snapshot 08:03 UTC). Prepared during active incident; numbers are ledger-exact, interpretations marked. Update cadence: after freeze confirmation, insurance measurement, and root cause.</p></div>
+<div class="call"><p class="call-t">Report status</p><p>v2 — 2026-09-18, from production read-replica data (snapshot 08:03 UTC). v2 adds: confirmed root cause (negative-margin → no-floor bankruptcy price), the YELLOW send-network answer to the CS question (33 accounts, 13 agent-enabled, machine running since 09-15), and expanded freeze/actions lists. Numbers are ledger-exact; interpretations marked. Next update: after freeze confirmation, insurance measurement, and Raft-log payout replay.</p></div>
 </section>
 </article>
 

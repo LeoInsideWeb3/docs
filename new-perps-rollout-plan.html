@@ -1,0 +1,789 @@
+<title>NeoDAX · 新增 Perps 市场上线操作手册</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{--ground:#F5F7F5;--surface:#FFF;--surface-sunk:#ECEFEC;--code-bg:#161E1C;--code-ink:#D6E2DD;--ink:#151E1B;--ink-soft:#4A5854;--ink-faint:#798883;--rule:#DCE2DF;--rule-strong:#C3CCC8;--accent:#0E6A58;--accent-soft:#E0EFEA;--warn:#A15A08;--warn-soft:#F7EBDA;--danger:#973030;--danger-soft:#F7E4E2;--shadow:0 1px 2px rgba(21,30,27,.06)}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--ground:#0F1513;--surface:#171F1C;--surface-sunk:#121917;--code-bg:#0A0F0E;--code-ink:#C9D8D2;--ink:#E8EEEB;--ink-soft:#A5B3AE;--ink-faint:#7A8983;--rule:#263230;--rule-strong:#35433F;--accent:#4FC2A6;--accent-soft:#14312A;--warn:#D9964A;--warn-soft:#302315;--danger:#DE7E77;--danger-soft:#2E1918;--shadow:0 1px 2px rgba(0,0,0,.3)}}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{background:var(--ground);color:var(--ink);font-family:"IBM Plex Sans",-apple-system,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.62;-webkit-font-smoothing:antialiased}
+.shell{max-width:1240px;margin:0 auto;padding-inline:20px;padding-block:28px 76px;display:grid;grid-template-columns:224px minmax(0,1fr);gap:40px;align-items:start}
+.side{position:sticky;top:20px}
+.brand{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:6px}
+.brand-t{font-family:"Bricolage Grotesque","IBM Plex Sans",sans-serif;font-weight:700;font-size:19px;letter-spacing:-.01em;line-height:1.15;margin:0 0 18px}
+nav.tabs{display:grid;gap:2px}
+nav.tabs .grp{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);font-weight:600;margin:14px 0 4px 10px}
+nav.tabs .grp:first-child{margin-top:0}
+nav.tabs a{display:flex;align-items:baseline;gap:8px;padding:7px 10px;border-radius:4px;color:var(--ink-soft);text-decoration:none;font-size:13.5px;line-height:1.3;border-left:2px solid transparent}
+nav.tabs a .n{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--ink-faint);width:16px;flex:none}
+nav.tabs a:hover{background:var(--surface);color:var(--ink)}
+nav.tabs a.on{background:var(--accent-soft);color:var(--accent);border-left-color:var(--accent);font-weight:600}
+nav.tabs a.on .n{color:var(--accent)}
+.side-foot{margin-top:22px;font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink-faint);line-height:1.6;padding-left:10px}
+.main{min-width:0}
+.panel>header{margin-bottom:30px}
+.eyebrow{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
+h1{font-family:"Bricolage Grotesque","IBM Plex Sans",sans-serif;font-weight:700;font-size:clamp(26px,4vw,36px);line-height:1.1;letter-spacing:-.02em;margin:0 0 14px;text-wrap:balance}
+.standfirst{font-size:16px;color:var(--ink-soft);max-width:65ch;margin:0}
+.standfirst strong{color:var(--ink);font-weight:600}
+.assume{margin-top:18px;padding:13px 18px;background:var(--warn-soft);border-left:3px solid var(--warn);font-size:13.5px;color:var(--ink-soft);max-width:78ch}
+.assume b{color:var(--ink);font-weight:600}
+section{margin-top:46px;scroll-margin-top:20px}
+.panel>header+section{margin-top:0}
+h2{font-family:"Bricolage Grotesque","IBM Plex Sans",sans-serif;font-weight:700;font-size:21px;letter-spacing:-.01em;margin:0 0 6px;text-wrap:balance}
+.section-note{color:var(--ink-soft);margin:0 0 20px;max-width:68ch}
+h3{font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);margin:30px 0 12px}
+h4{font-size:15px;font-weight:600;margin:24px 0 8px}
+p{max-width:70ch}
+code,.mono{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.87em}
+p code,td code,li code{color:var(--accent)}
+pre{background:var(--code-bg);color:var(--code-ink);padding:16px 18px;overflow-x:auto;margin:12px 0;font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12.5px;line-height:1.6;border-radius:3px}
+pre .c{color:#6E8A80}pre .k{color:#7FD1B9}pre .t{color:#E3B778}
+.layers{display:grid;gap:10px}
+.layer{background:var(--surface);border:1px solid var(--rule);box-shadow:var(--shadow);padding:16px 20px;display:grid;grid-template-columns:158px minmax(0,1fr);gap:20px}
+.layer.hi{border-color:var(--accent)}
+.layer-n{font-family:"Bricolage Grotesque",sans-serif;font-weight:600;font-size:15px}
+.layer-n small{display:block;font-family:"IBM Plex Mono",monospace;font-weight:400;font-size:10.5px;color:var(--ink-faint);letter-spacing:.06em;margin-top:3px;text-transform:uppercase}
+.layer-d{margin:0;font-size:13.5px;color:var(--ink-soft)}
+.layer-d b{color:var(--ink);font-weight:600}
+.arrow{text-align:center;color:var(--ink-faint);font-size:11.5px;line-height:1;font-family:"IBM Plex Mono",monospace}
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:520px}
+th{text-align:left;font-weight:600;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);padding:0 14px 8px 0;border-bottom:1px solid var(--rule-strong);white-space:nowrap}
+td{padding:9px 14px 9px 0;border-bottom:1px solid var(--rule);vertical-align:top}
+tr:last-child td{border-bottom:none}
+td.dim{color:var(--ink-soft)}
+td.mono-c{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12px}
+td b{color:var(--ink);font-weight:600}
+.pill{display:inline-block;font-size:10.5px;font-weight:500;padding:1px 7px;border-radius:100px;white-space:nowrap;line-height:1.6}
+.pill.ok{background:var(--accent-soft);color:var(--accent)}
+.pill.gap{background:var(--warn-soft);color:var(--warn)}
+.pill.no{background:var(--danger-soft);color:var(--danger)}
+.call{background:var(--surface);border:1px solid var(--rule);border-left:3px solid var(--accent);padding:16px 20px;margin:16px 0;box-shadow:var(--shadow);max-width:80ch}
+.call.warn{border-left-color:var(--warn)}
+.call-t{font-weight:600;font-size:14px;margin:0 0 6px}
+.call p{margin:0;font-size:13.5px;color:var(--ink-soft)}
+.call p+p{margin-top:8px}
+.call b{color:var(--ink);font-weight:600}
+ul.plain{padding-left:0;list-style:none;margin:0;display:grid;gap:0;font-size:14px}
+ul.plain li{padding:11px 0;border-top:1px solid var(--rule);color:var(--ink-soft);max-width:72ch}
+ul.plain li:last-child{border-bottom:1px solid var(--rule)}
+ul.plain b{color:var(--ink);font-weight:600}
+ol.steps{padding-left:0;list-style:none;margin:0;counter-reset:s}
+ol.steps li{counter-increment:s;position:relative;padding:15px 0 15px 46px;border-top:1px solid var(--rule)}
+ol.steps li:last-child{border-bottom:1px solid var(--rule)}
+ol.steps li::before{content:counter(s);position:absolute;left:0;top:17px;font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--accent)}
+ol.steps b{display:block;color:var(--ink);font-weight:600;margin-bottom:3px;max-width:70ch}
+ol.steps span{display:block;color:var(--ink-soft);font-size:13.5px;max-width:70ch}
+.pager{margin-top:54px;padding-top:16px;border-top:1px solid var(--rule);display:flex;justify-content:space-between;gap:16px;font-size:13.5px}
+.pager a{color:var(--accent);text-decoration:none}
+.pager a:hover{text-decoration:underline}
+a{color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media(max-width:860px){.shell{grid-template-columns:minmax(0,1fr);gap:20px}.side{position:static}.brand-t{margin-bottom:10px}nav.tabs{display:flex;overflow-x:auto;gap:4px;padding-bottom:6px}nav.tabs .grp{display:none}nav.tabs a{white-space:nowrap;border-left:0;border-bottom:2px solid transparent;border-radius:4px 4px 0 0}nav.tabs a.on{border-bottom-color:var(--accent)}.side-foot{display:none}.layer{grid-template-columns:minmax(0,1fr);gap:8px}}
+</style>
+
+<div class="shell">
+<aside class="side">
+<div class="brand">NeoDAX · Perps Rollout · 14 Markets</div>
+<p class="brand-t">新增永续市场上线操作手册</p>
+<nav class="tabs" id="tabs">
+<div class="grp">准备</div>
+<a href="#overview" data-tab="overview"><span class="n">1</span>总览与分配</a>
+<a href="#markets" data-tab="markets"><span class="n">2</span>市场参数</a>
+<a href="#preflight" data-tab="preflight"><span class="n">3</span>前置检查</a>
+<div class="grp">执行</div>
+<a href="#kafka" data-tab="kafka"><span class="n">4</span>Kafka Topics</a>
+<a href="#perppm" data-tab="perppm"><span class="n">5</span>Perp PM 建表</a>
+<a href="#finex" data-tab="finex"><span class="n">6</span>Finex Shard</a>
+<a href="#quote" data-tab="quote"><span class="n">7</span>Quote 行情</a>
+<a href="#edge" data-tab="edge"><span class="n">8</span>Ledger + API</a>
+<div class="grp">收尾</div>
+<a href="#verify" data-tab="verify"><span class="n">9</span>上线验证</a>
+<a href="#rollback" data-tab="rollback"><span class="n">10</span>回滚</a>
+</nav>
+<div class="side-foot">2026-09-18 · v4<br>PR #1703 (neodax) 待审<br>PR #150 (apps-value) 待审<br>min_sources = 1 锁定</div>
+</aside>
+
+<div class="main">
+
+<!-- ═══ 1 总览 ═══ -->
+<article class="panel" id="p-overview">
+<header>
+<div class="eyebrow">1 · 总览</div>
+<h1>14 个永续市场 · 一次完整上线</h1>
+<p class="standfirst">本次上线 <strong>13 个新市场 + 1 个启用</strong>（1000PEPE），涵盖商品（金/银/原油）、DeFi、股票永续三大类。所有新市场 <code>mark_price_min_sources_normal = 1</code>。执行顺序：<strong>Kafka → Perp PM → Finex Shard → Quote → Ledger/Trading-API → 验证</strong>。</p>
+<div class="assume"><b>关键确认（2026-09-18 全部核实）</b> · 配置源：<code>neodax-apps-value</code>（staging 分支，真实 Nacos 维护处）。三个 shard 现有分配已核实：<b>Finex-1 = BTC/1000PEPE/SUI/XRP，Finex-2 = ETH/BNB/TAO/LINK，Finex-3 = SOL/DOGE/TBTC/HYPE</b>（无重复，git 历史只有 #90/#98 两次变更）。14 个市场 Binance/OKX/Bybit <b>三家全有</b>（1000PEPE 除外：OKX 无对应合约）。TradFi 参数按 Binance 官方公告 + fapi exchangeInfo 定稿。<b>min_sources 全部 = 1，永久锁定，禁止调高</b>。</div>
+</header>
+
+<section>
+<h2>Shard 分配方案</h2>
+<p class="section-note">现状 12 个市场（每 shard 4 个）+ 13 新 + 1000PEPE 已在 Finex-1 名单 = 25 个。分配 <b>8 / 8 / 9</b>，<b>全部只加不删</b>——零迁移风险，无市场挪动。</p>
+<div class="layers">
+<div class="layer hi">
+<div class="layer-n">Finex-1<small>8 markets · 大盘币 + 明星股票 + 黄金（加 4）</small></div>
+<p class="layer-d"><span class="dim">现有：</span><code>BTCUSDT-PERP</code> <code>1000PEPEUSDT-PERP</code> <code>SUIUSDT-PERP</code> <code>XRPUSDT-PERP</code> + <b>新增</b>：<code>NVDAUSDT-PERP</code> <code>TSLAUSDT-PERP</code> <code>XAUUSDT-PERP</code> <code>NEARUSDT-PERP</code></p>
+</div>
+<div class="arrow">↑ 只加 4 行，不删现有</div>
+<div class="layer hi">
+<div class="layer-n">Finex-2<small>8 markets · 大币 + DeFi（加 4）</small></div>
+<p class="layer-d"><span class="dim">现有：</span><code>ETHUSDT-PERP</code> <code>BNBUSDT-PERP</code> <code>TAOUSDT-PERP</code> <code>LINKUSDT-PERP</code> + <b>新增</b>：<code>ARBUSDT-PERP</code> <code>UNIUSDT-PERP</code> <code>ADAUSDT-PERP</code> <code>AAVEUSDT-PERP</code></p>
+</div>
+<div class="arrow">↑ 只加 4 行，不删现有</div>
+<div class="layer hi">
+<div class="layer-n">Finex-3<small>9 markets · 山寨 + 商品 + 股票（加 5）</small></div>
+<p class="layer-d"><span class="dim">现有：</span><code>SOLUSDT-PERP</code> <code>DOGEUSDT-PERP</code> <code>TBTCUSDT-PERP</code> <code>HYPEUSDT-PERP</code> + <b>新增</b>：<code>XAGUSDT-PERP</code> <code>CLUSDT-PERP</code> <code>GOOGLUSDT-PERP</code> <code>MSTRUSDT-PERP</code> <code>CRCLUSDT-PERP</code></p>
+</div>
+</div>
+</section>
+
+<section>
+<h2>两个 PR（均已提交，等 owner 审核）</h2>
+<div class="tw"><table>
+<thead><tr><th>PR</th><th>仓库 / 分支</th><th>内容</th><th>合并时机</th></tr></thead>
+<tbody>
+<tr><td class="mono-c"><b>#1703</b></td><td>neodax → master</td><td>seeds：13 资产 + 13 市场 + 49 风险档位 + 1000PEPE 启用（<code>portfolio_manager_perp/seeds/20260918120000_perps_markets.sql</code> + <code>20260918120100_perps_market_risk_tiers.sql</code> + README）</td><td class="dim">先合并——只是文件落库，无任何运行时效果</td></tr>
+<tr><td class="mono-c"><b>#150</b></td><td>neodax-apps-value → staging</td><td>7 个文件：finex shard ×3 + quote + ledger + trading-api + kafka-topic-provision</td><td class="dim">后合并——ArgoCD sync 后立即生效（见下方热加载警告）</td></tr>
+</tbody>
+</table></div>
+
+<h2>操作员执行序列（不可乱序）</h2>
+<ol class="steps n">
+<li><b>合并 PR #1703（seeds）</b><span>owner 审核通过后合并。此步只是把 SQL 文件放进 master，无任何运行时效果。</span></li>
+<li><b>对 staging PM Perp 库执行 seeds</b><span>从 master 拉取后在能连 staging RDS 的环境执行（凭证从 vault 取 <code>neodax/stg/managed/rds</code>，sslmode=require）——完整命令见第 5 页。本地开发用 <code>make seed-perp-markets && make seed-perp-market-risk-tiers</code>。</span></li>
+<li><b>验证 PM 已识别（60s 内自动 reload）</b><span>admin 的 perpetual market list 或 PM gRPC 能看到 14 个市场 status=active。此时 trading-api 未暴露、finex 未加载——用户无感知，安全。</span></li>
+<li><b>合并 PR #150（staging 配置）</b><span>ArgoCD 自动 sync → 三个 Sync-hook Job 并跑：<code>neodax-db-migrate</code>（migrations，无新增）、<code>nacos-sync</code>（配置推进 Nacos）、<code>neodax-kafka-topic-provision</code>（自动创建全部新 topic，无需手动跑 §4 命令）。<b>⚠️ 从这一刻起 trading-api 热加载 enabled_futures_markets，市场已对用户暴露</b>——在 quote 重启完成前，新市场订单会被 mark price 门干净拒绝（可接受，数分钟窗口）。</span></li>
+<li><b>立即滚动重启 finex-perp-1/2/3</b><span>各实例加载新 configured_markets + order book。必须在 quote 之前——否则 quote 出价后订单会被 PM 接受却无人撮合（卡单）。命令见第 6 页。</span></li>
+<li><b>重启 quote</b><span>新市场的 mark price 开始产出（mark price 门通过）。从此刻起订单全链路可用。验证 mark 新鲜度（第 9 页第 4 项）。</span></li>
+<li><b>重启 ledger</b><span>K 线聚合开始消费新市场 trade。</span></li>
+<li><b>冒烟验证</b><span>按第 9 页 7 项逐一确认 + 2-3 个代表市场小额开平仓。</span></li>
+</ol>
+<div class="call warn"><p class="call-t">热加载行为矩阵（防操作员失误的关键）</p><p><b>trading-api</b>：<code>enabled_futures_markets</code> 热加载（Nacos 一变即生效，无需重启）——这是第 4 步暴露市场的原因。<b>PM Perp</b>：市场表 60s 自动 reload（seeds 后无需重启；重启也可）。<b>finex</b>：<code>configured_markets</code> 只在启动时读取——<b>必须重启</b>。<b>quote</b>：mark oracle 权重等可热调，但<b>新 symbol 的 WS 订阅必须重启</b>。<b>ledger</b>：markets 列表启动时读取——<b>必须重启</b>。重启顺序铁律：<b>finex → quote → ledger</b>（trading-api 不用重启）。</p></div>
+</section>
+</article>
+
+<!-- ═══ 2 市场参数 ═══ -->
+<article class="panel" id="p-markets" hidden>
+<header>
+<div class="eyebrow">2 · 市场参数</div>
+<h1>14 个市场的完整参数表</h1>
+<p class="standfirst">费率统一 <strong>maker 0.02% / taker 0.05%</strong>，quote 资产均为 USDT。<strong>全部参数已按 Binance fapi exchangeInfo 实测数据定稿</strong>（2026-09-18，VPN 直连核实：tick/step/minQty/maxQty/minNotional/PERCENT_PRICE 逐项对齐）。资金费周期：XAU/XAG/CL = <strong>4h</strong>，其余 = 8h（TSLA 上线时 4h，现已改 8h，以 fapi/v1/fundingInfo 实测为准）。<code>mark_price_min_sources_normal = 1</code>（全部，<b>永久锁定</b>）。</p>
+</header>
+
+<section>
+<h2>参数总表</h2>
+<div class="tw"><table>
+<thead><tr><th>Symbol</th><th>Category</th><th>Amt/Prc Prec</th><th>Tick / Step</th><th>MinQty / MinNot</th><th>MaxQty</th><th>Max Lev</th><th>IMR / MMR</th><th>Funding</th><th>限价波动带</th></tr></thead>
+<tbody>
+<tr><td class="mono-c"><b>XAUUSDT-PERP</b></td><td>商品·金</td><td class="mono-c">3 / 2</td><td class="mono-c">0.01 / 0.001</td><td class="mono-c">0.001 / 5</td><td class="mono-c">10000</td><td class="mono-c">50</td><td class="mono-c">0.02 / 0.01</td><td class="mono-c">4h ±2%</td><td class="mono-c">0.98 – 1.02</td></tr>
+<tr><td class="mono-c"><b>XAGUSDT-PERP</b></td><td>商品·银</td><td class="mono-c">3 / 2</td><td class="mono-c">0.01 / 0.001</td><td class="mono-c">0.001 / 5</td><td class="mono-c">1000000</td><td class="mono-c">50</td><td class="mono-c">0.02 / 0.01</td><td class="mono-c">4h ±2%</td><td class="mono-c">0.97 – 1.03</td></tr>
+<tr><td class="mono-c"><b>CLUSDT-PERP</b></td><td>商品·WTI原油</td><td class="mono-c">2 / 2</td><td class="mono-c">0.01 / 0.01</td><td class="mono-c">0.01 / 5</td><td class="mono-c">500000</td><td class="mono-c">100</td><td class="mono-c">0.01 / 0.005</td><td class="mono-c">4h ±2%</td><td class="mono-c">0.97 – 1.03</td></tr>
+<tr><td class="mono-c"><b>ARBUSDT-PERP</b></td><td>DeFi</td><td class="mono-c">1 / 5</td><td class="mono-c">0.00001 / 0.1</td><td class="mono-c">0.1 / 5</td><td class="mono-c">30000000</td><td class="mono-c">100</td><td class="mono-c">0.01 / 0.005</td><td class="mono-c">8h 平台</td><td class="mono-c">0.85 – 1.15</td></tr>
+<tr><td class="mono-c"><b>UNIUSDT-PERP</b></td><td>DeFi</td><td class="mono-c">0 / 3</td><td class="mono-c">0.001 / 1</td><td class="mono-c">1 / 5</td><td class="mono-c">2000000</td><td class="mono-c">100</td><td class="mono-c">0.01 / 0.005</td><td class="mono-c">8h 平台</td><td class="mono-c">0.90 – 1.10</td></tr>
+<tr><td class="mono-c"><b>NEARUSDT-PERP</b></td><td>L1</td><td class="mono-c">0 / 3</td><td class="mono-c">0.001 / 1</td><td class="mono-c">1 / 5</td><td class="mono-c">5000000</td><td class="mono-c">100</td><td class="mono-c">0.01 / 0.005</td><td class="mono-c">8h 平台</td><td class="mono-c">0.90 – 1.10</td></tr>
+<tr><td class="mono-c"><b>ADAUSDT-PERP</b></td><td>L1</td><td class="mono-c">0 / 4</td><td class="mono-c">0.0001 / 1</td><td class="mono-c">1 / 5</td><td class="mono-c">30000000</td><td class="mono-c">100</td><td class="mono-c">0.01 / 0.005</td><td class="mono-c">8h 平台</td><td class="mono-c">0.95 – 1.05</td></tr>
+<tr><td class="mono-c"><b>AAVEUSDT-PERP</b></td><td>DeFi</td><td class="mono-c">1 / 2</td><td class="mono-c">0.01 / 0.1</td><td class="mono-c">0.1 / 5</td><td class="mono-c">78000</td><td class="mono-c">100</td><td class="mono-c">0.01 / 0.005</td><td class="mono-c">8h 平台</td><td class="mono-c">0.90 – 1.10</td></tr>
+<tr><td class="mono-c"><b>NVDAUSDT-PERP</b></td><td>股票</td><td class="mono-c">2 / 2</td><td class="mono-c">0.01 / 0.01</td><td class="mono-c">0.01 / 5</td><td class="mono-c">30000</td><td class="mono-c">10</td><td class="mono-c">0.10 / 0.05</td><td class="mono-c">8h ±2%</td><td class="mono-c">0.97 – 1.03</td></tr>
+<tr><td class="mono-c"><b>CRCLUSDT-PERP</b></td><td>股票</td><td class="mono-c">2 / 2</td><td class="mono-c">0.01 / 0.01</td><td class="mono-c">0.01 / 5</td><td class="mono-c">70000</td><td class="mono-c">10</td><td class="mono-c">0.10 / 0.05</td><td class="mono-c">8h ±2%</td><td class="mono-c">0.97 – 1.03</td></tr>
+<tr><td class="mono-c"><b>MSTRUSDT-PERP</b></td><td>股票</td><td class="mono-c">2 / 2</td><td class="mono-c">0.01 / 0.01</td><td class="mono-c">0.01 / 5</td><td class="mono-c">42000</td><td class="mono-c">10</td><td class="mono-c">0.10 / 0.05</td><td class="mono-c">8h ±2%</td><td class="mono-c">0.97 – 1.03</td></tr>
+<tr><td class="mono-c"><b>TSLAUSDT-PERP</b></td><td>股票</td><td class="mono-c">2 / 2</td><td class="mono-c">0.01 / 0.01</td><td class="mono-c">0.01 / 5</td><td class="mono-c">20000</td><td class="mono-c">10</td><td class="mono-c">0.10 / 0.05</td><td class="mono-c">8h ±2%</td><td class="mono-c">0.97 – 1.03</td></tr>
+<tr><td class="mono-c"><b>GOOGLUSDT-PERP</b></td><td>股票</td><td class="mono-c">2 / 2</td><td class="mono-c">0.01 / 0.01</td><td class="mono-c">0.01 / 5</td><td class="mono-c">20000</td><td class="mono-c">10</td><td class="mono-c">0.10 / 0.05</td><td class="mono-c">8h ±2%</td><td class="mono-c">0.97 – 1.03</td></tr>
+<tr class="dim"><td class="mono-c">1000PEPEUSDT-PERP</td><td>Meme·启用</td><td class="mono-c">已有</td><td class="mono-c">已有</td><td class="mono-c">已有</td><td class="mono-c">已有</td><td class="mono-c">已有</td><td class="mono-c">已有</td><td class="mono-c">已有</td><td class="mono-c">已有（仅改 status）</td></tr>
+</tbody>
+</table></div>
+<div class="call ok"><p class="call-t">数据来源（全部 2026-09-18 实测）</p><p>tick / step / minQty / maxQty / minNotional / PERCENT_PRICE：Binance <code>fapi/v1/exchangeInfo</code> 直连抓取（本地 VPN）。资金费周期：<code>fapi/v1/fundingInfo</code>（XAU/XAG/CL=4h，TSLA 现为 8h）。杠杆与利率：官方上线公告（XAU/XAG 50x、CL 100x、股票 10x、利率 0%）。Prc Prec = tick 小数位（Binance 的 pricePrecision 字段含补零，不采用）。</p></div>
+<div class="call warn"><p class="call-t">min_sources = 1 永久锁定</p><p><b>任何市场、任何时候都不要把 mark_price_min_sources_normal 改成 2 或 3</b>。多源强制会把市场推进 SAFE_MODE（历史事故：开单被全拒）。行情源可以多接（Binance/OKX/Bybit 三家都接上，权重分散），但 min_sources 判定线永远是 1——只要还有一个源活着就正常。</p></div>
+</section>
+
+<section>
+<h2>行情源覆盖（2026-09-18 三家 API 实测）</h2>
+<div class="tw"><table>
+<thead><tr><th>Market</th><th>Binance</th><th>OKX</th><th>Bybit</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td class="mono-c">XAUUSDT-PERP</td><td><span class="pill ok">✓ XAUUSDT</span></td><td><span class="pill ok">✓ XAU-USDT-SWAP</span></td><td><span class="pill ok">✓ XAUUSDT</span></td><td class="dim">三家全有</td></tr>
+<tr><td class="mono-c">XAGUSDT-PERP</td><td><span class="pill ok">✓ XAGUSDT</span></td><td><span class="pill ok">✓ XAG-USDT-SWAP</span></td><td><span class="pill ok">✓ XAGUSDT</span></td><td class="dim">三家全有</td></tr>
+<tr><td class="mono-c">CLUSDT-PERP</td><td><span class="pill ok">✓ CLUSDT</span></td><td><span class="pill ok">✓ CL-USDT-SWAP</span></td><td><span class="pill ok">✓ CLUSDT</span></td><td class="dim">三家全有</td></tr>
+<tr><td class="mono-c">ARBUSDT-PERP</td><td><span class="pill ok">✓</span></td><td><span class="pill ok">✓ ARB-USDT-SWAP</span></td><td><span class="pill ok">✓</span></td><td class="dim">三家全有</td></tr>
+<tr><td class="mono-c">UNIUSDT-PERP</td><td><span class="pill ok">✓</span></td><td><span class="pill ok">✓ UNI-USDT-SWAP</span></td><td><span class="pill ok">✓</span></td><td class="dim">三家全有</td></tr>
+<tr><td class="mono-c">NEARUSDT-PERP</td><td><span class="pill ok">✓</span></td><td><span class="pill ok">✓ NEAR-USDT-SWAP</span></td><td><span class="pill ok">✓</span></td><td class="dim">三家全有</td></tr>
+<tr><td class="mono-c">ADAUSDT-PERP</td><td><span class="pill ok">✓</span></td><td><span class="pill ok">✓ ADA-USDT-SWAP</span></td><td><span class="pill ok">✓</span></td><td class="dim">三家全有</td></tr>
+<tr><td class="mono-c">AAVEUSDT-PERP</td><td><span class="pill ok">✓</span></td><td><span class="pill ok">✓ AAVE-USDT-SWAP</span></td><td><span class="pill ok">✓</span></td><td class="dim">三家全有</td></tr>
+<tr><td class="mono-c">NVDAUSDT-PERP</td><td><span class="pill ok">✓</span></td><td><span class="pill ok">✓ NVDA-USDT-SWAP</span></td><td><span class="pill ok">✓</span></td><td class="dim">三家全有</td></tr>
+<tr><td class="mono-c">CRCLUSDT-PERP</td><td><span class="pill ok">✓</span></td><td><span class="pill ok">✓ CRCL-USDT-SWAP</span></td><td><span class="pill ok">✓</span></td><td class="dim">三家全有</td></tr>
+<tr><td class="mono-c">MSTRUSDT-PERP</td><td><span class="pill ok">✓</span></td><td><span class="pill ok">✓ MSTR-USDT-SWAP</span></td><td><span class="pill ok">✓</span></td><td class="dim">三家全有</td></tr>
+<tr><td class="mono-c">TSLAUSDT-PERP</td><td><span class="pill ok">✓</span></td><td><span class="pill ok">✓ TSLA-USDT-SWAP</span></td><td><span class="pill ok">✓</span></td><td class="dim">三家全有</td></tr>
+<tr><td class="mono-c">GOOGLUSDT-PERP</td><td><span class="pill ok">✓</span></td><td><span class="pill ok">✓ GOOGL-USDT-SWAP</span></td><td><span class="pill ok">✓</span></td><td class="dim">三家全有</td></tr>
+<tr><td class="mono-c">1000PEPEUSDT-PERP</td><td><span class="pill ok">✓</span></td><td><span class="pill gap">✗ 无对应合约</span></td><td><span class="pill ok">✓</span></td><td class="dim">OKX 只有 PEPE-USDT-SWAP（面值 10,000,000，语义不匹配）；现有配置映射的 "1000PEPE-USDT-SWAP" 实际不存在 → 该源一直是死的</td></tr>
+</tbody>
+</table></div>
+<div class="call"><p class="call-t">策略：三源全接，min_sources = 1</p><p>13 个新市场三家全有 → quote 配置里 Binance/OKX/Bybit 三个源都接上（第 7 页），任一家挂了另外两家顶上。<b>但 min_sources 判定线永远 = 1</b>——只要还有一个源出价就保持 normal，绝不进 SAFE_MODE。</p></div>
+</section>
+</article>
+
+<!-- ═══ 3 前置检查 ═══ -->
+<article class="panel" id="p-preflight" hidden>
+<header>
+<div class="eyebrow">3 · 前置检查</div>
+<h1>动手之前必须确认的事</h1>
+<p class="standfirst">这一页全勾完才往下走。任何一项不确定，先停下来问。</p>
+</header>
+<section>
+<ol class="steps n">
+<li><b>行情源确认（已完成）</b><span>✅ 2026-09-18 三家 API 实测：13 个新市场 Binance/OKX/Bybit 全有，三个源全接（第 7 页配置）。1000PEPE 用 Binance+Bybit（OKX 无对应合约）。min_sources = 1 全部锁定。</span></li>
+<li><b>参数确认（已完成）</b><span>✅ 全部按 Binance fapi exchangeInfo 实测定稿（tick/step/minQty/maxQty/minNotional/PERCENT_PRICE 逐项对齐，见第 2 页）。资金费周期按 fundingInfo 实测（XAU/XAG/CL 4h，TSLA 8h）。唯一简化：风险档位用 IMR=1/杠杆、MMR=IMR/2 的简化结构（Binance riskBrackets 需签名 API 拿不到；如要精确档位上线后可替换）。</span></li>
+<li><b>Finex-3 市场消失——已核实（staging）</b><span>✅ <code>neodax-apps-value</code> staging 分支核实：Finex-3 名单 <b>SOL/DOGE/TBTC/HYPE 完好</b>，git 历史仅 #90（建 shard）和 #98（加 HYPE）两次变更，从未重复。若运行时看不到这 4 个市场，查两处：① PM staging DB 里这 4 行 <code>perps_markets.status</code> 是否 active（Finex 只加载 PM 报告且在白名单里的市场）；② finex-perp-3 pod 是否 Ready。⚠️ 若你当时看的是<b>生产</b> Nacos，生产配置不在此 repo——执行生产上线前先拿生产名单跟本方案核对。</span></li>
+<li><b>现存隐患：TBTC 无任何行情源</b><span>⚠️ TBTCUSDT-PERP 在 Binance/OKX/Bybit 三家都没有合约，staging quote 配置也没给它任何源（不在任何 symbols 列表）。目前靠 <code>safe_mode_zero_sources_sec: 2592000</code>（30 天零源宽限）活着——宽限期一过就进 SAFE_MODE（开单全拒）。本次上线顺手处理：要么给 TBTC 加 <code>internal_perp_trade</code> 源（用自己场内成交价做 mark），要么接受 SAFE_MODE，要么下架。建议单独决策，别混进本次 rollout。</span></li>
+<li><b>确认 Finex-1 的 1000PEPE 只需启用</b><span>已在 shard 配置里。只需把 <code>perps_markets.status</code> 改为 active + 全链路 quote 配置补上。</span></li>
+<li><b>确认系统账户有 USDT 余额行</b><span>quote 用现有 USDT，不需要新种。确认保险基金池 / 手续费金库 / 清算残差金库的 USDT 行已存在。</span></li>
+<li><b>预估 Kafka topic 总量</b><span>13 个新市场 × 3-4 topic/市场 ≈ 40-52 个新 topic。确认 Kafka 集群容量。</span></li>
+</ol>
+</section>
+</article>
+
+<!-- ═══ 4 Kafka ═══ -->
+<article class="panel" id="p-kafka" hidden>
+<header>
+<div class="eyebrow">4 · Kafka Topics</div>
+<h1>Kafka Topics（staging 自动创建）</h1>
+<p class="standfirst"><strong>staging 无需手动执行</strong>——PR #150 已把 13 个新市场加进 <code>neodax-kafka-topic-provision/staging/values.yaml</code> 的 <code>-perp-markets=</code> 列表，ArgoCD sync 时 Sync-hook Job 自动跑 <code>kafka_topic_init</code>（幂等，只补缺失）。手动命令仅用于本地开发或应急补建。</p>
+</header>
+<section>
+<h3>自动路径（staging，默认）</h3>
+<pre><span class="c"># PR #150 合并 → ArgoCD sync → neodax-kafka-topic-provision Job 自动执行：</span>
+/app/kafka_topic_init -replication-factor=3 -min-isr=2 \
+  --brokers "$KAFKA_BROKERS" \
+  -perp-markets=BTCUSDT-PERP,...,HYPEUSDT-PERP,<span class="c"># 现有 12 个</span>
+    XAUUSDT-PERP,XAGUSDT-PERP,CLUSDT-PERP,ARBUSDT-PERP,UNIUSDT-PERP,NEARUSDT-PERP,\
+    ADAUSDT-PERP,AAVEUSDT-PERP,NVDAUSDT-PERP,CRCLUSDT-PERP,MSTRUSDT-PERP,TSLAUSDT-PERP,GOOGLUSDT-PERP <span class="c"># ← PR #150 新增 13 个</span>
+  -spot-markets=ETHUSDT,BTCUSDT,... <span class="c"># spot 不变</span></pre>
+
+<h3>手动路径（本地开发 / 应急补建）</h3>
+<pre><span class="c"># 先 dry-run 确认要建哪些（幂等，只补缺失，1000PEPE 的已存在会跳过）</span>
+go run ./tools/kafka_topic_init \
+  -brokers &lt;BROKER_ADDR&gt; \
+  -perp-markets "XAUUSDT-PERP,XAGUSDT-PERP,CLUSDT-PERP,ARBUSDT-PERP,UNIUSDT-PERP,NEARUSDT-PERP,ADAUSDT-PERP,AAVEUSDT-PERP,NVDAUSDT-PERP,CRCLUSDT-PERP,MSTRUSDT-PERP,TSLAUSDT-PERP,GOOGLUSDT-PERP,1000PEPEUSDT-PERP" \
+  -dry-run
+<span class="c"># 确认无误后去掉 -dry-run 加上 -replication-factor 3 -min-isr 2</span></pre>
+
+<div class="call"><p class="call-t">每个市场创建哪些 topic</p><p><code>commands.{MKT}.OrderCommands</code> · <code>events.{MKT}.EventOrderUpdated</code> · <code>events.{MKT}.EventTradeExecuted</code> · <code>events.{MKT}.EventPerpTriggerOrder</code>。13 个新市场 × 3-4 ≈ 40-52 个新 topic（1000PEPE 已存在）。验证：第 9 页第 1 项，或 Kafka UI 里按 symbol 前缀过滤。</p></div>
+</section>
+</article>
+
+<!-- ═══ 5 Perp PM ═══ -->
+<article class="panel" id="p-perppm" hidden>
+<header>
+<div class="eyebrow">5 · Perp PM</div>
+<h1>数据库插入 + 滚动重启</h1>
+<p class="standfirst">以下 SQL 就是 <strong>PR #1703</strong> 的两个 seed 文件内容（<code>20260918120000_perps_markets.sql</code> + <code>20260918120100_perps_market_risk_tiers.sql</code>，已提交 neodax master 待审核）。staging 执行方式见下方命令块；PM Perp 60s 自动 reload 市场表，<strong>执行完 seeds 无需重启 PM</strong>（重启亦可）。</p>
+</header>
+<section>
+<h3>执行 seeds（staging）</h3>
+<pre><span class="c"># ① 合并 PR #1703 后，在能连 staging RDS 的环境拉取 master</span>
+git fetch && git checkout master && git pull
+
+<span class="c"># ② 凭证从 vault 取 neodax/stg/managed/rds（host/port/db_name/username/password），sslmode=require</span>
+<span class="c"># ③ 顺序执行两个 seed 文件（幂等，可重跑）：</span>
+psql "postgresql://&lt;USERNAME&gt;:&lt;PASSWORD&gt;@&lt;HOST&gt;:&lt;PORT&gt;/&lt;DB_NAME&gt;?sslmode=require" \
+  -f portfolio_manager_perp/seeds/20260918120000_perps_markets.sql
+psql "postgresql://&lt;USERNAME&gt;:&lt;PASSWORD&gt;@&lt;HOST&gt;:&lt;PORT&gt;/&lt;DB_NAME&gt;?sslmode=require" \
+  -f portfolio_manager_perp/seeds/20260918120100_perps_market_risk_tiers.sql
+
+<span class="c"># ④ 验证：14 个市场 active（1000PEPE 含在内）</span>
+psql "postgresql://..." -c "SELECT symbol, status, max_allowed_leverage, funding_interval_seconds
+  FROM portfolio_manager_perp.perps_markets WHERE symbol IN ('XAUUSDT-PERP','XAGUSDT-PERP','CLUSDT-PERP',
+  'ARBUSDT-PERP','UNIUSDT-PERP','NEARUSDT-PERP','ADAUSDT-PERP','AAVEUSDT-PERP','NVDAUSDT-PERP',
+  'CRCLUSDT-PERP','MSTRUSDT-PERP','TSLAUSDT-PERP','GOOGLUSDT-PERP','1000PEPEUSDT-PERP') ORDER BY symbol;"</pre>
+<div class="call"><p class="call-t">本地开发（docker compose 环境）</p><p><code>make seed-perp-markets && make seed-perp-market-risk-tiers</code>——两个文件命名匹配 Makefile glob（<code>[0-9]*_perps_markets.sql</code> / <code>[0-9]*_perps_market_risk_tiers.sql</code>），自动按时间戳顺序并入，无需改 Makefile。</p></div>
+<h3>Step 1: 资产（perps_assets）</h3>
+<pre><span class="c">-- 13 个新 base 资产（quote USDT 已存在，1000PEPE 已存在）</span>
+INSERT INTO portfolio_manager_perp.perps_assets (symbol, name, decimals, is_active, is_stablecoin, created_at) VALUES
+  ('XAU',  'Gold',            8, true, false, NOW()),
+  ('XAG',  'Silver',          8, true, false, NOW()),
+  ('CL',   'WTI Crude Oil',   2, true, false, NOW()),
+  ('ARB',  'Arbitrum',       18, true, false, NOW()),
+  ('UNI',  'Uniswap',        18, true, false, NOW()),
+  ('NEAR', 'NEAR Protocol',  24, true, false, NOW()),
+  ('ADA',  'Cardano',         6, true, false, NOW()),
+  ('AAVE', 'Aave',           18, true, false, NOW()),
+  ('NVDA', 'NVIDIA',          8, true, false, NOW()),
+  ('CRCL', 'Circle',          8, true, false, NOW()),
+  ('MSTR', 'MicroStrategy',   8, true, false, NOW()),
+  ('TSLA', 'Tesla',           8, true, false, NOW()),
+  ('GOOGL','Alphabet',        8, true, false, NOW())
+ON CONFLICT (symbol) DO UPDATE SET is_active=EXCLUDED.is_active, decimals=EXCLUDED.decimals, name=EXCLUDED.name;</pre>
+
+<h3>Step 2: 市场（perps_markets）</h3>
+<pre><span class="c">-- 13 个新市场。列清单与当前 schema 一致（display precision 两列已在 20260702 migration 删除）。</span>
+<span class="c">-- 全部参数 = Binance fapi exchangeInfo 实测（2026-09-18）：tick/step/minQty/maxQty/minNotional/PERCENT_PRICE 逐项对齐。</span>
+<span class="c">-- 资金费周期：XAU/XAG/CL = 14400（4h），其余 = 28800（8h，含 TSLA——上线时 4h 已改 8h，以 fundingInfo 实测为准）。</span>
+<span class="c">-- TradFi 资金费：cap ±2%（0.02）、利率 0（Binance 官方）；crypto 沿用平台模板 cap/利率 0.003。</span>
+<span class="c">-- min_price/max_price 留空 → 用 price_min/max_ratio（Binance PERCENT_PRICE 原值）。</span>
+INSERT INTO portfolio_manager_perp.perps_markets (
+  symbol, base_asset, quote_asset, status, maker_fee_rate, taker_fee_rate,
+  amount_precision, price_precision, price_min_ratio, price_max_ratio,
+  step_size, tick_size, min_qty, max_qty, min_notional, depth_level,
+  maintenance_margin_rate, max_allowed_leverage, funding_interval_seconds,
+  max_funding_rate_per_int, interest_rate_per_interval, mark_price_min_sources_normal,
+  created_at, updated_at
+) VALUES
+  <span class="c">-- 商品（Binance: 50x/50x/100x, funding 4h, cap ±2%, 利率 0%）</span>
+  ('XAUUSDT-PERP','XAU','USDT','active',0.0002,0.0005, 3,2, 0.98,1.02,'0.001','0.01','0.001','10000','5','["0.01","0.1","1","10"]',0.01,50,14400,0.02,0.0,1,NOW(),NOW()),
+  ('XAGUSDT-PERP','XAG','USDT','active',0.0002,0.0005, 3,2, 0.97,1.03,'0.001','0.01','0.001','1000000','5','["0.01","0.1","1","10"]',0.01,50,14400,0.02,0.0,1,NOW(),NOW()),
+  ('CLUSDT-PERP','CL','USDT','active',0.0002,0.0005, 2,2, 0.97,1.03,'0.01','0.01','0.01','500000','5','["0.01","0.1","1","10"]',0.005,100,14400,0.02,0.0,1,NOW(),NOW()),
+  <span class="c">-- DeFi / L1（LOT_SIZE 按 fapi 实测；cap/利率 = 平台模板）</span>
+  ('ARBUSDT-PERP','ARB','USDT','active',0.0002,0.0005, 1,5, 0.85,1.15,'0.1','0.00001','0.1','30000000','5','["0.00001","0.0001","0.001","0.01"]',0.005,100,28800,0.003,0.003,1,NOW(),NOW()),
+  ('UNIUSDT-PERP','UNI','USDT','active',0.0002,0.0005, 0,3, 0.90,1.10,'1','0.001','1','2000000','5','["0.001","0.01","0.1","1"]',0.005,100,28800,0.003,0.003,1,NOW(),NOW()),
+  ('NEARUSDT-PERP','NEAR','USDT','active',0.0002,0.0005, 0,3, 0.90,1.10,'1','0.001','1','5000000','5','["0.001","0.01","0.1","1"]',0.005,100,28800,0.003,0.003,1,NOW(),NOW()),
+  ('ADAUSDT-PERP','ADA','USDT','active',0.0002,0.0005, 0,4, 0.95,1.05,'1','0.0001','1','30000000','5','["0.0001","0.001","0.01","0.1"]',0.005,100,28800,0.003,0.003,1,NOW(),NOW()),
+  ('AAVEUSDT-PERP','AAVE','USDT','active',0.0002,0.0005, 1,2, 0.90,1.10,'0.1','0.01','0.1','78000','5','["0.01","0.1","1","10"]',0.005,100,28800,0.003,0.003,1,NOW(),NOW()),
+  <span class="c">-- 股票（Binance: 10x, funding 8h, cap ±2%, 利率 0%）</span>
+  ('NVDAUSDT-PERP','NVDA','USDT','active',0.0002,0.0005, 2,2, 0.97,1.03,'0.01','0.01','0.01','30000','5','["0.01","0.1","1","10"]',0.05,10,28800,0.02,0.0,1,NOW(),NOW()),
+  ('CRCLUSDT-PERP','CRCL','USDT','active',0.0002,0.0005, 2,2, 0.97,1.03,'0.01','0.01','0.01','70000','5','["0.01","0.1","1","10"]',0.05,10,28800,0.02,0.0,1,NOW(),NOW()),
+  ('MSTRUSDT-PERP','MSTR','USDT','active',0.0002,0.0005, 2,2, 0.97,1.03,'0.01','0.01','0.01','42000','5','["0.01","0.1","1","10"]',0.05,10,28800,0.02,0.0,1,NOW(),NOW()),
+  ('TSLAUSDT-PERP','TSLA','USDT','active',0.0002,0.0005, 2,2, 0.97,1.03,'0.01','0.01','0.01','20000','5','["0.01","0.1","1","10"]',0.05,10,28800,0.02,0.0,1,NOW(),NOW()),
+  ('GOOGLUSDT-PERP','GOOGL','USDT','active',0.0002,0.0005, 2,2, 0.97,1.03,'0.01','0.01','0.01','20000','5','["0.01","0.1","1","10"]',0.05,10,28800,0.02,0.0,1,NOW(),NOW())
+ON CONFLICT (symbol) DO UPDATE SET
+  base_asset=EXCLUDED.base_asset, status=EXCLUDED.status,
+  maker_fee_rate=EXCLUDED.maker_fee_rate, taker_fee_rate=EXCLUDED.taker_fee_rate,
+  amount_precision=EXCLUDED.amount_precision, price_precision=EXCLUDED.price_precision,
+  price_min_ratio=EXCLUDED.price_min_ratio, price_max_ratio=EXCLUDED.price_max_ratio,
+  step_size=EXCLUDED.step_size, tick_size=EXCLUDED.tick_size,
+  min_qty=EXCLUDED.min_qty, max_qty=EXCLUDED.max_qty, min_notional=EXCLUDED.min_notional,
+  depth_level=EXCLUDED.depth_level,
+  maintenance_margin_rate=EXCLUDED.maintenance_margin_rate,
+  max_allowed_leverage=EXCLUDED.max_allowed_leverage,
+  funding_interval_seconds=EXCLUDED.funding_interval_seconds,
+  max_funding_rate_per_int=EXCLUDED.max_funding_rate_per_int,
+  interest_rate_per_interval=EXCLUDED.interest_rate_per_interval,
+  mark_price_min_sources_normal=EXCLUDED.mark_price_min_sources_normal,
+  updated_at=NOW();
+
+<span class="c">-- 1000PEPE 启用：已有行，只改 status，其他参数一律不动</span>
+UPDATE portfolio_manager_perp.perps_markets
+  SET status='active', updated_at=NOW()
+  WHERE symbol='1000PEPEUSDT-PERP';</pre>
+
+<h3>Step 3: 风险档位（perps_market_risk_tiers）</h3>
+<pre><span class="c">-- max_position_qty = quote notional（USDT），与 HYPE seed 同语义。</span>
+<span class="c">-- IMR = 1/max_leverage，MMR = IMR/2（简化结构；上线前可用 Binance riskBrackets 精确替换）。</span>
+INSERT INTO portfolio_manager_perp.perps_market_risk_tiers (symbol,tier_index,max_position_qty,max_leverage,initial_margin_rate,maintenance_margin_rate,config_version,created_at,updated_at) VALUES
+  <span class="c">-- 商品 XAU/XAG: 50x / 25x / 10x</span>
+  ('XAUUSDT-PERP',1,   50000, 50, 0.02, 0.01, 1,NOW(),NOW()),
+  ('XAUUSDT-PERP',2,  500000, 25, 0.04, 0.02, 1,NOW(),NOW()),
+  ('XAUUSDT-PERP',3, 5000000, 10, 0.10, 0.05, 1,NOW(),NOW()),
+  ('XAGUSDT-PERP',1,   50000, 50, 0.02, 0.01, 1,NOW(),NOW()),
+  ('XAGUSDT-PERP',2,  500000, 25, 0.04, 0.02, 1,NOW(),NOW()),
+  ('XAGUSDT-PERP',3, 5000000, 10, 0.10, 0.05, 1,NOW(),NOW()),
+  <span class="c">-- CL: 100x / 50x / 10x</span>
+  ('CLUSDT-PERP',1,   50000,100, 0.01, 0.005,1,NOW(),NOW()),
+  ('CLUSDT-PERP',2,  500000, 50, 0.02, 0.01, 1,NOW(),NOW()),
+  ('CLUSDT-PERP',3, 5000000, 10, 0.10, 0.05, 1,NOW(),NOW()),
+  <span class="c">-- DeFi / L1: 100x / 50x / 20x / 10x / 1x（notional 档位对齐 BTC 模板）</span>
+  ('ARBUSDT-PERP',1,   50000,100, 0.01, 0.005,1,NOW(),NOW()),
+  ('ARBUSDT-PERP',2,  250000, 50, 0.02, 0.01, 1,NOW(),NOW()),
+  ('ARBUSDT-PERP',3, 1000000, 20, 0.05, 0.025,1,NOW(),NOW()),
+  ('ARBUSDT-PERP',4, 7500000, 10, 0.10, 0.05, 1,NOW(),NOW()),
+  ('ARBUSDT-PERP',5,40000000,  1, 1.00, 0.50, 1,NOW(),NOW()),
+  ('UNIUSDT-PERP',1,   50000,100, 0.01, 0.005,1,NOW(),NOW()),
+  ('UNIUSDT-PERP',2,  250000, 50, 0.02, 0.01, 1,NOW(),NOW()),
+  ('UNIUSDT-PERP',3, 1000000, 20, 0.05, 0.025,1,NOW(),NOW()),
+  ('UNIUSDT-PERP',4, 7500000, 10, 0.10, 0.05, 1,NOW(),NOW()),
+  ('UNIUSDT-PERP',5,40000000,  1, 1.00, 0.50, 1,NOW(),NOW()),
+  ('NEARUSDT-PERP',1,   50000,100, 0.01, 0.005,1,NOW(),NOW()),
+  ('NEARUSDT-PERP',2,  250000, 50, 0.02, 0.01, 1,NOW(),NOW()),
+  ('NEARUSDT-PERP',3, 1000000, 20, 0.05, 0.025,1,NOW(),NOW()),
+  ('NEARUSDT-PERP',4, 7500000, 10, 0.10, 0.05, 1,NOW(),NOW()),
+  ('NEARUSDT-PERP',5,40000000,  1, 1.00, 0.50, 1,NOW(),NOW()),
+  ('ADAUSDT-PERP',1,   50000,100, 0.01, 0.005,1,NOW(),NOW()),
+  ('ADAUSDT-PERP',2,  250000, 50, 0.02, 0.01, 1,NOW(),NOW()),
+  ('ADAUSDT-PERP',3, 1000000, 20, 0.05, 0.025,1,NOW(),NOW()),
+  ('ADAUSDT-PERP',4, 7500000, 10, 0.10, 0.05, 1,NOW(),NOW()),
+  ('ADAUSDT-PERP',5,40000000,  1, 1.00, 0.50, 1,NOW(),NOW()),
+  ('AAVEUSDT-PERP',1,   50000,100, 0.01, 0.005,1,NOW(),NOW()),
+  ('AAVEUSDT-PERP',2,  250000, 50, 0.02, 0.01, 1,NOW(),NOW()),
+  ('AAVEUSDT-PERP',3, 1000000, 20, 0.05, 0.025,1,NOW(),NOW()),
+  ('AAVEUSDT-PERP',4, 7500000, 10, 0.10, 0.05, 1,NOW(),NOW()),
+  ('AAVEUSDT-PERP',5,40000000,  1, 1.00, 0.50, 1,NOW(),NOW()),
+  <span class="c">-- 股票: 10x / 5x / 1x</span>
+  ('NVDAUSDT-PERP',1,   50000, 10, 0.10, 0.05, 1,NOW(),NOW()),
+  ('NVDAUSDT-PERP',2,  500000,  5, 0.20, 0.10, 1,NOW(),NOW()),
+  ('NVDAUSDT-PERP',3, 5000000,  1, 1.00, 0.50, 1,NOW(),NOW()),
+  ('CRCLUSDT-PERP',1,   50000, 10, 0.10, 0.05, 1,NOW(),NOW()),
+  ('CRCLUSDT-PERP',2,  500000,  5, 0.20, 0.10, 1,NOW(),NOW()),
+  ('CRCLUSDT-PERP',3, 5000000,  1, 1.00, 0.50, 1,NOW(),NOW()),
+  ('MSTRUSDT-PERP',1,   50000, 10, 0.10, 0.05, 1,NOW(),NOW()),
+  ('MSTRUSDT-PERP',2,  500000,  5, 0.20, 0.10, 1,NOW(),NOW()),
+  ('MSTRUSDT-PERP',3, 5000000,  1, 1.00, 0.50, 1,NOW(),NOW()),
+  ('TSLAUSDT-PERP',1,   50000, 10, 0.10, 0.05, 1,NOW(),NOW()),
+  ('TSLAUSDT-PERP',2,  500000,  5, 0.20, 0.10, 1,NOW(),NOW()),
+  ('TSLAUSDT-PERP',3, 5000000,  1, 1.00, 0.50, 1,NOW(),NOW()),
+  ('GOOGLUSDT-PERP',1,   50000, 10, 0.10, 0.05, 1,NOW(),NOW()),
+  ('GOOGLUSDT-PERP',2,  500000,  5, 0.20, 0.10, 1,NOW(),NOW()),
+  ('GOOGLUSDT-PERP',3, 5000000,  1, 1.00, 0.50, 1,NOW(),NOW())
+ON CONFLICT (symbol, tier_index) DO UPDATE SET
+  max_position_qty=EXCLUDED.max_position_qty, max_leverage=EXCLUDED.max_leverage,
+  initial_margin_rate=EXCLUDED.initial_margin_rate,
+  maintenance_margin_rate=EXCLUDED.maintenance_margin_rate, updated_at=NOW();
+
+<span class="c">-- 1000PEPE：不动（已随市场 seed 过档位）。执行前 SELECT 确认：</span>
+<span class="c">-- SELECT symbol, count(*) FROM perps_market_risk_tiers WHERE symbol='1000PEPEUSDT-PERP' GROUP BY symbol;</span></pre>
+
+<h3>Step 4: PM 重启（可选）</h3>
+<pre><span class="c"># 默认不用重启：seeds 执行后 60s 内 ReloadMarketsSchedule 自动加载新市场</span>
+<span class="c"># 如需立即生效或验证重启路径，滚动重启：follower 先，leader 最后</span>
+kubectl -n &lt;perp-pm-ns&gt; rollout restart deploy/perpetual-pm-2  <span class="c"># follower</span>
+kubectl -n &lt;perp-pm-ns&gt; rollout restart deploy/perpetual-pm-3  <span class="c"># follower</span>
+<span class="c"># 确认两个 follower Ready 后:</span>
+kubectl -n &lt;perp-pm-ns&gt; rollout restart deploy/perpetual-pm-1  <span class="c"># leader last</span></pre>
+</section>
+</article>
+
+<!-- ═══ 6 Finex Shard ═══ -->
+<article class="panel" id="p-finex" hidden>
+<header>
+<div class="eyebrow">6 · Finex Shard</div>
+<h1>更新三个 Finex 实例的 configured_markets</h1>
+<p class="standfirst">三个实例 <strong>全部只加不删</strong>（Finex-1/2 各加 4 行，Finex-3 加 5 行）——<strong>已包含在 PR #150</strong>（apps-value staging）。现有名单已核实。合并 + ArgoCD sync 后按第 1 页序列滚动重启。</p>
+<div class="call"><p class="call-t">生产执行前</p><p>本页名单基于 <b>staging</b> 配置（neodax-apps-value staging 分支，git 历史干净：#90 建 shard、#98 加 HYPE）。生产 Nacos 不在该 repo——上生产前拿生产的 finex_perp_1/2/3 名单逐行核对，确认现有 12 个市场的分布与 staging 一致后再加行。</p></div>
+</header>
+<section>
+<h3>Finex-1（加 4 行）</h3>
+<pre><span class="c"># nacos: finex_perp_1.yaml（现有 4 个不动）</span>
+configured_markets:
+  - BTCUSDT-PERP
+  - 1000PEPEUSDT-PERP
+  - SUIUSDT-PERP
+  - XRPUSDT-PERP
+  <span class="c"># ↓ 新增 4 行</span>
+  - NVDAUSDT-PERP
+  - TSLAUSDT-PERP
+  - XAUUSDT-PERP
+  - NEARUSDT-PERP</pre>
+
+<h3>Finex-2（加 4 行）</h3>
+<pre><span class="c"># nacos: finex_perp_2.yaml（现有 4 个不动）</span>
+configured_markets:
+  - ETHUSDT-PERP
+  - BNBUSDT-PERP
+  - TAOUSDT-PERP
+  - LINKUSDT-PERP
+  <span class="c"># ↓ 新增 4 行</span>
+  - ARBUSDT-PERP
+  - UNIUSDT-PERP
+  - ADAUSDT-PERP
+  - AAVEUSDT-PERP</pre>
+
+<h3>Finex-3（加 5 行）</h3>
+<pre><span class="c"># nacos: finex_perp_3.yaml（现有 4 个不动）</span>
+configured_markets:
+  - SOLUSDT-PERP
+  - DOGEUSDT-PERP
+  - TBTCUSDT-PERP
+  - HYPEUSDT-PERP
+  <span class="c"># ↓ 新增 5 行</span>
+  - XAGUSDT-PERP
+  - CLUSDT-PERP
+  - GOOGLUSDT-PERP
+  - MSTRUSDT-PERP
+  - CRCLUSDT-PERP</pre>
+
+<h3>重启</h3>
+<pre>kubectl -n &lt;finex-ns&gt; rollout restart deploy/finex-perp-1
+kubectl -n &lt;finex-ns&gt; rollout restart deploy/finex-perp-2
+kubectl -n &lt;finex-ns&gt; rollout restart deploy/finex-perp-3</pre>
+</section>
+</article>
+
+<!-- ═══ 7 Quote ═══ -->
+<article class="panel" id="p-quote" hidden>
+<header>
+<div class="eyebrow">7 · Quote 行情</div>
+<h1>配置 Mark Price 抓取（quote.yaml，共 6 处）</h1>
+<p class="standfirst">以下结构与 <code>neodax-apps-value</code> 的 quote.yaml 逐段对齐，<strong>已包含在 PR #150</strong>（11 处插入全部提交）。13 个新市场 × 11 处 = 143 行，已程序化校验每市场恰好 11 次、每 shard 恰好 1 次。合并后重启 quote 生效。</p>
+</header>
+<section>
+<h3>① mark_price_oracle.symbols（聚合器符号表，带 -PERP）</h3>
+<pre><span class="c"># quote.yaml → mark_price_oracle.symbols（现有 11 个（已含 1000PEPE）后追加 13 个新市场）</span>
+mark_price_oracle:
+  symbols:
+    <span class="c"># ... 现有 BTCUSDT-PERP ~ HYPEUSDT-PERP 11 个不动 ...</span>
+    - "XAUUSDT-PERP"
+    - "XAGUSDT-PERP"
+    - "CLUSDT-PERP"
+    - "ARBUSDT-PERP"
+    - "UNIUSDT-PERP"
+    - "NEARUSDT-PERP"
+    - "ADAUSDT-PERP"
+    - "AAVEUSDT-PERP"
+    - "NVDAUSDT-PERP"
+    - "CRCLUSDT-PERP"
+    - "MSTRUSDT-PERP"
+    - "TSLAUSDT-PERP"
+    - "GOOGLUSDT-PERP"
+    - "1000PEPEUSDT-PERP"</pre>
+<div class="call"><p class="call-t">market_source_weights 不用加</p><p>新市场全部走全局默认权重（binance 0.97 / okx 0.01 / bybit 0.01 / internal 0.01），不加 per-market 覆盖条目——配置最少、Binance 主导、OKX/Bybit 兜底。后续如想给某市场调权重（如 XRP 那样偏 OKX），单独加 <code>market_source_weights</code> 条目即可。</p></div>
+
+<h3>② engine.symbol_aliases_perp（legacy 路径 symbol 映射）</h3>
+<pre><span class="c"># quote.yaml → engine.symbol_aliases_perp（追加 13 个；1000PEPE 已有）</span>
+    XAUUSDT:   "XAUUSDT-PERP"
+    XAGUSDT:   "XAGUSDT-PERP"
+    CLUSDT:    "CLUSDT-PERP"
+    ARBUSDT:   "ARBUSDT-PERP"
+    UNIUSDT:   "UNIUSDT-PERP"
+    NEARUSDT:  "NEARUSDT-PERP"
+    ADAUSDT:   "ADAUSDT-PERP"
+    AAVEUSDT:  "AAVEUSDT-PERP"
+    NVDAUSDT:  "NVDAUSDT-PERP"
+    CRCLUSDT:  "CRCLUSDT-PERP"
+    MSTRUSDT:  "MSTRUSDT-PERP"
+    TSLAUSDT:  "TSLAUSDT-PERP"
+    GOOGLUSDT: "GOOGLUSDT-PERP"</pre>
+
+<h3>③ engine.binance_perp.markets（funding/index 辅助字段，小写带斜杠）</h3>
+<pre><span class="c"># quote.yaml → engine.binance_perp.markets（追加 13 个；1000pepe 已有）</span>
+      - "xau/usdt"
+      - "xag/usdt"
+      - "cl/usdt"
+      - "arb/usdt"
+      - "uni/usdt"
+      - "near/usdt"
+      - "ada/usdt"
+      - "aave/usdt"
+      - "nvda/usdt"
+      - "crcl/usdt"
+      - "mstr/usdt"
+      - "tsla/usdt"
+      - "googl/usdt"</pre>
+
+<h3>④ mark_oracle 四个源的 symbols（各追加 13 个）</h3>
+<pre><span class="c"># quote.yaml → mark_oracle.binance.symbols / okx.symbols / bybit.symbols / internal_perp_trade.symbols</span>
+<span class="c"># 四个列表每个都追加同样的 13 个新市场（-PERP 格式；1000PEPE 已在）：</span>
+    - "XAUUSDT-PERP" ... - "GOOGLUSDT-PERP"   <span class="c"># 13 个新市场</span>
+    - "1000PEPEUSDT-PERP"</pre>
+<div class="call"><p class="call-t">OKX 的 1000PEPE 源是死的（现状如此，本次不修）</p><p>现有配置把 1000PEPEUSDT-PERP 映射到 OKX 的 <code>"1000PEPE-USDT-SWAP"</code>——该合约实际不存在（OKX 只有 PEPE-USDT-SWAP，面值 10,000,000，语义不匹配）。订阅会一直失败但无害（该源 offline，Binance/Bybit 正常供价，min_sources=1 不受影响）。本次保持原样，别动它。</p></div>
+
+<h3>⑤⑥ mark_oracle.symbol_mappings 四组原生 symbol 映射</h3>
+<pre><span class="c"># quote.yaml → mark_oracle.symbol_mappings（四组各追加 13 条；1000PEPE 已有，不动）</span>
+    binance:               <span class="c"># 小写带斜杠</span>
+      "XAUUSDT-PERP": "xau/usdt"
+      "XAGUSDT-PERP": "xag/usdt"
+      "CLUSDT-PERP":  "cl/usdt"
+      "ARBUSDT-PERP": "arb/usdt"
+      "UNIUSDT-PERP": "uni/usdt"
+      "NEARUSDT-PERP": "near/usdt"
+      "ADAUSDT-PERP": "ada/usdt"
+      "AAVEUSDT-PERP": "aave/usdt"
+      "NVDAUSDT-PERP": "nvda/usdt"
+      "CRCLUSDT-PERP": "crcl/usdt"
+      "MSTRUSDT-PERP": "mstr/usdt"
+      "TSLAUSDT-PERP": "tsla/usdt"
+      "GOOGLUSDT-PERP": "googl/usdt"
+    okx:                   <span class="c"># 大写-连字符-SWAP（三家实测确认存在）</span>
+      "XAUUSDT-PERP": "XAU-USDT-SWAP"
+      "XAGUSDT-PERP": "XAG-USDT-SWAP"
+      "CLUSDT-PERP":  "CL-USDT-SWAP"
+      "ARBUSDT-PERP": "ARB-USDT-SWAP"
+      "UNIUSDT-PERP": "UNI-USDT-SWAP"
+      "NEARUSDT-PERP": "NEAR-USDT-SWAP"
+      "ADAUSDT-PERP": "ADA-USDT-SWAP"
+      "AAVEUSDT-PERP": "AAVE-USDT-SWAP"
+      "NVDAUSDT-PERP": "NVDA-USDT-SWAP"
+      "CRCLUSDT-PERP": "CRCL-USDT-SWAP"
+      "MSTRUSDT-PERP": "MSTR-USDT-SWAP"
+      "TSLAUSDT-PERP": "TSLA-USDT-SWAP"
+      "GOOGLUSDT-PERP": "GOOGL-USDT-SWAP"
+    bybit:                 <span class="c"># 大写原生 symbol（实测确认存在）</span>
+      "XAUUSDT-PERP": "XAUUSDT"
+      "XAGUSDT-PERP": "XAGUSDT"
+      "CLUSDT-PERP":  "CLUSDT"
+      "ARBUSDT-PERP": "ARBUSDT"
+      "UNIUSDT-PERP": "UNIUSDT"
+      "NEARUSDT-PERP": "NEARUSDT"
+      "ADAUSDT-PERP": "ADAUSDT"
+      "AAVEUSDT-PERP": "AAVEUSDT"
+      "NVDAUSDT-PERP": "NVDAUSDT"
+      "CRCLUSDT-PERP": "CRCLUSDT"
+      "MSTRUSDT-PERP": "MSTRUSDT"
+      "TSLAUSDT-PERP": "TSLAUSDT"
+      "GOOGLUSDT-PERP": "GOOGLUSDT"
+    internal_perp_trade:   <span class="c"># 恒等映射</span>
+      "XAUUSDT-PERP": "XAUUSDT-PERP"
+      <span class="c"># ... 其余 12 个同格式 + 1000PEPEUSDT-PERP</span></pre>
+
+<h3>重启 Quote</h3>
+<pre>kubectl -n &lt;quote-ns&gt; rollout restart deploy/quote</pre>
+
+<div class="call warn"><p class="call-t">R1 — Mark price 必须在 trading-api 放开之前就绪</p><p>quote 抓不到 mark price → trading-api 的 mark price 新鲜度门（<code>mark_price_max_age_sec: 10</code>）会拒绝所有开仓（<code>mark_price_unavailable</code>）。<b>先做这一步（§7），验证 mark price 在产出，再做 §8 放开 trading-api。</b></p></div>
+<div class="call warn"><p class="call-t">min_sources = 1（再次强调）</p><p>quote.yaml 顶层的 <code>min_sources_normal: 3</code> 是代码固定的默认值，<b>实际生效的是 PM DB 里每个市场的 <code>mark_price_min_sources_normal</code></b>（60s 自动刷新）——第 5 页 SQL 里全部 = 1。<b>永远不要把某个市场调成 2/3</b>：三家源任两家断线就会把该市场打进 SAFE_MODE。</p></div>
+</section>
+</article>
+
+<!-- ═══ 8 Ledger + Trading-API ═══ -->
+<article class="panel" id="p-edge" hidden>
+<header>
+<div class="eyebrow">8 · Ledger + Trading-API</div>
+<h1>改 Nacos 配置并重启</h1>
+<p class="standfirst">最后一步：放开交易——<strong>已包含在 PR #150</strong>。ledger 加消费源（K 线），trading-api 加市场入口。<b>注意：trading-api 热加载，合并 sync 后即生效，无需重启</b>；ledger 需要重启。</p>
+</header>
+<section>
+<h3>Ledger</h3>
+<pre><span class="c"># nacos: ledger.yaml → 加 perp_markets</span>
+perp_markets:
+  - "BTCUSDT-PERP"
+  - "ETHUSDT-PERP"
+  - "SOLUSDT-PERP"
+  <span class="c"># ↓ 新增 13 个（1000PEPE 已在现有列表）</span>
+  - "XAUUSDT-PERP"
+  - "XAGUSDT-PERP"
+  - "CLUSDT-PERP"
+  - "ARBUSDT-PERP"
+  - "UNIUSDT-PERP"
+  - "NEARUSDT-PERP"
+  - "ADAUSDT-PERP"
+  - "AAVEUSDT-PERP"
+  - "NVDAUSDT-PERP"
+  - "CRCLUSDT-PERP"
+  - "MSTRUSDT-PERP"
+  - "TSLAUSDT-PERP"
+  - "GOOGLUSDT-PERP"
+  - "1000PEPEUSDT-PERP"
+
+<span class="c"># ledger.yaml 有两处列表，都要加（格式都是大写 -PERP，与现有条目一致）：</span>
+markets:              <span class="c"># K 线聚合用（现有含 spot + perp 混排）</span>
+  - "WBTCUSDT"
+  - "BTCUSDT-PERP"
+  <span class="c"># ... 现有不动 ...</span>
+  <span class="c"># ↓ 新增 13 个（1000PEPE 已在现有列表）</span>
+  - "XAUUSDT-PERP"
+  - "XAGUSDT-PERP"
+  - "CLUSDT-PERP"
+  - "ARBUSDT-PERP"
+  - "UNIUSDT-PERP"
+  - "NEARUSDT-PERP"
+  - "ADAUSDT-PERP"
+  - "AAVEUSDT-PERP"
+  - "NVDAUSDT-PERP"
+  - "CRCLUSDT-PERP"
+  - "MSTRUSDT-PERP"
+  - "TSLAUSDT-PERP"
+  - "GOOGLUSDT-PERP"
+  - "1000PEPEUSDT-PERP"
+
+perp_markets:         <span class="c"># perp 消费用，同样追加 13 个</span>
+  <span class="c"># ... 现有不动 ...</span>
+  - "XAUUSDT-PERP"
+  - "XAGUSDT-PERP"
+  - "CLUSDT-PERP"
+  - "ARBUSDT-PERP"
+  - "UNIUSDT-PERP"
+  - "NEARUSDT-PERP"
+  - "ADAUSDT-PERP"
+  - "AAVEUSDT-PERP"
+  - "NVDAUSDT-PERP"
+  - "CRCLUSDT-PERP"
+  - "MSTRUSDT-PERP"
+  - "TSLAUSDT-PERP"
+  - "GOOGLUSDT-PERP"
+  - "1000PEPEUSDT-PERP"</pre>
+<pre>kubectl -n &lt;ledger-ns&gt; rollout restart deploy/ledger</pre>
+
+<h3>Trading-API</h3>
+<pre><span class="c"># nacos: trading_api.yaml → enabled_futures_markets 追加 13 个</span>
+<span class="c"># 格式 = 大写 -PERP（与现有 "BTCUSDT-PERP" 一致，不是 BASE/USD）</span>
+enabled_futures_markets:
+  - "BTCUSDT-PERP"
+  <span class="c"># ... 现有不动 ...</span>
+  <span class="c"># ↓ 新增 13 个（1000PEPE 已在现有列表）</span>
+  - "XAUUSDT-PERP"
+  - "XAGUSDT-PERP"
+  - "CLUSDT-PERP"
+  - "ARBUSDT-PERP"
+  - "UNIUSDT-PERP"
+  - "NEARUSDT-PERP"
+  - "ADAUSDT-PERP"
+  - "AAVEUSDT-PERP"
+  - "NVDAUSDT-PERP"
+  - "CRCLUSDT-PERP"
+  - "MSTRUSDT-PERP"
+  - "TSLAUSDT-PERP"
+  - "GOOGLUSDT-PERP"
+  - "1000PEPEUSDT-PERP"</pre>
+<pre>kubectl -n &lt;trading-api-ns&gt; rollout restart deploy/trading-api</pre>
+</section>
+</article>
+
+<!-- ═══ 9 验证 ═══ -->
+<article class="panel" id="p-verify" hidden>
+<header>
+<div class="eyebrow">9 · 上线验证</div>
+<h1>逐项确认，缺一不可</h1>
+<p class="standfirst">每个市场都要过一遍。可以批量做第 1-5 项，第 6-7 项挑 2-3 个代表市场做冒烟。</p>
+</header>
+<section>
+<ol class="steps n">
+<li><b>Topic 存在</b><span>ArgoCD sync 后 <code>neodax-kafka-topic-provision</code> Job 应为 Success；用 Kafka admin / Kafka UI 确认 13 个新市场的 <code>commands.{MKT}.OrderCommands</code> 等 topic 已创建（≈40-52 个，1000PEPE 已有）。Job 失败的话用第 4 页手动命令补建。</span></li>
+<li><b>PM 已识别</b><span>Perp PM admin gRPC <code>GetPerpetualsMarkets</code> 能看到新市场且 <code>status=active</code>。Funding engine worker 已启动（日志搜 <code>ReloadMarketWorkers</code>）。</span></li>
+<li><b>Finex 已加载</b><span>各 shard 的 admin <code>GetEngineStatus</code> 显示分配给它的市场。确认 Finex-3 的市场列表不再与 Finex-2 重复。</span></li>
+<li><b>Mark price 在产出</b><span>quote 在发 <code>EventQuoteObserved</code> 或 <code>MarkPriceSample</code>，symbol 正确。trading-api 侧 mark 新鲜度满足 <code>mark_price_max_age_sec</code>。商品/股票市场确认 mark price 不是零/空。</span></li>
+<li><b>Trading-API 暴露</b><span><code>GET /perpetual/markets</code> 返回所有新市场。前端能搜到。</span></li>
+<li><b>小额冒烟单</b><span>挑 2-3 个代表市场（1 个 DeFi + 1 个股票 + 1 个商品）用测试账户下一笔小额开仓+平仓，确认撮合、结算、持仓、资金费、WS 推送、K 线全链路正常。注意 XAU/XAG/CL 的资金费是 <b>4h</b> 结算、其余 8h——冒烟时确认 funding worker 按正确周期出值。</span></li>
+<li><b>风险档位生效</b><span>尝试超过最高档杠杆应被拒。商品 XAU/XAG 50x、CL 100x、股票 10x、DeFi 100x 上限。</span></li>
+</ol>
+</section>
+</article>
+
+<!-- ═══ 10 回滚 ═══ -->
+<article class="panel" id="p-rollback" hidden>
+<header>
+<div class="eyebrow">10 · 回滚</div>
+<h1>出问题怎么办</h1>
+<p class="standfirst">按影响范围从小到大排列。能只回配置就不动数据库。</p>
+</header>
+<section>
+<h3>只回某个市场</h3>
+<pre><span class="c">-- 1. 从 trading-api 的 enabled_futures_markets 移除该市场,重启 trading-api</span>
+<span class="c">-- 2. 从 quote 的相关配置移除,重启 quote</span>
+<span class="c">-- 3. DB 置 inactive(不影响已有数据):</span>
+UPDATE portfolio_manager_perp.perps_markets
+SET status = 'inactive', updated_at = NOW()
+WHERE symbol = '&lt;MKT&gt;USDT-PERP';</pre>
+
+<h3>全部回滚</h3>
+<pre><span class="c">-- 1. trading-api: 从 enabled_futures_markets 移除全部新市场,重启</span>
+<span class="c">-- 2. quote: 移除新增 symbol_aliases / mark_oracle / binance_perp 条目,重启</span>
+<span class="c">-- 3. ledger: 移除新增 perp_markets 条目,重启</span>
+<span class="c">-- 4. finex: 恢复原来的 configured_markets,重启(注意 finex-3 恢复为原来的重复配置)</span>
+<span class="c">-- 5. DB: 全部置 inactive</span>
+UPDATE portfolio_manager_perp.perps_markets
+SET status = 'inactive', updated_at = NOW()
+WHERE symbol IN (
+  'XAUUSDT-PERP','XAGUSDT-PERP','CLUSDT-PERP',
+  'ARBUSDT-PERP','UNIUSDT-PERP','NEARUSDT-PERP',
+  'ADAUSDT-PERP','AAVEUSDT-PERP',
+  'NVDAUSDT-PERP','CRCLUSDT-PERP','MSTRUSDT-PERP',
+  'TSLAUSDT-PERP','GOOGLUSDT-PERP','1000PEPEUSDT-PERP'
+);</pre>
+
+<div class="call warn"><p class="call-t">不要删 DB 行和 Kafka Topic</p><p>已有成交、持仓、审计数据关联这些市场。置 <code>inactive</code> 即可，直接删会断历史链。Kafka topic 保留，不影响成本。</p></div>
+
+<h3>SAFE_MODE 处理</h3>
+<p>如果某个市场进入 SAFE_MODE（mark price 全断），开仓会被拒但平仓/撤单仍可用。参见 <code>docs/2026-08-28-delist-perp-mark-price-runbook.md</code> 处理 mark price hold 残留。</p>
+</section>
+</article>
+
+</div><!-- main -->
+</div><!-- shell -->
+
+<script>
+(function(){
+  var tabs=document.querySelectorAll('nav.tabs a');
+  var panels=document.querySelectorAll('article.panel');
+  function show(id){
+    panels.forEach(function(p){p.hidden=p.id!=='p-'+id;});
+    tabs.forEach(function(a){a.classList.toggle('on',a.getAttribute('href')==='#'+id);});
+    window.scrollTo({top:0,behavior:'instant'});
+  }
+  tabs.forEach(function(a){
+    a.addEventListener('click',function(e){e.preventDefault();show(this.getAttribute('href').slice(1));});
+  });
+  show('overview');
+})();
+</script>

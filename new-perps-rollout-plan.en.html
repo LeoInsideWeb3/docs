@@ -1,0 +1,857 @@
+<title>NeoDAX · New Perps Markets Rollout Runbook</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{--ground:#F5F7F5;--surface:#FFF;--surface-sunk:#ECEFEC;--code-bg:#161E1C;--code-ink:#D6E2DD;--ink:#151E1B;--ink-soft:#4A5854;--ink-faint:#798883;--rule:#DCE2DF;--rule-strong:#C3CCC8;--accent:#0E6A58;--accent-soft:#E0EFEA;--warn:#A15A08;--warn-soft:#F7EBDA;--danger:#973030;--danger-soft:#F7E4E2;--shadow:0 1px 2px rgba(21,30,27,.06)}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--ground:#0F1513;--surface:#171F1C;--surface-sunk:#121917;--code-bg:#0A0F0E;--code-ink:#C9D8D2;--ink:#E8EEEB;--ink-soft:#A5B3AE;--ink-faint:#7A8983;--rule:#263230;--rule-strong:#35433F;--accent:#4FC2A6;--accent-soft:#14312A;--warn:#D9964A;--warn-soft:#302315;--danger:#DE7E77;--danger-soft:#2E1918;--shadow:0 1px 2px rgba(0,0,0,.3)}}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{background:var(--ground);color:var(--ink);font-family:"IBM Plex Sans",-apple-system,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.62;-webkit-font-smoothing:antialiased}
+.shell{max-width:1240px;margin:0 auto;padding-inline:20px;padding-block:28px 76px;display:grid;grid-template-columns:224px minmax(0,1fr);gap:40px;align-items:start}
+.side{position:sticky;top:20px}
+.brand{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:6px}
+.brand-t{font-family:"Bricolage Grotesque","IBM Plex Sans",sans-serif;font-weight:700;font-size:19px;letter-spacing:-.01em;line-height:1.15;margin:0 0 18px}
+nav.tabs{display:grid;gap:2px}
+nav.tabs .grp{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);font-weight:600;margin:14px 0 4px 10px}
+nav.tabs .grp:first-child{margin-top:0}
+nav.tabs a{display:flex;align-items:baseline;gap:8px;padding:7px 10px;border-radius:4px;color:var(--ink-soft);text-decoration:none;font-size:13.5px;line-height:1.3;border-left:2px solid transparent}
+nav.tabs a .n{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--ink-faint);width:16px;flex:none}
+nav.tabs a:hover{background:var(--surface);color:var(--ink)}
+nav.tabs a.on{background:var(--accent-soft);color:var(--accent);border-left-color:var(--accent);font-weight:600}
+nav.tabs a.on .n{color:var(--accent)}
+.side-foot{margin-top:22px;font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink-faint);line-height:1.6;padding-left:10px}
+.main{min-width:0}
+.panel>header{margin-bottom:30px}
+.eyebrow{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
+h1{font-family:"Bricolage Grotesque","IBM Plex Sans",sans-serif;font-weight:700;font-size:clamp(26px,4vw,36px);line-height:1.1;letter-spacing:-.02em;margin:0 0 14px;text-wrap:balance}
+.standfirst{font-size:16px;color:var(--ink-soft);max-width:65ch;margin:0}
+.standfirst strong{color:var(--ink);font-weight:600}
+.assume{margin-top:18px;padding:13px 18px;background:var(--warn-soft);border-left:3px solid var(--warn);font-size:13.5px;color:var(--ink-soft);max-width:78ch}
+.assume b{color:var(--ink);font-weight:600}
+section{margin-top:46px;scroll-margin-top:20px}
+.panel>header+section{margin-top:0}
+h2{font-family:"Bricolage Grotesque","IBM Plex Sans",sans-serif;font-weight:700;font-size:21px;letter-spacing:-.01em;margin:0 0 6px;text-wrap:balance}
+.section-note{color:var(--ink-soft);margin:0 0 20px;max-width:68ch}
+h3{font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);margin:30px 0 12px}
+h4{font-size:15px;font-weight:600;margin:24px 0 8px}
+p{max-width:70ch}
+code,.mono{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.87em}
+p code,td code,li code{color:var(--accent)}
+pre{background:var(--code-bg);color:var(--code-ink);padding:16px 18px;overflow-x:auto;margin:12px 0;font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12.5px;line-height:1.6;border-radius:3px}
+pre .c{color:#6E8A80}pre .k{color:#7FD1B9}pre .t{color:#E3B778}
+.layers{display:grid;gap:10px}
+.layer{background:var(--surface);border:1px solid var(--rule);box-shadow:var(--shadow);padding:16px 20px;display:grid;grid-template-columns:158px minmax(0,1fr);gap:20px}
+.layer.hi{border-color:var(--accent)}
+.layer-n{font-family:"Bricolage Grotesque",sans-serif;font-weight:600;font-size:15px}
+.layer-n small{display:block;font-family:"IBM Plex Mono",monospace;font-weight:400;font-size:10.5px;color:var(--ink-faint);letter-spacing:.06em;margin-top:3px;text-transform:uppercase}
+.layer-d{margin:0;font-size:13.5px;color:var(--ink-soft)}
+.layer-d b{color:var(--ink);font-weight:600}
+.arrow{text-align:center;color:var(--ink-faint);font-size:11.5px;line-height:1;font-family:"IBM Plex Mono",monospace}
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:520px}
+th{text-align:left;font-weight:600;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);padding:0 14px 8px 0;border-bottom:1px solid var(--rule-strong);white-space:nowrap}
+td{padding:9px 14px 9px 0;border-bottom:1px solid var(--rule);vertical-align:top}
+tr:last-child td{border-bottom:none}
+td.dim{color:var(--ink-soft)}
+td.mono-c{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12px}
+td b{color:var(--ink);font-weight:600}
+.pill{display:inline-block;font-size:10.5px;font-weight:500;padding:1px 7px;border-radius:100px;white-space:nowrap;line-height:1.6}
+.pill.ok{background:var(--accent-soft);color:var(--accent)}
+.pill.gap{background:var(--warn-soft);color:var(--warn)}
+.pill.no{background:var(--danger-soft);color:var(--danger)}
+.call{background:var(--surface);border:1px solid var(--rule);border-left:3px solid var(--accent);padding:16px 20px;margin:16px 0;box-shadow:var(--shadow);max-width:80ch}
+.call.warn{border-left-color:var(--warn)}
+.call-t{font-weight:600;font-size:14px;margin:0 0 6px}
+.call p{margin:0;font-size:13.5px;color:var(--ink-soft)}
+.call p+p{margin-top:8px}
+.call b{color:var(--ink);font-weight:600}
+ul.plain{padding-left:0;list-style:none;margin:0;display:grid;gap:0;font-size:14px}
+ul.plain li{padding:11px 0;border-top:1px solid var(--rule);color:var(--ink-soft);max-width:72ch}
+ul.plain li:last-child{border-bottom:1px solid var(--rule)}
+ul.plain b{color:var(--ink);font-weight:600}
+ol.steps{padding-left:0;list-style:none;margin:0;counter-reset:s}
+ol.steps li{counter-increment:s;position:relative;padding:15px 0 15px 46px;border-top:1px solid var(--rule)}
+ol.steps li:last-child{border-bottom:1px solid var(--rule)}
+ol.steps li::before{content:counter(s);position:absolute;left:0;top:17px;font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--accent)}
+ol.steps b{display:block;color:var(--ink);font-weight:600;margin-bottom:3px;max-width:70ch}
+ol.steps span{display:block;color:var(--ink-soft);font-size:13.5px;max-width:70ch}
+.pager{margin-top:54px;padding-top:16px;border-top:1px solid var(--rule);display:flex;justify-content:space-between;gap:16px;font-size:13.5px}
+.pager a{color:var(--accent);text-decoration:none}
+.pager a:hover{text-decoration:underline}
+a{color:var(--accent)}
+a:hover{text-decoration:underline}
+.pr-meta{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11px;color:var(--ink-faint);margin:0 0 10px}
+a.btn{display:inline-block;font-size:12px;font-weight:600;color:var(--accent);background:var(--accent-soft);padding:5px 14px;border-radius:100px;text-decoration:none;line-height:1.5}
+a.btn:hover{text-decoration:underline}
+ol.pts{padding-left:0;list-style:none;margin:6px 0 0;counter-reset:p}
+ol.pts li{counter-increment:p;position:relative;padding:5px 0 5px 26px;font-size:13.5px;color:var(--ink-soft);max-width:74ch}
+ol.pts li::before{content:counter(p);position:absolute;left:2px;top:8.5px;font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--accent)}
+ol.pts b{color:var(--ink);font-weight:600}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media(max-width:860px){.shell{grid-template-columns:minmax(0,1fr);gap:20px}.side{position:static}.brand-t{margin-bottom:10px}nav.tabs{display:flex;overflow-x:auto;gap:4px;padding-bottom:6px}nav.tabs .grp{display:none}nav.tabs a{white-space:nowrap;border-left:0;border-bottom:2px solid transparent;border-radius:4px 4px 0 0}nav.tabs a.on{border-bottom-color:var(--accent)}.side-foot{display:none}.layer{grid-template-columns:minmax(0,1fr);gap:8px}}
+</style>
+
+<div class="shell">
+<aside class="side">
+<div class="brand">NeoDAX · Perps Rollout · 14 Markets</div>
+<p class="brand-t">New Perpetual Markets Rollout Runbook</p>
+<p class="pr-meta"><a href="new-perps-rollout-plan.html">中文</a> · <b>EN</b></p>
+<nav class="tabs" id="tabs">
+<div class="grp">Prepare</div>
+<a href="#overview" data-tab="overview"><span class="n">1</span>Overview &amp; Distribution</a>
+<a href="#markets" data-tab="markets"><span class="n">2</span>Market Parameters</a>
+<a href="#preflight" data-tab="preflight"><span class="n">3</span>Pre-flight Checks</a>
+<div class="grp">Execute</div>
+<a href="#kafka" data-tab="kafka"><span class="n">4</span>Kafka Topics</a>
+<a href="#perppm" data-tab="perppm"><span class="n">5</span>Perp PM Seeds</a>
+<a href="#finex" data-tab="finex"><span class="n">6</span>Finex Shard</a>
+<a href="#quote" data-tab="quote"><span class="n">7</span>Quote Feeds</a>
+<a href="#edge" data-tab="edge"><span class="n">8</span>Ledger + API</a>
+<div class="grp">Wrap up</div>
+<a href="#verify" data-tab="verify"><span class="n">9</span>Launch Verification</a>
+<a href="#rollback" data-tab="rollback"><span class="n">10</span>Rollback</a>
+</nav>
+<div class="side-foot">2026-09-18 · v5<br>incl. PR change details<br>#1703 · #150 pending review<br>min_sources = 1 locked</div>
+</aside>
+
+<div class="main">
+
+<!-- ═══ 1 Overview ═══ -->
+<article class="panel" id="p-overview">
+<header>
+<div class="eyebrow">1 · Overview</div>
+<h1>14 Perpetual Markets · One Full Rollout</h1>
+<p class="standfirst">This rollout lists <strong>13 new markets + 1 enable</strong> (1000PEPE) across three families: commodities (gold/silver/crude oil), DeFi, and equity perps. Every new market gets <code>mark_price_min_sources_normal = 1</code>. Execution order: <strong>Kafka → Perp PM → Finex Shard → Quote → Ledger/Trading-API → verification</strong>.</p>
+<div class="assume"><b>Key confirmations (all verified 2026-09-18)</b> · Config source: <code>neodax-apps-value</code> (staging branch — where the real Nacos configs are maintained). Current shard split verified: <b>Finex-1 = BTC/1000PEPE/SUI/XRP, Finex-2 = ETH/BNB/TAO/LINK, Finex-3 = SOL/DOGE/TBTC/HYPE</b> (no duplicates; git history has only #90/#98). All 14 markets exist on <b>all three of Binance/OKX/Bybit</b> (except 1000PEPE: no matching OKX contract). TradFi parameters finalized from Binance official announcements + fapi exchangeInfo. <b>min_sources = 1 everywhere, permanently locked — never raise it.</b></div>
+</header>
+
+<section>
+<h2>Shard Distribution Plan</h2>
+<p class="section-note">Current state: 12 markets (4 per shard) + 13 new + 1000PEPE already listed on Finex-1 = 25 total. Distribution is <b>8 / 8 / 9</b>, <b>add-only everywhere</b> — zero migration risk, no market moves.</p>
+<div class="layers">
+<div class="layer hi">
+<div class="layer-n">Finex-1<small>8 markets · Majors + headline stocks + gold (+4)</small></div>
+<p class="layer-d"><span class="dim">Existing:</span> <code>BTCUSDT-PERP</code> <code>1000PEPEUSDT-PERP</code> <code>SUIUSDT-PERP</code> <code>XRPUSDT-PERP</code> + <b>New</b>: <code>NVDAUSDT-PERP</code> <code>TSLAUSDT-PERP</code> <code>XAUUSDT-PERP</code> <code>NEARUSDT-PERP</code></p>
+</div>
+<div class="arrow">↑ add 4 lines only — nothing removed</div>
+<div class="layer hi">
+<div class="layer-n">Finex-2<small>8 markets · Large caps + DeFi (+4)</small></div>
+<p class="layer-d"><span class="dim">Existing:</span> <code>ETHUSDT-PERP</code> <code>BNBUSDT-PERP</code> <code>TAOUSDT-PERP</code> <code>LINKUSDT-PERP</code> + <b>New</b>: <code>ARBUSDT-PERP</code> <code>UNIUSDT-PERP</code> <code>ADAUSDT-PERP</code> <code>AAVEUSDT-PERP</code></p>
+</div>
+<div class="arrow">↑ add 4 lines only — nothing removed</div>
+<div class="layer hi">
+<div class="layer-n">Finex-3<small>9 markets · Alts + commodities + equities (+5)</small></div>
+<p class="layer-d"><span class="dim">Existing:</span> <code>SOLUSDT-PERP</code> <code>DOGEUSDT-PERP</code> <code>TBTCUSDT-PERP</code> <code>HYPEUSDT-PERP</code> + <b>New</b>: <code>XAGUSDT-PERP</code> <code>CLUSDT-PERP</code> <code>GOOGLUSDT-PERP</code> <code>MSTRUSDT-PERP</code> <code>CRCLUSDT-PERP</code></p>
+</div>
+</div>
+</section>
+
+<section>
+<h2>Two PRs (both submitted, awaiting owner review)</h2>
+<div class="call warn"><p class="call-t">Review is step 0 of the whole process — until these two PRs merge, none of the 8 steps below can start</p><p>Every change in this runbook (the SQL and configs on pages 5-8) lives in these two PRs. Only after the owner approves and <b>merges in order (#1703 first, then #150)</b> can the operator sequence begin. While reviewing, cross-check against the "PR change details" below.</p></div>
+<div class="tw"><table>
+<thead><tr><th>PR</th><th>Repo / branch</th><th>Contents</th><th>Merge timing</th></tr></thead>
+<tbody>
+<tr><td class="mono-c"><b><a href="https://github.com/layer-3/neodax/pull/1703" target="_blank" rel="noopener">#1703 ↗</a></b></td><td>neodax → master</td><td>seeds: 13 assets + 13 markets + 49 risk tiers + 1000PEPE enable (<code>portfolio_manager_perp/seeds/20260918120000_perps_markets.sql</code> + <code>20260918120100_perps_market_risk_tiers.sql</code> + README)</td><td class="dim">Merge first — files only, no runtime effect</td></tr>
+<tr><td class="mono-c"><b><a href="https://github.com/layer-3/neodax-apps-value/pull/150" target="_blank" rel="noopener">#150 ↗</a></b></td><td>neodax-apps-value → staging</td><td>7 files: finex shards ×3 + quote + ledger + trading-api + kafka-topic-provision</td><td class="dim">Merge second — takes effect at ArgoCD sync (see hot-reload warning below)</td></tr>
+</tbody>
+</table></div>
+
+<h2>PR Change Details (for owner review)</h2>
+<h4>PR #1703 · neodax → master · seeds</h4>
+<p class="pr-meta">3 files · +210 lines · <span class="pill gap">awaiting owner review</span></p>
+<p><a class="btn" href="https://github.com/layer-3/neodax/pull/1703" target="_blank" rel="noopener">Open PR #1703 for review ↗</a></p>
+<pre><span class="c"># Changed files</span>
+A  portfolio_manager_perp/seeds/20260918120000_perps_markets.sql       <span class="c"># 13 assets + 13 markets + 1000PEPE enable</span>
+A  portfolio_manager_perp/seeds/20260918120100_perps_market_risk_tiers.sql <span class="c"># 49 tier rows</span>
+M  portfolio_manager_perp/seeds/README.md                              <span class="c"># file table + market list updates</span></pre>
+<div class="call"><p class="call-t">Review notes (8)</p>
+<ol class="pts">
+<li><b>Parameter sources</b> — all from live Binance fapi data (2026-09-18): LOT_SIZE / PRICE_FILTER / MIN_NOTIONAL / PERCENT_PRICE aligned item by item; funding intervals from fundingInfo (XAU/XAG/CL 4h, TSLA now 8h).</li>
+<li><b>Leverage &amp; interest</b> — per official announcements: XAU/XAG 50x, CL 100x, equities 10x, TradFi interest 0%; crypto keeps the platform template 0.003.</li>
+<li><b>depth_level</b> — ladder starts at tick_size then ×10 (existing repo convention, same as the HYPE seed).</li>
+<li><b>min_sources = 1 locked on every row</b> — changes raising it are not accepted.</li>
+<li><b>1000PEPE only flips status</b> — targeted UPDATE; all other columns and tiers untouched.</li>
+<li><b>File names match the Makefile globs</b> — <code>[0-9]*_perps_markets.sql</code> / <code>[0-9]*_perps_market_risk_tiers.sql</code>; local <code>make seed</code> picks them up in timestamp order, no Makefile change needed.</li>
+<li><b>Base assets sit at the top of the markets file</b> (DO NOTHING) — <code>make seed-perp-assets</code> is hardcoded to the old collateral-only file, so placing them here keeps seed-perp-markets self-contained.</li>
+<li><b>Idempotent and re-runnable</b> — markets/tiers use ON CONFLICT DO UPDATE; re-runs only refresh config columns, and all 13 symbols are new so no existing market is overwritten.</li>
+</ol></div>
+
+<h4>PR #150 · neodax-apps-value → staging · Nacos configs</h4>
+<p class="pr-meta">7 files · +196 lines · all additions · <span class="pill gap">awaiting owner review</span></p>
+<p><a class="btn" href="https://github.com/layer-3/neodax-apps-value/pull/150" target="_blank" rel="noopener">Open PR #150 for review ↗</a></p>
+<pre><span class="c"># Changed files (all add-only, zero deletions)</span>
+M  neodax-nacos/staging/finex/finex_perp_1.yaml     <span class="c"># +4: NVDA TSLA XAU NEAR</span>
+M  neodax-nacos/staging/finex/finex_perp_2.yaml     <span class="c"># +4: ARB UNI ADA AAVE</span>
+M  neodax-nacos/staging/finex/finex_perp_3.yaml     <span class="c"># +5: XAG CL GOOGL MSTR CRCL</span>
+M  neodax-nacos/staging/quote/quote.yaml            <span class="c"># 11 places × 13 markets = +143 lines</span>
+M  neodax-nacos/staging/ledger/ledger.yaml          <span class="c"># markets + perp_markets, both lists ×13</span>
+M  neodax-nacos/staging/trading_api/trading_api.yaml <span class="c"># enabled_futures_markets +13</span>
+M  neodax-kafka-topic-provision/staging/values.yaml <span class="c"># -perp-markets list +13 (same as HYPE precedent #98)</span></pre>
+<div class="call"><p class="call-t">Review notes (7)</p>
+<ol class="pts">
+<li><b>Shard split is add-only</b> — the existing 12 markets are untouched; programmatically verified that every new market appears on exactly 1 shard (a cross-shard duplicate = double matching, never allowed).</li>
+<li><b>quote inserts complete across 11 places</b> — mark_price_oracle.symbols, symbol_aliases_perp, binance_perp.markets, 4 mark_oracle source symbol lists, 4 symbol_mappings groups; each market appears exactly 11 times.</li>
+<li><b>OKX / Bybit mappings verified</b> — <code>XAU-USDT-SWAP</code> / <code>XAUUSDT</code> formats confirmed to exist via both exchanges' APIs (2026-09-18).</li>
+<li><b>No market_source_weights added</b> — new markets use the global defaults (binance 0.97 dominant); the min_sources threshold line stays 1 forever.</li>
+<li><b>OKX's dead 1000PEPE mapping left as-is</b> — it points to a non-existent contract; intentionally untouched (Binance/Bybit cover it).</li>
+<li><b>trading-api hot-reloads</b> — markets are exposed the moment the merge syncs; restart order must be finex → quote → ledger (see matrix below).</li>
+<li><b>kafka-topic-provision</b> — the ArgoCD Sync-hook Job's market list; with the 13 new markets added, topics are created automatically on sync.</li>
+</ol></div>
+
+<h2>Operator Execution Sequence (order matters)</h2>
+<ol class="steps n">
+<li><b>Merge PR #1703 (seeds)</b><span>Owner approves and merges. This only lands SQL files on master — no runtime effect.</span></li>
+<li><b>Run the seeds against the staging PM Perp database</b><span>After merging, pull master in an environment that can reach staging RDS (credentials from vault <code>neodax/stg/managed/rds</code>, sslmode=require) — full commands on page 5. For local dev: <code>make seed-perp-markets && make seed-perp-market-risk-tiers</code>.</span></li>
+<li><b>Verify PM picked them up (auto-reloads within 60s)</b><span>The admin perpetual market list or PM gRPC shows 14 markets with status=active. trading-api hasn't exposed them and finex hasn't loaded them yet — invisible to users, safe.</span></li>
+<li><b>Merge PR #150 (staging configs)</b><span>ArgoCD auto-syncs → three Sync-hook Jobs run together: <code>neodax-db-migrate</code> (migrations, nothing new), <code>nacos-sync</code> (pushes configs into Nacos), <code>neodax-kafka-topic-provision</code> (creates all new topics automatically — no need to run the §4 commands manually).<br><b>⚠️ From this moment trading-api hot-reloads enabled_futures_markets and the markets are exposed to users</b> — until quote is restarted, new-market orders are cleanly rejected by the mark price gate (acceptable, a window of a few minutes).</span></li>
+<li><b>Immediately rolling-restart finex-perp-1/2/3</b><span>Each instance loads its new configured_markets + order books. Must happen before quote — otherwise once quote produces prices, orders get accepted by PM but never matched (stuck orders). Commands on page 6.</span></li>
+<li><b>Restart quote</b><span>Mark prices for the new markets start flowing (the mark price gate passes). From this moment the full order path works. Verify mark freshness (page 9, item 4).</span></li>
+<li><b>Restart ledger</b><span>K-line aggregation starts consuming the new markets' trades.</span></li>
+<li><b>Smoke verification</b><span>Work through the 7 items on page 9 + small open/close round trips on 2-3 representative markets.</span></li>
+</ol>
+<div class="call warn"><p class="call-t">Restart order iron rule: finex → quote → ledger (trading-api needs no restart)</p><p>Getting this wrong opens a "orders accepted by PM but nobody matching" stuck-order window. Each service's hot-reload behavior dictates the order:</p></div>
+<div class="tw"><table>
+<thead><tr><th>Service</th><th>Config</th><th>Behavior</th><th>Requirement</th></tr></thead>
+<tbody>
+<tr><td><b>trading-api</b></td><td class="mono-c">enabled_futures_markets</td><td>Hot-reloads — effective the moment Nacos changes</td><td class="dim">No restart; this is why markets auto-expose at step 4</td></tr>
+<tr><td><b>PM Perp</b></td><td class="mono-c">perps_markets table</td><td>Auto-reloads every 60s</td><td class="dim">No restart needed after seeds (restart optional)</td></tr>
+<tr><td><b>finex</b></td><td class="mono-c">configured_markets</td><td>Read only at startup</td><td><b>Must restart</b> — and before quote</td></tr>
+<tr><td><b>quote</b></td><td class="mono-c">new-symbol WS subscriptions</td><td>Weights hot-adjustable; new subscriptions are not</td><td><b>Must restart</b> — mark prices flow from this moment</td></tr>
+<tr><td><b>ledger</b></td><td class="mono-c">markets / perp_markets</td><td>Read at startup</td><td><b>Must restart</b> — last</td></tr>
+</tbody>
+</table></div>
+</section>
+</article>
+
+<!-- ═══ 2 Market Parameters ═══ -->
+<article class="panel" id="p-markets" hidden>
+<header>
+<div class="eyebrow">2 · Market Parameters</div>
+<h1>Full Parameter Table for the 14 Markets</h1>
+<p class="standfirst">Fees are uniform <strong>maker 0.02% / taker 0.05%</strong>, quote asset is USDT for all. <strong>All parameters finalized from live Binance data</strong> (2026-09-18). Funding intervals: XAU/XAG/CL = <strong>4h</strong>, everything else 8h. <code>mark_price_min_sources_normal = 1</code>, <b>permanently locked</b>. Source details below.</p>
+</header>
+
+<section>
+<h2>Parameter Table</h2>
+<div class="tw"><table>
+<thead><tr><th>Symbol</th><th>Category</th><th>Amt/Prc Prec</th><th>Tick / Step</th><th>MinQty / MinNot</th><th>MaxQty</th><th>Max Lev</th><th>IMR / MMR</th><th>Funding</th><th>Limit Band</th></tr></thead>
+<tbody>
+<tr><td class="mono-c"><b>XAUUSDT-PERP</b></td><td>Commodity · Gold</td><td class="mono-c">3 / 2</td><td class="mono-c">0.01 / 0.001</td><td class="mono-c">0.001 / 5</td><td class="mono-c">10000</td><td class="mono-c">50</td><td class="mono-c">0.02 / 0.01</td><td class="mono-c">4h ±2%</td><td class="mono-c">0.98 – 1.02</td></tr>
+<tr><td class="mono-c"><b>XAGUSDT-PERP</b></td><td>Commodity · Silver</td><td class="mono-c">3 / 2</td><td class="mono-c">0.01 / 0.001</td><td class="mono-c">0.001 / 5</td><td class="mono-c">1000000</td><td class="mono-c">50</td><td class="mono-c">0.02 / 0.01</td><td class="mono-c">4h ±2%</td><td class="mono-c">0.97 – 1.03</td></tr>
+<tr><td class="mono-c"><b>CLUSDT-PERP</b></td><td>Commodity · WTI Crude</td><td class="mono-c">2 / 2</td><td class="mono-c">0.01 / 0.01</td><td class="mono-c">0.01 / 5</td><td class="mono-c">500000</td><td class="mono-c">100</td><td class="mono-c">0.01 / 0.005</td><td class="mono-c">4h ±2%</td><td class="mono-c">0.97 – 1.03</td></tr>
+<tr><td class="mono-c"><b>ARBUSDT-PERP</b></td><td>DeFi</td><td class="mono-c">1 / 5</td><td class="mono-c">0.00001 / 0.1</td><td class="mono-c">0.1 / 5</td><td class="mono-c">30000000</td><td class="mono-c">100</td><td class="mono-c">0.01 / 0.005</td><td class="mono-c">8h platform</td><td class="mono-c">0.85 – 1.15</td></tr>
+<tr><td class="mono-c"><b>UNIUSDT-PERP</b></td><td>DeFi</td><td class="mono-c">0 / 3</td><td class="mono-c">0.001 / 1</td><td class="mono-c">1 / 5</td><td class="mono-c">2000000</td><td class="mono-c">100</td><td class="mono-c">0.01 / 0.005</td><td class="mono-c">8h platform</td><td class="mono-c">0.90 – 1.10</td></tr>
+<tr><td class="mono-c"><b>NEARUSDT-PERP</b></td><td>L1</td><td class="mono-c">0 / 3</td><td class="mono-c">0.001 / 1</td><td class="mono-c">1 / 5</td><td class="mono-c">5000000</td><td class="mono-c">100</td><td class="mono-c">0.01 / 0.005</td><td class="mono-c">8h platform</td><td class="mono-c">0.90 – 1.10</td></tr>
+<tr><td class="mono-c"><b>ADAUSDT-PERP</b></td><td>L1</td><td class="mono-c">0 / 4</td><td class="mono-c">0.0001 / 1</td><td class="mono-c">1 / 5</td><td class="mono-c">30000000</td><td class="mono-c">100</td><td class="mono-c">0.01 / 0.005</td><td class="mono-c">8h platform</td><td class="mono-c">0.95 – 1.05</td></tr>
+<tr><td class="mono-c"><b>AAVEUSDT-PERP</b></td><td>DeFi</td><td class="mono-c">1 / 2</td><td class="mono-c">0.01 / 0.1</td><td class="mono-c">0.1 / 5</td><td class="mono-c">78000</td><td class="mono-c">100</td><td class="mono-c">0.01 / 0.005</td><td class="mono-c">8h platform</td><td class="mono-c">0.90 – 1.10</td></tr>
+<tr><td class="mono-c"><b>NVDAUSDT-PERP</b></td><td>Equity</td><td class="mono-c">2 / 2</td><td class="mono-c">0.01 / 0.01</td><td class="mono-c">0.01 / 5</td><td class="mono-c">30000</td><td class="mono-c">10</td><td class="mono-c">0.10 / 0.05</td><td class="mono-c">8h ±2%</td><td class="mono-c">0.97 – 1.03</td></tr>
+<tr><td class="mono-c"><b>CRCLUSDT-PERP</b></td><td>Equity</td><td class="mono-c">2 / 2</td><td class="mono-c">0.01 / 0.01</td><td class="mono-c">0.01 / 5</td><td class="mono-c">70000</td><td class="mono-c">10</td><td class="mono-c">0.10 / 0.05</td><td class="mono-c">8h ±2%</td><td class="mono-c">0.97 – 1.03</td></tr>
+<tr><td class="mono-c"><b>MSTRUSDT-PERP</b></td><td>Equity</td><td class="mono-c">2 / 2</td><td class="mono-c">0.01 / 0.01</td><td class="mono-c">0.01 / 5</td><td class="mono-c">42000</td><td class="mono-c">10</td><td class="mono-c">0.10 / 0.05</td><td class="mono-c">8h ±2%</td><td class="mono-c">0.97 – 1.03</td></tr>
+<tr><td class="mono-c"><b>TSLAUSDT-PERP</b></td><td>Equity</td><td class="mono-c">2 / 2</td><td class="mono-c">0.01 / 0.01</td><td class="mono-c">0.01 / 5</td><td class="mono-c">20000</td><td class="mono-c">10</td><td class="mono-c">0.10 / 0.05</td><td class="mono-c">8h ±2%</td><td class="mono-c">0.97 – 1.03</td></tr>
+<tr><td class="mono-c"><b>GOOGLUSDT-PERP</b></td><td>Equity</td><td class="mono-c">2 / 2</td><td class="mono-c">0.01 / 0.01</td><td class="mono-c">0.01 / 5</td><td class="mono-c">20000</td><td class="mono-c">10</td><td class="mono-c">0.10 / 0.05</td><td class="mono-c">8h ±2%</td><td class="mono-c">0.97 – 1.03</td></tr>
+<tr class="dim"><td class="mono-c">1000PEPEUSDT-PERP</td><td>Meme · enable</td><td class="mono-c">existing</td><td class="mono-c">existing</td><td class="mono-c">existing</td><td class="mono-c">existing</td><td class="mono-c">existing</td><td class="mono-c">existing</td><td class="mono-c">existing</td><td class="mono-c">existing (status flip only)</td></tr>
+</tbody>
+</table></div>
+<div class="call ok"><p class="call-t">Data sources (all verified live on 2026-09-18)</p>
+<ol class="pts">
+<li><b>Filters</b> — tick / step / minQty / maxQty / minNotional / PERCENT_PRICE: fetched directly from Binance <code>fapi/v1/exchangeInfo</code> (VPN), aligned item by item.</li>
+<li><b>Funding intervals</b> — <code>fapi/v1/fundingInfo</code>: XAU/XAG/CL = 4h; TSLA listed at 4h, now 8h — live data wins.</li>
+<li><b>Leverage &amp; interest</b> — official listing announcements: XAU/XAG 50x, CL 100x, equities 10x, TradFi interest 0%.</li>
+<li><b>Prc Prec rule</b> — decimal places of tick (Binance's pricePrecision field is zero-padded — not used).</li>
+</ol></div>
+<div class="call warn"><p class="call-t">min_sources = 1 — permanently locked</p><p><b>Never change mark_price_min_sources_normal to 2 or 3 on any market, at any time.</b></p><p>Multi-source enforcement pushes markets into SAFE_MODE (past incident: all open orders rejected). Sources can be multiplied (Binance/OKX/Bybit all wired, weights spread) — but the min_sources threshold stays 1: as long as one source is alive, the market stays normal.</p></div>
+</section>
+
+<section>
+<h2>Market Data Source Coverage (verified via all three exchanges' APIs, 2026-09-18)</h2>
+<div class="tw"><table>
+<thead><tr><th>Market</th><th>Binance</th><th>OKX</th><th>Bybit</th><th>Notes</th></tr></thead>
+<tbody>
+<tr><td class="mono-c">XAUUSDT-PERP</td><td><span class="pill ok">✓ XAUUSDT</span></td><td><span class="pill ok">✓ XAU-USDT-SWAP</span></td><td><span class="pill ok">✓ XAUUSDT</span></td><td class="dim">On all three</td></tr>
+<tr><td class="mono-c">XAGUSDT-PERP</td><td><span class="pill ok">✓ XAGUSDT</span></td><td><span class="pill ok">✓ XAG-USDT-SWAP</span></td><td><span class="pill ok">✓ XAGUSDT</span></td><td class="dim">On all three</td></tr>
+<tr><td class="mono-c">CLUSDT-PERP</td><td><span class="pill ok">✓ CLUSDT</span></td><td><span class="pill ok">✓ CL-USDT-SWAP</span></td><td><span class="pill ok">✓ CLUSDT</span></td><td class="dim">On all three</td></tr>
+<tr><td class="mono-c">ARBUSDT-PERP</td><td><span class="pill ok">✓</span></td><td><span class="pill ok">✓ ARB-USDT-SWAP</span></td><td><span class="pill ok">✓</span></td><td class="dim">On all three</td></tr>
+<tr><td class="mono-c">UNIUSDT-PERP</td><td><span class="pill ok">✓</span></td><td><span class="pill ok">✓ UNI-USDT-SWAP</span></td><td><span class="pill ok">✓</span></td><td class="dim">On all three</td></tr>
+<tr><td class="mono-c">NEARUSDT-PERP</td><td><span class="pill ok">✓</span></td><td><span class="pill ok">✓ NEAR-USDT-SWAP</span></td><td><span class="pill ok">✓</span></td><td class="dim">On all three</td></tr>
+<tr><td class="mono-c">ADAUSDT-PERP</td><td><span class="pill ok">✓</span></td><td><span class="pill ok">✓ ADA-USDT-SWAP</span></td><td><span class="pill ok">✓</span></td><td class="dim">On all three</td></tr>
+<tr><td class="mono-c">AAVEUSDT-PERP</td><td><span class="pill ok">✓</span></td><td><span class="pill ok">✓ AAVE-USDT-SWAP</span></td><td><span class="pill ok">✓</span></td><td class="dim">On all three</td></tr>
+<tr><td class="mono-c">NVDAUSDT-PERP</td><td><span class="pill ok">✓</span></td><td><span class="pill ok">✓ NVDA-USDT-SWAP</span></td><td><span class="pill ok">✓</span></td><td class="dim">On all three</td></tr>
+<tr><td class="mono-c">CRCLUSDT-PERP</td><td><span class="pill ok">✓</span></td><td><span class="pill ok">✓ CRCL-USDT-SWAP</span></td><td><span class="pill ok">✓</span></td><td class="dim">On all three</td></tr>
+<tr><td class="mono-c">MSTRUSDT-PERP</td><td><span class="pill ok">✓</span></td><td><span class="pill ok">✓ MSTR-USDT-SWAP</span></td><td><span class="pill ok">✓</span></td><td class="dim">On all three</td></tr>
+<tr><td class="mono-c">TSLAUSDT-PERP</td><td><span class="pill ok">✓</span></td><td><span class="pill ok">✓ TSLA-USDT-SWAP</span></td><td><span class="pill ok">✓</span></td><td class="dim">On all three</td></tr>
+<tr><td class="mono-c">GOOGLUSDT-PERP</td><td><span class="pill ok">✓</span></td><td><span class="pill ok">✓ GOOGL-USDT-SWAP</span></td><td><span class="pill ok">✓</span></td><td class="dim">On all three</td></tr>
+<tr><td class="mono-c">1000PEPEUSDT-PERP</td><td><span class="pill ok">✓</span></td><td><span class="pill gap">✗ no matching contract</span></td><td><span class="pill ok">✓</span></td><td class="dim">OKX only lists PEPE-USDT-SWAP (10,000,000 face value — semantics mismatch); the existing config maps "1000PEPE-USDT-SWAP" which doesn't exist → that source has always been dead</td></tr>
+</tbody>
+</table></div>
+<div class="call"><p class="call-t">Strategy: wire all three sources, min_sources = 1</p><p>All 13 new markets exist on all three exchanges → quote config wires Binance/OKX/Bybit (page 7); if one drops, the other two carry it. <b>But the min_sources threshold stays 1 forever</b> — as long as one source publishes prices the market stays normal and never enters SAFE_MODE.</p></div>
+</section>
+</article>
+
+<!-- ═══ 3 Pre-flight ═══ -->
+<article class="panel" id="p-preflight" hidden>
+<header>
+<div class="eyebrow">3 · Pre-flight Checks</div>
+<h1>Confirm These Before You Start</h1>
+<p class="standfirst">Every item on this page must be checked off before moving on. If anything is uncertain, stop and ask.</p>
+</header>
+<section>
+<ol class="steps n">
+<li><b>Market data sources (done)</b><span>✅ Verified against all three exchanges' APIs on 2026-09-18: all 13 new markets exist on Binance/OKX/Bybit; all three sources wired (page 7 config). 1000PEPE uses Binance+Bybit (no matching OKX contract). min_sources = 1 locked everywhere.</span></li>
+<li><b>Parameters (done)</b><span>✅ Finalized from live Binance fapi exchangeInfo (tick/step/minQty/maxQty/minNotional/PERCENT_PRICE aligned item by item — see page 2). Funding intervals from fundingInfo (XAU/XAG/CL 4h, TSLA 8h).<br>One simplification: risk tiers use the IMR=1/leverage, MMR=IMR/2 structure (Binance riskBrackets needs a signed API; swap in exact brackets post-launch if wanted).</span></li>
+<li><b>Finex-3 markets "disappearing" — verified (staging)</b><span>✅ Verified on the <code>neodax-apps-value</code> staging branch: Finex-3's list has <b>SOL/DOGE/TBTC/HYPE intact</b>; git history shows only #90 (shards created) and #98 (HYPE added) — never duplicated.<br>If these 4 markets are missing at runtime, check two things:<br>① the 4 rows' <code>perps_markets.status</code> in the PM staging DB (finex only loads markets PM reports AND that are in its allowlist)<br>② whether the finex-perp-3 pod is Ready<br>⚠️ If you were looking at <b>production</b> Nacos — production configs are not in this repo; before a production rollout, diff production's finex_perp_1/2/3 lists against this plan.</span></li>
+<li><b>Known risk: TBTC has no market data source at all</b><span>⚠️ TBTCUSDT-PERP has no contract on Binance/OKX/Bybit, and the staging quote config gives it no source either (absent from every symbols list).<br>It survives on <code>safe_mode_zero_sources_sec: 2592000</code> (30-day zero-source grace) — once that expires it enters SAFE_MODE (all opens rejected).<br>Options: add an <code>internal_perp_trade</code> source for TBTC (self-priced mark) / accept SAFE_MODE / delist. <b>Decide separately — do not mix into this rollout.</b></span></li>
+<li><b>Confirm 1000PEPE on Finex-1 only needs enabling</b><span>Already in the shard config. Just flip <code>perps_markets.status</code> to active + the quote config chain is already in place.</span></li>
+<li><b>Confirm system accounts have USDT balance rows</b><span>Quote uses existing USDT — no new asset needed. Confirm the insurance pool / fee treasury / liquidation-residual treasury USDT rows exist.</span></li>
+<li><b>Estimate total Kafka topics</b><span>13 new markets × 3-4 topics each ≈ 40-52 new topics. Confirm Kafka cluster capacity.</span></li>
+</ol>
+</section>
+</article>
+
+<!-- ═══ 4 Kafka ═══ -->
+<article class="panel" id="p-kafka" hidden>
+<header>
+<div class="eyebrow">4 · Kafka Topics</div>
+<h1>Kafka Topics (auto-created on staging)</h1>
+<p class="standfirst"><strong>No manual action needed on staging</strong> — PR #150 added the 13 new markets to the <code>-perp-markets=</code> list in <code>neodax-kafka-topic-provision/staging/values.yaml</code>; the ArgoCD Sync-hook Job runs <code>kafka_topic_init</code> automatically (idempotent, only fills gaps). The manual command is only for local dev or emergency backfill.</p>
+</header>
+<section>
+<h3>Automatic path (staging, default)</h3>
+<pre><span class="c"># PR #150 merged → ArgoCD sync → neodax-kafka-topic-provision Job runs:</span>
+/app/kafka_topic_init -replication-factor=3 -min-isr=2 \
+  --brokers "$KAFKA_BROKERS" \
+  -perp-markets=BTCUSDT-PERP,...,HYPEUSDT-PERP,<span class="c"># existing 12</span>
+    XAUUSDT-PERP,XAGUSDT-PERP,CLUSDT-PERP,ARBUSDT-PERP,UNIUSDT-PERP,NEARUSDT-PERP,\
+    ADAUSDT-PERP,AAVEUSDT-PERP,NVDAUSDT-PERP,CRCLUSDT-PERP,MSTRUSDT-PERP,TSLAUSDT-PERP,GOOGLUSDT-PERP <span class="c"># ← 13 new in PR #150</span>
+  -spot-markets=ETHUSDT,BTCUSDT,... <span class="c"># spot unchanged</span></pre>
+
+<h3>Manual path (local dev / emergency backfill)</h3>
+<pre><span class="c"># Dry-run first to see what would be created (idempotent, only fills gaps; 1000PEPE's exist already)</span>
+go run ./tools/kafka_topic_init \
+  -brokers &lt;BROKER_ADDR&gt; \
+  -perp-markets "XAUUSDT-PERP,XAGUSDT-PERP,CLUSDT-PERP,ARBUSDT-PERP,UNIUSDT-PERP,NEARUSDT-PERP,ADAUSDT-PERP,AAVEUSDT-PERP,NVDAUSDT-PERP,CRCLUSDT-PERP,MSTRUSDT-PERP,TSLAUSDT-PERP,GOOGLUSDT-PERP,1000PEPEUSDT-PERP" \
+  -dry-run
+<span class="c"># If it looks right, drop -dry-run and add -replication-factor 3 -min-isr 2</span></pre>
+
+<div class="call"><p class="call-t">Topics created per market</p><p><code>commands.{MKT}.OrderCommands</code> · <code>events.{MKT}.EventOrderUpdated</code> · <code>events.{MKT}.EventTradeExecuted</code> · <code>events.{MKT}.EventPerpTriggerOrder</code>. 13 new markets × 3-4 ≈ 40-52 new topics (1000PEPE's already exist). Verify: page 9 item 1, or filter by symbol prefix in Kafka UI.</p></div>
+</section>
+</article>
+
+<!-- ═══ 5 Perp PM ═══ -->
+<article class="panel" id="p-perppm" hidden>
+<header>
+<div class="eyebrow">5 · Perp PM</div>
+<h1>Database Inserts + Rolling Restart</h1>
+<p class="standfirst">The SQL below is the content of the two seed files in <strong>PR #1703</strong> (<code>20260918120000_perps_markets.sql</code> + <code>20260918120100_perps_market_risk_tiers.sql</code>, submitted to neodax master, pending review). Staging execution commands below; PM Perp auto-reloads the markets table every 60s — <strong>no PM restart needed after running the seeds</strong> (restart optional).</p>
+</header>
+<section>
+<h3>Running the seeds (staging)</h3>
+<pre><span class="c"># ① After PR #1703 merges, pull master in an environment that can reach staging RDS</span>
+git fetch && git checkout master && git pull
+
+<span class="c"># ② Credentials from vault: neodax/stg/managed/rds (host/port/db_name/username/password), sslmode=require</span>
+<span class="c"># ③ Run the two seed files in order (idempotent, re-runnable):</span>
+psql "postgresql://&lt;USERNAME&gt;:&lt;PASSWORD&gt;@&lt;HOST&gt;:&lt;PORT&gt;/&lt;DB_NAME&gt;?sslmode=require" \
+  -f portfolio_manager_perp/seeds/20260918120000_perps_markets.sql
+psql "postgresql://&lt;USERNAME&gt;:&lt;PASSWORD&gt;@&lt;HOST&gt;:&lt;PORT&gt;/&lt;DB_NAME&gt;?sslmode=require" \
+  -f portfolio_manager_perp/seeds/20260918120100_perps_market_risk_tiers.sql
+
+<span class="c"># ④ Verify: 14 markets active (including 1000PEPE)</span>
+psql "postgresql://..." -c "SELECT symbol, status, max_allowed_leverage, funding_interval_seconds
+  FROM portfolio_manager_perp.perps_markets WHERE symbol IN ('XAUUSDT-PERP','XAGUSDT-PERP','CLUSDT-PERP',
+  'ARBUSDT-PERP','UNIUSDT-PERP','NEARUSDT-PERP','ADAUSDT-PERP','AAVEUSDT-PERP','NVDAUSDT-PERP',
+  'CRCLUSDT-PERP','MSTRUSDT-PERP','TSLAUSDT-PERP','GOOGLUSDT-PERP','1000PEPEUSDT-PERP') ORDER BY symbol;"</pre>
+<div class="call"><p class="call-t">Local dev (docker compose environment)</p><p><code>make seed-perp-markets && make seed-perp-market-risk-tiers</code> — both file names match the Makefile globs (<code>[0-9]*_perps_markets.sql</code> / <code>[0-9]*_perps_market_risk_tiers.sql</code>) and are merged in timestamp order automatically; no Makefile change needed.</p></div>
+<h3>Step 1: Assets (perps_assets)</h3>
+<pre><span class="c">-- 13 new base assets (quote USDT already exists; 1000PEPE already exists)</span>
+INSERT INTO portfolio_manager_perp.perps_assets (symbol, name, decimals, is_active, is_stablecoin, created_at) VALUES
+  ('XAU',  'Gold',            8, true, false, NOW()),
+  ('XAG',  'Silver',          8, true, false, NOW()),
+  ('CL',   'WTI Crude Oil',   2, true, false, NOW()),
+  ('ARB',  'Arbitrum',       18, true, false, NOW()),
+  ('UNI',  'Uniswap',        18, true, false, NOW()),
+  ('NEAR', 'NEAR Protocol',  24, true, false, NOW()),
+  ('ADA',  'Cardano',         6, true, false, NOW()),
+  ('AAVE', 'Aave',           18, true, false, NOW()),
+  ('NVDA', 'NVIDIA',          8, true, false, NOW()),
+  ('CRCL', 'Circle',          8, true, false, NOW()),
+  ('MSTR', 'MicroStrategy',   8, true, false, NOW()),
+  ('TSLA', 'Tesla',           8, true, false, NOW()),
+  ('GOOGL','Alphabet',        8, true, false, NOW())
+ON CONFLICT (symbol) DO UPDATE SET is_active=EXCLUDED.is_active, decimals=EXCLUDED.decimals, name=EXCLUDED.name;</pre>
+
+<h3>Step 2: Markets (perps_markets)</h3>
+<pre><span class="c">-- 13 new markets. Column list matches the current schema (the two display-precision columns were dropped by the 20260702 migration).</span>
+<span class="c">-- All parameters from live Binance fapi exchangeInfo (2026-09-18): tick/step/minQty/maxQty/minNotional/PERCENT_PRICE aligned item by item.</span>
+<span class="c">-- Funding intervals: XAU/XAG/CL = 14400 (4h), everything else = 28800 (8h, incl. TSLA — listed at 4h, since changed to 8h; live fundingInfo wins).</span>
+<span class="c">-- TradFi funding: cap ±2% (0.02), interest 0 (Binance official); crypto keeps the platform template cap/interest 0.003.</span>
+<span class="c">-- min_price/max_price left empty → price_min/max_ratio applies (raw Binance PERCENT_PRICE values).</span>
+INSERT INTO portfolio_manager_perp.perps_markets (
+  symbol, base_asset, quote_asset, status, maker_fee_rate, taker_fee_rate,
+  amount_precision, price_precision, price_min_ratio, price_max_ratio,
+  step_size, tick_size, min_qty, max_qty, min_notional, depth_level,
+  maintenance_margin_rate, max_allowed_leverage, funding_interval_seconds,
+  max_funding_rate_per_int, interest_rate_per_interval, mark_price_min_sources_normal,
+  created_at, updated_at
+) VALUES
+  <span class="c">-- Commodities (Binance: 50x/50x/100x, funding 4h, cap ±2%, interest 0%)</span>
+  ('XAUUSDT-PERP','XAU','USDT','active',0.0002,0.0005, 3,2, 0.98,1.02,'0.001','0.01','0.001','10000','5','["0.01","0.1","1","10"]',0.01,50,14400,0.02,0.0,1,NOW(),NOW()),
+  ('XAGUSDT-PERP','XAG','USDT','active',0.0002,0.0005, 3,2, 0.97,1.03,'0.001','0.01','0.001','1000000','5','["0.01","0.1","1","10"]',0.01,50,14400,0.02,0.0,1,NOW(),NOW()),
+  ('CLUSDT-PERP','CL','USDT','active',0.0002,0.0005, 2,2, 0.97,1.03,'0.01','0.01','0.01','500000','5','["0.01","0.1","1","10"]',0.005,100,14400,0.02,0.0,1,NOW(),NOW()),
+  <span class="c">-- DeFi / L1 (LOT_SIZE per live fapi; cap/interest = platform template)</span>
+  ('ARBUSDT-PERP','ARB','USDT','active',0.0002,0.0005, 1,5, 0.85,1.15,'0.1','0.00001','0.1','30000000','5','["0.00001","0.0001","0.001","0.01"]',0.005,100,28800,0.003,0.003,1,NOW(),NOW()),
+  ('UNIUSDT-PERP','UNI','USDT','active',0.0002,0.0005, 0,3, 0.90,1.10,'1','0.001','1','2000000','5','["0.001","0.01","0.1","1"]',0.005,100,28800,0.003,0.003,1,NOW(),NOW()),
+  ('NEARUSDT-PERP','NEAR','USDT','active',0.0002,0.0005, 0,3, 0.90,1.10,'1','0.001','1','5000000','5','["0.001","0.01","0.1","1"]',0.005,100,28800,0.003,0.003,1,NOW(),NOW()),
+  ('ADAUSDT-PERP','ADA','USDT','active',0.0002,0.0005, 0,4, 0.95,1.05,'1','0.0001','1','30000000','5','["0.0001","0.001","0.01","0.1"]',0.005,100,28800,0.003,0.003,1,NOW(),NOW()),
+  ('AAVEUSDT-PERP','AAVE','USDT','active',0.0002,0.0005, 1,2, 0.90,1.10,'0.1','0.01','0.1','78000','5','["0.01","0.1","1","10"]',0.005,100,28800,0.003,0.003,1,NOW(),NOW()),
+  <span class="c">-- Equity perps (Binance: 10x, funding 8h, cap ±2%, interest 0%)</span>
+  ('NVDAUSDT-PERP','NVDA','USDT','active',0.0002,0.0005, 2,2, 0.97,1.03,'0.01','0.01','0.01','30000','5','["0.01","0.1","1","10"]',0.05,10,28800,0.02,0.0,1,NOW(),NOW()),
+  ('CRCLUSDT-PERP','CRCL','USDT','active',0.0002,0.0005, 2,2, 0.97,1.03,'0.01','0.01','0.01','70000','5','["0.01","0.1","1","10"]',0.05,10,28800,0.02,0.0,1,NOW(),NOW()),
+  ('MSTRUSDT-PERP','MSTR','USDT','active',0.0002,0.0005, 2,2, 0.97,1.03,'0.01','0.01','0.01','42000','5','["0.01","0.1","1","10"]',0.05,10,28800,0.02,0.0,1,NOW(),NOW()),
+  ('TSLAUSDT-PERP','TSLA','USDT','active',0.0002,0.0005, 2,2, 0.97,1.03,'0.01','0.01','0.01','20000','5','["0.01","0.1","1","10"]',0.05,10,28800,0.02,0.0,1,NOW(),NOW()),
+  ('GOOGLUSDT-PERP','GOOGL','USDT','active',0.0002,0.0005, 2,2, 0.97,1.03,'0.01','0.01','0.01','20000','5','["0.01","0.1","1","10"]',0.05,10,28800,0.02,0.0,1,NOW(),NOW())
+ON CONFLICT (symbol) DO UPDATE SET
+  base_asset=EXCLUDED.base_asset, status=EXCLUDED.status,
+  maker_fee_rate=EXCLUDED.maker_fee_rate, taker_fee_rate=EXCLUDED.taker_fee_rate,
+  amount_precision=EXCLUDED.amount_precision, price_precision=EXCLUDED.price_precision,
+  price_min_ratio=EXCLUDED.price_min_ratio, price_max_ratio=EXCLUDED.price_max_ratio,
+  step_size=EXCLUDED.step_size, tick_size=EXCLUDED.tick_size,
+  min_qty=EXCLUDED.min_qty, max_qty=EXCLUDED.max_qty, min_notional=EXCLUDED.min_notional,
+  depth_level=EXCLUDED.depth_level,
+  maintenance_margin_rate=EXCLUDED.maintenance_margin_rate,
+  max_allowed_leverage=EXCLUDED.max_allowed_leverage,
+  funding_interval_seconds=EXCLUDED.funding_interval_seconds,
+  max_funding_rate_per_int=EXCLUDED.max_funding_rate_per_int,
+  interest_rate_per_interval=EXCLUDED.interest_rate_per_interval,
+  mark_price_min_sources_normal=EXCLUDED.mark_price_min_sources_normal,
+  updated_at=NOW();
+
+<span class="c">-- 1000PEPE enable: the row exists — flip status only, touch nothing else</span>
+UPDATE portfolio_manager_perp.perps_markets
+  SET status='active', updated_at=NOW()
+  WHERE symbol='1000PEPEUSDT-PERP';</pre>
+
+<h3>Step 3: Risk tiers (perps_market_risk_tiers)</h3>
+<pre><span class="c">-- max_position_qty = quote notional (USDT), same semantics as the HYPE seed.</span>
+<span class="c">-- IMR = 1/max_leverage, MMR = IMR/2 (simplified structure; can be replaced with exact Binance riskBrackets pre-launch).</span>
+INSERT INTO portfolio_manager_perp.perps_market_risk_tiers (symbol,tier_index,max_position_qty,max_leverage,initial_margin_rate,maintenance_margin_rate,config_version,created_at,updated_at) VALUES
+  <span class="c">-- Commodities XAU/XAG: 50x / 25x / 10x</span>
+  ('XAUUSDT-PERP',1,   50000, 50, 0.02, 0.01, 1,NOW(),NOW()),
+  ('XAUUSDT-PERP',2,  500000, 25, 0.04, 0.02, 1,NOW(),NOW()),
+  ('XAUUSDT-PERP',3, 5000000, 10, 0.10, 0.05, 1,NOW(),NOW()),
+  ('XAGUSDT-PERP',1,   50000, 50, 0.02, 0.01, 1,NOW(),NOW()),
+  ('XAGUSDT-PERP',2,  500000, 25, 0.04, 0.02, 1,NOW(),NOW()),
+  ('XAGUSDT-PERP',3, 5000000, 10, 0.10, 0.05, 1,NOW(),NOW()),
+  <span class="c">-- CL: 100x / 50x / 10x</span>
+  ('CLUSDT-PERP',1,   50000,100, 0.01, 0.005,1,NOW(),NOW()),
+  ('CLUSDT-PERP',2,  500000, 50, 0.02, 0.01, 1,NOW(),NOW()),
+  ('CLUSDT-PERP',3, 5000000, 10, 0.10, 0.05, 1,NOW(),NOW()),
+  <span class="c">-- DeFi / L1: 100x / 50x / 20x / 10x / 1x (notional caps mirror the BTC template)</span>
+  ('ARBUSDT-PERP',1,   50000,100, 0.01, 0.005,1,NOW(),NOW()),
+  ('ARBUSDT-PERP',2,  250000, 50, 0.02, 0.01, 1,NOW(),NOW()),
+  ('ARBUSDT-PERP',3, 1000000, 20, 0.05, 0.025,1,NOW(),NOW()),
+  ('ARBUSDT-PERP',4, 7500000, 10, 0.10, 0.05, 1,NOW(),NOW()),
+  ('ARBUSDT-PERP',5,40000000,  1, 1.00, 0.50, 1,NOW(),NOW()),
+  ('UNIUSDT-PERP',1,   50000,100, 0.01, 0.005,1,NOW(),NOW()),
+  ('UNIUSDT-PERP',2,  250000, 50, 0.02, 0.01, 1,NOW(),NOW()),
+  ('UNIUSDT-PERP',3, 1000000, 20, 0.05, 0.025,1,NOW(),NOW()),
+  ('UNIUSDT-PERP',4, 7500000, 10, 0.10, 0.05, 1,NOW(),NOW()),
+  ('UNIUSDT-PERP',5,40000000,  1, 1.00, 0.50, 1,NOW(),NOW()),
+  ('NEARUSDT-PERP',1,   50000,100, 0.01, 0.005,1,NOW(),NOW()),
+  ('NEARUSDT-PERP',2,  250000, 50, 0.02, 0.01, 1,NOW(),NOW()),
+  ('NEARUSDT-PERP',3, 1000000, 20, 0.05, 0.025,1,NOW(),NOW()),
+  ('NEARUSDT-PERP',4, 7500000, 10, 0.10, 0.05, 1,NOW(),NOW()),
+  ('NEARUSDT-PERP',5,40000000,  1, 1.00, 0.50, 1,NOW(),NOW()),
+  ('ADAUSDT-PERP',1,   50000,100, 0.01, 0.005,1,NOW(),NOW()),
+  ('ADAUSDT-PERP',2,  250000, 50, 0.02, 0.01, 1,NOW(),NOW()),
+  ('ADAUSDT-PERP',3, 1000000, 20, 0.05, 0.025,1,NOW(),NOW()),
+  ('ADAUSDT-PERP',4, 7500000, 10, 0.10, 0.05, 1,NOW(),NOW()),
+  ('ADAUSDT-PERP',5,40000000,  1, 1.00, 0.50, 1,NOW(),NOW()),
+  ('AAVEUSDT-PERP',1,   50000,100, 0.01, 0.005,1,NOW(),NOW()),
+  ('AAVEUSDT-PERP',2,  250000, 50, 0.02, 0.01, 1,NOW(),NOW()),
+  ('AAVEUSDT-PERP',3, 1000000, 20, 0.05, 0.025,1,NOW(),NOW()),
+  ('AAVEUSDT-PERP',4, 7500000, 10, 0.10, 0.05, 1,NOW(),NOW()),
+  ('AAVEUSDT-PERP',5,40000000,  1, 1.00, 0.50, 1,NOW(),NOW()),
+  <span class="c">-- Equities: 10x / 5x / 1x</span>
+  ('NVDAUSDT-PERP',1,   50000, 10, 0.10, 0.05, 1,NOW(),NOW()),
+  ('NVDAUSDT-PERP',2,  500000,  5, 0.20, 0.10, 1,NOW(),NOW()),
+  ('NVDAUSDT-PERP',3, 5000000,  1, 1.00, 0.50, 1,NOW(),NOW()),
+  ('CRCLUSDT-PERP',1,   50000, 10, 0.10, 0.05, 1,NOW(),NOW()),
+  ('CRCLUSDT-PERP',2,  500000,  5, 0.20, 0.10, 1,NOW(),NOW()),
+  ('CRCLUSDT-PERP',3, 5000000,  1, 1.00, 0.50, 1,NOW(),NOW()),
+  ('MSTRUSDT-PERP',1,   50000, 10, 0.10, 0.05, 1,NOW(),NOW()),
+  ('MSTRUSDT-PERP',2,  500000,  5, 0.20, 0.10, 1,NOW(),NOW()),
+  ('MSTRUSDT-PERP',3, 5000000,  1, 1.00, 0.50, 1,NOW(),NOW()),
+  ('TSLAUSDT-PERP',1,   50000, 10, 0.10, 0.05, 1,NOW(),NOW()),
+  ('TSLAUSDT-PERP',2,  500000,  5, 0.20, 0.10, 1,NOW(),NOW()),
+  ('TSLAUSDT-PERP',3, 5000000,  1, 1.00, 0.50, 1,NOW(),NOW()),
+  ('GOOGLUSDT-PERP',1,   50000, 10, 0.10, 0.05, 1,NOW(),NOW()),
+  ('GOOGLUSDT-PERP',2,  500000,  5, 0.20, 0.10, 1,NOW(),NOW()),
+  ('GOOGLUSDT-PERP',3, 5000000,  1, 1.00, 0.50, 1,NOW(),NOW())
+ON CONFLICT (symbol, tier_index) DO UPDATE SET
+  max_position_qty=EXCLUDED.max_position_qty, max_leverage=EXCLUDED.max_leverage,
+  initial_margin_rate=EXCLUDED.initial_margin_rate,
+  maintenance_margin_rate=EXCLUDED.maintenance_margin_rate, updated_at=NOW();
+
+<span class="c">-- 1000PEPE: untouched (tiers were seeded with the market row). Confirm before running:</span>
+<span class="c">-- SELECT symbol, count(*) FROM perps_market_risk_tiers WHERE symbol='1000PEPEUSDT-PERP' GROUP BY symbol;</span></pre>
+
+<h3>Step 4: PM restart (optional)</h3>
+<pre><span class="c"># Default: no restart needed — ReloadMarketsSchedule picks up new markets within 60s of the seeds</span>
+<span class="c"># For immediate effect or to validate the restart path, roll: followers first, leader last</span>
+kubectl -n &lt;perp-pm-ns&gt; rollout restart deploy/perpetual-pm-2  <span class="c"># follower</span>
+kubectl -n &lt;perp-pm-ns&gt; rollout restart deploy/perpetual-pm-3  <span class="c"># follower</span>
+<span class="c"># after both followers are Ready:</span>
+kubectl -n &lt;perp-pm-ns&gt; rollout restart deploy/perpetual-pm-1  <span class="c"># leader last</span></pre>
+</section>
+</article>
+
+<!-- ═══ 6 Finex Shard ═══ -->
+<article class="panel" id="p-finex" hidden>
+<header>
+<div class="eyebrow">6 · Finex Shard</div>
+<h1>Update configured_markets on the Three Finex Instances</h1>
+<p class="standfirst">All three instances are <strong>add-only</strong> (Finex-1/2 gain 4 lines each, Finex-3 gains 5) — <strong>included in PR #150</strong> (apps-value staging). Existing lists verified. After merge + ArgoCD sync, roll the restarts per the page 1 sequence.</p>
+<div class="call"><p class="call-t">Before production</p><p>This page's lists are based on the <b>staging</b> config (neodax-apps-value staging branch; clean git history: #90 created shards, #98 added HYPE). Production Nacos is not in that repo — before a production rollout, diff production's finex_perp_1/2/3 lists line by line and confirm the existing 12 markets match the staging split before adding lines.</p></div>
+</header>
+<section>
+<h3>Finex-1 (+4 lines)</h3>
+<pre><span class="c"># nacos: finex_perp_1.yaml (existing 4 untouched)</span>
+configured_markets:
+  - BTCUSDT-PERP
+  - 1000PEPEUSDT-PERP
+  - SUIUSDT-PERP
+  - XRPUSDT-PERP
+  <span class="c"># ↓ 4 new lines</span>
+  - NVDAUSDT-PERP
+  - TSLAUSDT-PERP
+  - XAUUSDT-PERP
+  - NEARUSDT-PERP</pre>
+
+<h3>Finex-2 (+4 lines)</h3>
+<pre><span class="c"># nacos: finex_perp_2.yaml (existing 4 untouched)</span>
+configured_markets:
+  - ETHUSDT-PERP
+  - BNBUSDT-PERP
+  - TAOUSDT-PERP
+  - LINKUSDT-PERP
+  <span class="c"># ↓ 4 new lines</span>
+  - ARBUSDT-PERP
+  - UNIUSDT-PERP
+  - ADAUSDT-PERP
+  - AAVEUSDT-PERP</pre>
+
+<h3>Finex-3 (+5 lines)</h3>
+<pre><span class="c"># nacos: finex_perp_3.yaml (existing 4 untouched)</span>
+configured_markets:
+  - SOLUSDT-PERP
+  - DOGEUSDT-PERP
+  - TBTCUSDT-PERP
+  - HYPEUSDT-PERP
+  <span class="c"># ↓ 5 new lines</span>
+  - XAGUSDT-PERP
+  - CLUSDT-PERP
+  - GOOGLUSDT-PERP
+  - MSTRUSDT-PERP
+  - CRCLUSDT-PERP</pre>
+
+<h3>Restart</h3>
+<pre>kubectl -n &lt;finex-ns&gt; rollout restart deploy/finex-perp-1
+kubectl -n &lt;finex-ns&gt; rollout restart deploy/finex-perp-2
+kubectl -n &lt;finex-ns&gt; rollout restart deploy/finex-perp-3</pre>
+</section>
+</article>
+
+<!-- ═══ 7 Quote ═══ -->
+<article class="panel" id="p-quote" hidden>
+<header>
+<div class="eyebrow">7 · Quote Feeds</div>
+<h1>Configure Mark Price Ingestion (quote.yaml, 6 blocks)</h1>
+<p class="standfirst">The structure below matches the quote.yaml in <code>neodax-apps-value</code> section by section — <strong>all included in PR #150</strong> (all 11 insertion points submitted). 13 new markets × 11 places = 143 lines; programmatically verified: each market exactly 11 occurrences, each shard exactly once. Restart quote after merge to take effect.</p>
+</header>
+<section>
+<h3>① mark_price_oracle.symbols (aggregator symbol table, with -PERP)</h3>
+<pre><span class="c"># quote.yaml → mark_price_oracle.symbols (13 new markets appended after the existing 11 (1000PEPE already in))</span>
+mark_price_oracle:
+  symbols:
+    <span class="c"># ... existing BTCUSDT-PERP ~ HYPEUSDT-PERP, 11 untouched ...</span>
+    - "XAUUSDT-PERP"
+    - "XAGUSDT-PERP"
+    - "CLUSDT-PERP"
+    - "ARBUSDT-PERP"
+    - "UNIUSDT-PERP"
+    - "NEARUSDT-PERP"
+    - "ADAUSDT-PERP"
+    - "AAVEUSDT-PERP"
+    - "NVDAUSDT-PERP"
+    - "CRCLUSDT-PERP"
+    - "MSTRUSDT-PERP"
+    - "TSLAUSDT-PERP"
+    - "GOOGLUSDT-PERP"
+    - "1000PEPEUSDT-PERP"</pre>
+<div class="call"><p class="call-t">No market_source_weights needed</p><p>All new markets use the global default weights (binance 0.97 / okx 0.01 / bybit 0.01 / internal 0.01); no per-market override entries — minimal config, Binance-dominant, OKX/Bybit as backup. Later, if a market needs different weights (e.g. XRP is OKX-heavy), add a single <code>market_source_weights</code> entry.</p></div>
+
+<h3>② engine.symbol_aliases_perp (legacy-path symbol mapping)</h3>
+<pre><span class="c"># quote.yaml → engine.symbol_aliases_perp (append 13; 1000PEPE already present)</span>
+    XAUUSDT:   "XAUUSDT-PERP"
+    XAGUSDT:   "XAGUSDT-PERP"
+    CLUSDT:    "CLUSDT-PERP"
+    ARBUSDT:   "ARBUSDT-PERP"
+    UNIUSDT:   "UNIUSDT-PERP"
+    NEARUSDT:  "NEARUSDT-PERP"
+    ADAUSDT:   "ADAUSDT-PERP"
+    AAVEUSDT:  "AAVEUSDT-PERP"
+    NVDAUSDT:  "NVDAUSDT-PERP"
+    CRCLUSDT:  "CRCLUSDT-PERP"
+    MSTRUSDT:  "MSTRUSDT-PERP"
+    TSLAUSDT:  "TSLAUSDT-PERP"
+    GOOGLUSDT: "GOOGLUSDT-PERP"</pre>
+
+<h3>③ engine.binance_perp.markets (funding/index aux fields, lowercase with slash)</h3>
+<pre><span class="c"># quote.yaml → engine.binance_perp.markets (append 13; 1000pepe already present)</span>
+      - "xau/usdt"
+      - "xag/usdt"
+      - "cl/usdt"
+      - "arb/usdt"
+      - "uni/usdt"
+      - "near/usdt"
+      - "ada/usdt"
+      - "aave/usdt"
+      - "nvda/usdt"
+      - "crcl/usdt"
+      - "mstr/usdt"
+      - "tsla/usdt"
+      - "googl/usdt"</pre>
+
+<h3>④ mark_oracle — the four sources' symbols (13 appended to each)</h3>
+<pre><span class="c"># quote.yaml → mark_oracle.binance.symbols / okx.symbols / bybit.symbols / internal_perp_trade.symbols</span>
+<span class="c"># Each of the four lists gets the same 13 new markets (-PERP format; 1000PEPE already in):</span>
+    - "XAUUSDT-PERP" ... - "GOOGLUSDT-PERP"   <span class="c"># 13 new markets</span>
+    - "1000PEPEUSDT-PERP"</pre>
+<div class="call"><p class="call-t">OKX's 1000PEPE source is dead (existing state, not fixed in this rollout)</p><p>The existing config maps 1000PEPEUSDT-PERP to OKX's <code>"1000PEPE-USDT-SWAP"</code> — that instrument does not exist (OKX only lists PEPE-USDT-SWAP with a 10,000,000 face value; semantics mismatch). The subscription fails permanently but is harmless (that source stays offline; Binance/Bybit supply prices normally, min_sources=1 unaffected). Left as-is on purpose — don't touch it.</p></div>
+
+<h3>⑤⑥ mark_oracle.symbol_mappings — four native-symbol mapping groups</h3>
+<pre><span class="c"># quote.yaml → mark_oracle.symbol_mappings (13 entries appended to each of the four groups; 1000PEPE already present, untouched)</span>
+    binance:               <span class="c"># lowercase with slash</span>
+      "XAUUSDT-PERP": "xau/usdt"
+      "XAGUSDT-PERP": "xag/usdt"
+      "CLUSDT-PERP":  "cl/usdt"
+      "ARBUSDT-PERP": "arb/usdt"
+      "UNIUSDT-PERP": "uni/usdt"
+      "NEARUSDT-PERP": "near/usdt"
+      "ADAUSDT-PERP": "ada/usdt"
+      "AAVEUSDT-PERP": "aave/usdt"
+      "NVDAUSDT-PERP": "nvda/usdt"
+      "CRCLUSDT-PERP": "crcl/usdt"
+      "MSTRUSDT-PERP": "mstr/usdt"
+      "TSLAUSDT-PERP": "tsla/usdt"
+      "GOOGLUSDT-PERP": "googl/usdt"
+    okx:                   <span class="c"># UPPERCASE-hyphen-SWAP (verified to exist on all three, 2026-09-18)</span>
+      "XAUUSDT-PERP": "XAU-USDT-SWAP"
+      "XAGUSDT-PERP": "XAG-USDT-SWAP"
+      "CLUSDT-PERP":  "CL-USDT-SWAP"
+      "ARBUSDT-PERP": "ARB-USDT-SWAP"
+      "UNIUSDT-PERP": "UNI-USDT-SWAP"
+      "NEARUSDT-PERP": "NEAR-USDT-SWAP"
+      "ADAUSDT-PERP": "ADA-USDT-SWAP"
+      "AAVEUSDT-PERP": "AAVE-USDT-SWAP"
+      "NVDAUSDT-PERP": "NVDA-USDT-SWAP"
+      "CRCLUSDT-PERP": "CRCL-USDT-SWAP"
+      "MSTRUSDT-PERP": "MSTR-USDT-SWAP"
+      "TSLAUSDT-PERP": "TSLA-USDT-SWAP"
+      "GOOGLUSDT-PERP": "GOOGL-USDT-SWAP"
+    bybit:                 <span class="c"># uppercase native symbol (verified to exist)</span>
+      "XAUUSDT-PERP": "XAUUSDT"
+      "XAGUSDT-PERP": "XAGUSDT"
+      "CLUSDT-PERP":  "CLUSDT"
+      "ARBUSDT-PERP": "ARBUSDT"
+      "UNIUSDT-PERP": "UNIUSDT"
+      "NEARUSDT-PERP": "NEARUSDT"
+      "ADAUSDT-PERP": "ADAUSDT"
+      "AAVEUSDT-PERP": "AAVEUSDT"
+      "NVDAUSDT-PERP": "NVDAUSDT"
+      "CRCLUSDT-PERP": "CRCLUSDT"
+      "MSTRUSDT-PERP": "MSTRUSDT"
+      "TSLAUSDT-PERP": "TSLAUSDT"
+      "GOOGLUSDT-PERP": "GOOGLUSDT"
+    internal_perp_trade:   <span class="c"># identity mapping</span>
+      "XAUUSDT-PERP": "XAUUSDT-PERP"
+      <span class="c"># ... the other 12 in the same format + 1000PEPEUSDT-PERP</span></pre>
+
+<h3>Restart quote</h3>
+<pre>kubectl -n &lt;quote-ns&gt; rollout restart deploy/quote</pre>
+
+<div class="call warn"><p class="call-t">R1 — Mark price must be ready before trading-api opens</p><p>If quote isn't producing mark prices, trading-api's freshness gate (<code>mark_price_max_age_sec: 10</code>) rejects every open (<code>mark_price_unavailable</code>). <b>Do this step (§7) first, verify mark prices are flowing, then §8 opens trading-api.</b></p></div>
+<div class="call warn"><p class="call-t">min_sources = 1 (emphasized again)</p><p>The top-level <code>min_sources_normal: 3</code> in quote.yaml is a code-fixed default — <b>what actually applies is each market's <code>mark_price_min_sources_normal</code> in the PM DB</b> (auto-refreshed every 60s) — all set to 1 in the page 5 SQL. <b>Never set any market to 2/3</b>: any two of the three sources going down would push that market into SAFE_MODE.</p></div>
+</section>
+</article>
+
+<!-- ═══ 8 Ledger + Trading-API ═══ -->
+<article class="panel" id="p-edge" hidden>
+<header>
+<div class="eyebrow">8 · Ledger + Trading-API</div>
+<h1>Update Nacos Configs and Restart</h1>
+<p class="standfirst">Final step: open trading — <strong>included in PR #150</strong>. Ledger gains consumption sources (K-lines), trading-api gains the market entries. <b>Note: trading-api hot-reloads — effective at merge sync, no restart needed</b>; ledger needs a restart.</p>
+</header>
+<section>
+<h3>Ledger</h3>
+<pre><span class="c"># nacos: ledger.yaml → perp_markets</span>
+perp_markets:
+  - "BTCUSDT-PERP"
+  - "ETHUSDT-PERP"
+  - "SOLUSDT-PERP"
+  <span class="c"># ↓ 13 new (1000PEPE already in the existing list)</span>
+  - "XAUUSDT-PERP"
+  - "XAGUSDT-PERP"
+  - "CLUSDT-PERP"
+  - "ARBUSDT-PERP"
+  - "UNIUSDT-PERP"
+  - "NEARUSDT-PERP"
+  - "ADAUSDT-PERP"
+  - "AAVEUSDT-PERP"
+  - "NVDAUSDT-PERP"
+  - "CRCLUSDT-PERP"
+  - "MSTRUSDT-PERP"
+  - "TSLAUSDT-PERP"
+  - "GOOGLUSDT-PERP"
+  - "1000PEPEUSDT-PERP"
+
+<span class="c"># ledger.yaml has two lists — add to both (uppercase -PERP format, matching existing entries):</span>
+markets:              <span class="c"># K-line aggregation (existing entries mix spot + perp)</span>
+  - "WBTCUSDT"
+  - "BTCUSDT-PERP"
+  <span class="c"># ... existing untouched ...</span>
+  <span class="c"># ↓ 13 new (1000PEPE already in the existing list)</span>
+  - "XAUUSDT-PERP"
+  - "XAGUSDT-PERP"
+  - "CLUSDT-PERP"
+  - "ARBUSDT-PERP"
+  - "UNIUSDT-PERP"
+  - "NEARUSDT-PERP"
+  - "ADAUSDT-PERP"
+  - "AAVEUSDT-PERP"
+  - "NVDAUSDT-PERP"
+  - "CRCLUSDT-PERP"
+  - "MSTRUSDT-PERP"
+  - "TSLAUSDT-PERP"
+  - "GOOGLUSDT-PERP"
+  - "1000PEPEUSDT-PERP"
+
+perp_markets:         <span class="c"># perp consumption — append the same 13</span>
+  <span class="c"># ... existing untouched ...</span>
+  - "XAUUSDT-PERP"
+  - "XAGUSDT-PERP"
+  - "CLUSDT-PERP"
+  - "ARBUSDT-PERP"
+  - "UNIUSDT-PERP"
+  - "NEARUSDT-PERP"
+  - "ADAUSDT-PERP"
+  - "AAVEUSDT-PERP"
+  - "NVDAUSDT-PERP"
+  - "CRCLUSDT-PERP"
+  - "MSTRUSDT-PERP"
+  - "TSLAUSDT-PERP"
+  - "GOOGLUSDT-PERP"
+  - "1000PEPEUSDT-PERP"</pre>
+<pre>kubectl -n &lt;ledger-ns&gt; rollout restart deploy/ledger</pre>
+
+<h3>Trading-API</h3>
+<pre><span class="c"># nacos: trading_api.yaml → enabled_futures_markets, append 13</span>
+<span class="c"># Format = uppercase -PERP (same as existing "BTCUSDT-PERP" — NOT BASE/USD)</span>
+enabled_futures_markets:
+  - "BTCUSDT-PERP"
+  <span class="c"># ... existing untouched ...</span>
+  <span class="c"># ↓ 13 new (1000PEPE already in the existing list)</span>
+  - "XAUUSDT-PERP"
+  - "XAGUSDT-PERP"
+  - "CLUSDT-PERP"
+  - "ARBUSDT-PERP"
+  - "UNIUSDT-PERP"
+  - "NEARUSDT-PERP"
+  - "ADAUSDT-PERP"
+  - "AAVEUSDT-PERP"
+  - "NVDAUSDT-PERP"
+  - "CRCLUSDT-PERP"
+  - "MSTRUSDT-PERP"
+  - "TSLAUSDT-PERP"
+  - "GOOGLUSDT-PERP"
+  - "1000PEPEUSDT-PERP"</pre>
+<pre>kubectl -n &lt;trading-api-ns&gt; rollout restart deploy/trading-api</pre>
+</section>
+</article>
+
+<!-- ═══ 9 Verification ═══ -->
+<article class="panel" id="p-verify" hidden>
+<header>
+<div class="eyebrow">9 · Launch Verification</div>
+<h1>Verify Every Item — No Exceptions</h1>
+<p class="standfirst">Every market must pass. Items 1-5 can be batched; pick 2-3 representative markets for the 6-7 smoke tests.</p>
+</header>
+<section>
+<ol class="steps n">
+<li><b>Topics exist</b><span>After ArgoCD sync, the <code>neodax-kafka-topic-provision</code> Job should show Success; confirm via Kafka admin / Kafka UI that the 13 new markets' <code>commands.{MKT}.OrderCommands</code> etc. topics exist (≈40-52; 1000PEPE's already there). If the Job failed, backfill with the manual commands on page 4.</span></li>
+<li><b>PM recognized them</b><span>Perp PM admin gRPC <code>GetPerpetualsMarkets</code> shows the new markets with <code>status=active</code>. Funding engine workers started (grep logs for <code>ReloadMarketWorkers</code>).</span></li>
+<li><b>Finex loaded them</b><span>Each shard's admin <code>GetEngineStatus</code> shows the markets assigned to it. Confirm Finex-3's market list no longer duplicates Finex-2's.</span></li>
+<li><b>Mark prices are flowing</b><span>quote is publishing <code>EventQuoteObserved</code> or <code>MarkPriceSample</code> with correct symbols. Mark freshness on the trading-api side satisfies <code>mark_price_max_age_sec</code>. For commodity/equity markets confirm mark price isn't zero/empty.</span></li>
+<li><b>Trading-API exposes them</b><span><code>GET /perpetual/markets</code> returns all new markets. Frontend search finds them.</span></li>
+<li><b>Small smoke orders</b><span>Pick 2-3 representative markets (1 DeFi + 1 equity + 1 commodity) and run a small open+close round trip with a test account — verify matching, settlement, positions, funding, WS pushes, and K-lines end to end. Note XAU/XAG/CL settle funding every <b>4h</b>, everything else 8h — during smoke tests confirm the funding worker produces values on the right interval.</span></li>
+<li><b>Risk tiers enforced</b><span>Orders exceeding the top tier's leverage should be rejected. Caps: XAU/XAG 50x, CL 100x, equities 10x, DeFi 100x.</span></li>
+</ol>
+</section>
+</article>
+
+<!-- ═══ 10 Rollback ═══ -->
+<article class="panel" id="p-rollback" hidden>
+<header>
+<div class="eyebrow">10 · Rollback</div>
+<h1>When Something Goes Wrong</h1>
+<p class="standfirst">Ordered from smallest to largest blast radius. If config-only rollback suffices, don't touch the database.</p>
+</header>
+<section>
+<h3>Roll back a single market</h3>
+<pre><span class="c">-- 1. Remove the market from trading-api's enabled_futures_markets, restart trading-api</span>
+<span class="c">-- 2. Remove it from the quote configs, restart quote</span>
+<span class="c">-- 3. Set inactive in the DB (existing data unaffected):</span>
+UPDATE portfolio_manager_perp.perps_markets
+SET status = 'inactive', updated_at = NOW()
+WHERE symbol = '&lt;MKT&gt;USDT-PERP';</pre>
+
+<h3>Full rollback</h3>
+<pre><span class="c">-- 1. trading-api: remove all new markets from enabled_futures_markets, restart</span>
+<span class="c">-- 2. quote: remove the new symbol_aliases / mark_oracle / binance_perp entries, restart</span>
+<span class="c">-- 3. ledger: remove the new perp_markets entries, restart</span>
+<span class="c">-- 4. finex: restore the original configured_markets, restart</span>
+<span class="c">-- 5. DB: set all inactive</span>
+UPDATE portfolio_manager_perp.perps_markets
+SET status = 'inactive', updated_at = NOW()
+WHERE symbol IN (
+  'XAUUSDT-PERP','XAGUSDT-PERP','CLUSDT-PERP',
+  'ARBUSDT-PERP','UNIUSDT-PERP','NEARUSDT-PERP',
+  'ADAUSDT-PERP','AAVEUSDT-PERP',
+  'NVDAUSDT-PERP','CRCLUSDT-PERP','MSTRUSDT-PERP',
+  'TSLAUSDT-PERP','GOOGLUSDT-PERP','1000PEPEUSDT-PERP'
+);</pre>
+
+<div class="call warn"><p class="call-t">Do not delete DB rows or Kafka topics</p><p>Existing trades, positions, and audit records reference these markets. Setting <code>inactive</code> is enough — deleting rows breaks the history chain. Keep the Kafka topics; they cost nothing.</p></div>
+
+<h3>SAFE_MODE handling</h3>
+<p>If a market enters SAFE_MODE (all mark price sources down), opens are rejected but closes/cancels still work. See <code>docs/2026-08-28-delist-perp-mark-price-runbook.md</code> for handling leftover mark price holds.</p>
+</section>
+</article>
+
+</div><!-- main -->
+</div><!-- shell -->
+
+<script>
+(function(){
+  var tabs=document.querySelectorAll('nav.tabs a');
+  var panels=document.querySelectorAll('article.panel');
+  function show(id){
+    panels.forEach(function(p){p.hidden=p.id!=='p-'+id;});
+    tabs.forEach(function(a){a.classList.toggle('on',a.getAttribute('href')==='#'+id);});
+    window.scrollTo({top:0,behavior:'instant'});
+  }
+  tabs.forEach(function(a){
+    a.addEventListener('click',function(e){e.preventDefault();show(this.getAttribute('href').slice(1));});
+  });
+  show('overview');
+})();
+</script>

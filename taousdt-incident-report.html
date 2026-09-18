@@ -124,7 +124,7 @@ ol.pts b{color:var(--ink);font-weight:600}
 <a href="#actions" data-tab="actions"><span class="n">10</span>Action List</a>
 <a href="#open" data-tab="open"><span class="n">11</span>Open Questions</a>
 </nav>
-<div class="side-foot">2026-09-18 · v5<br>three bugs confirmed<br>replay loop measured<br>CONFIDENTIAL</div>
+<div class="side-foot">2026-09-18 · v6<br>loss measured −$144k<br>operators identified<br>CONFIDENTIAL</div>
 </aside>
 
 <div class="main">
@@ -232,23 +232,22 @@ ol.pts b{color:var(--ink);font-weight:600}
 </header>
 <section>
 <div class="tw"><table class="tl">
-<thead><tr><th>Time (UTC)</th><th>Phase</th><th>Event</th><th>Evidence ref</th></tr></thead>
+<thead><tr><th>Time (UTC)</th><th>Phase</th><th>Operator</th><th>Event</th><th>Evidence ref</th></tr></thead>
 <tbody>
-<tr><td>14:11→23:13</td><td><span class="phase p2">REPLAY</span></td><td>Disposal retry loop runs 9 hours — pool executes 1,878 IOC fills vs one maker (0x535c), ~2,820 TAO swept vs ~950 taken over (~3× duplication) — extraction transfers move out mid-loop</td><td class="dim">E15 · perps_trades taker=0x000</td></tr>
-<tr><td>14:22:10</td><td><span class="phase p1">PROBE</span></td><td>First micro-sell (0.0003 TAO) against the system's take-over counterparty — testing the mechanism</td><td class="dim">trade 69950fd1… maker 0x000…000</td></tr>
-<tr><td>14:22–15:39</td><td><span class="phase p2">EXPLOIT</span></td><td>Three large sells — 291 / 326 / 293 TAO at ~$228–229 — forced onto the system counterparty (~$210k notional taken over)</td><td class="dim">perps_trades, takers 0x535c… / 0x7152…</td></tr>
-<tr><td>17:30–19:35</td><td><span class="phase p1">PROBE</span></td><td>≥6 accounts run repeated price-0 micro-sells against the same counterparty — refining the trigger</td><td class="dim">12+ zero-price trades</td></tr>
-<tr><td>18:01</td><td><span class="phase p1">PREP</span></td><td>Separate cluster (0x3030… / 0x5E1c… / 0x1b7B…) bounces YELLOW between accounts at millisecond intervals — suspicious price preparation on the YELLOW market</td><td class="dim">spot_sends, 18:01:03–18:01:25</td></tr>
-<tr><td>18:15–19:26</td><td><span class="phase p3">LAUNDER</span></td><td>Five fresh accounts opened (18:15 / 19:02 / 19:21 ×2 / 19:26) — the future withdrawal whales</td><td class="dim">spot_accounts.opened_at</td></tr>
-<tr><td>18:54–18:57</td><td><span class="phase p2">EXTRACT</span></td><td>First perps→spot transfers: two accounts cash out exactly 23,400.00 each; 30,000 moved in by the main exploiter</td><td class="dim">perps account_transfers</td></tr>
-<tr><td>19:09–19:12</td><td><span class="phase p2">EXTRACT</span></td><td>Three more accounts cash out 24,082.87 each</td><td class="dim">perps account_transfers</td></tr>
-<tr><td>19:31–19:36</td><td><span class="phase p2">EXTRACT</span></td><td>The five whales transfer out 24,082.87 / 24,082.87 / 21,889 + 4,642 … — <b>12 transfers totalling $251,020.94</b></td><td class="dim">perps account_transfers</td></tr>
-<tr><td>19:42</td><td><span class="phase p3">CONVERT</span></td><td>Whale buys 24,101 YELLOW for 857.92 USDT (≈ 0.0356 each) — favourable price; buys continue in bulk</td><td class="dim">ledger txn 296756893</td></tr>
-<tr><td>19:39–01:40</td><td><span class="phase p3">DRAIN</span></td><td>Chunked withdrawals: 109 × YELLOW (6,000–8,888 each), plus USDT/ETH/WBTC</td><td class="dim">cage.pending_withdrawals</td></tr>
-<tr><td>01:00–01:59</td><td><span class="phase p3">DRAIN</span></td><td>Peak hour: <b>132 withdrawals, 411,757 YELLOW</b></td><td class="dim">cage.pending_withdrawals</td></tr>
-<tr><td>07:14</td><td><span class="phase p3">DRAIN</span></td><td>Last withdrawal of the night recorded</td><td class="dim">cage.pending_withdrawals</td></tr>
-<tr><td>08:03</td><td><span class="phase">REVIEW</span></td><td>Investigation snapshot — this report's data cut</td><td class="dim">DB replica read</td></tr>
-</tbody>
+<tr><td>14:11→23:13</td><td><span class="phase p2">REPLAY</span></td><td class="mono-c">0x000…0005 ↔ 0x535c…f283</td><td>Disposal retry loop runs 9 hours — pool executes 1,878 IOC fills vs one maker (0x535c), ~2,820 TAO swept vs ~950 taken over (~3× duplication) — extraction transfers move out mid-loop</td><td class="dim">E15 · perps_trades taker=0x000</td></tr>
+<tr><td>14:22:10</td><td><span class="phase p1">PROBE</span></td><td class="mono-c">0x7152…fDFf</td><td>First micro-sell (0.0003 TAO) against the system's take-over counterparty — testing the mechanism</td><td class="dim">trade 69950fd1… maker 0x000…000</td></tr>
+<tr><td>14:22–15:39</td><td><span class="phase p2">EXPLOIT</span></td><td class="mono-c">0x535c…f283 · 0x7152…fDFf</td><td>Three large sells — 291 / 326 / 293 TAO at ~$228–229 — forced onto the system counterparty (~$210k notional taken over)</td><td class="dim">perps_trades, takers 0x535c… / 0x7152…</td></tr>
+<tr><td>17:30–19:35</td><td><span class="phase p1">PROBE</span></td><td class="mono-c">0x7152… · 0x535c… · 0xe1ae… · 0xfA11… · 0x82AB… · 0x4762…</td><td>≥6 accounts run repeated price-0 micro-sells against the same counterparty — refining the trigger</td><td class="dim">12+ zero-price trades</td></tr>
+<tr><td>18:01</td><td><span class="phase p1">PREP</span></td><td class="mono-c">0x3030…0180 · 0x5E1c…3CB1 · 0x1b7B…9696</td><td>Separate cluster bounces YELLOW between accounts at millisecond intervals — suspicious price preparation on the YELLOW market</td><td class="dim">spot_sends, 18:01:03–18:01:25</td></tr>
+<tr><td>18:15–19:26</td><td><span class="phase p3">LAUNDER</span></td><td class="mono-c">0x83C6…1654 · 0x4762…9090 · 0xb0f3…b165 · 0xdeF0…71a7 · 0x1e18…9802</td><td>Five fresh accounts opened (18:15 / 19:02 / 19:21 ×2 / 19:26) — the future withdrawal whales</td><td class="dim">spot_accounts.opened_at</td></tr>
+<tr><td>18:54–18:57</td><td><span class="phase p2">EXTRACT</span></td><td class="mono-c">0xA22ae3…cb1e · 0x42Cb…146f</td><td>First perps→spot transfers: two accounts cash out exactly 23,400.00 each; 30,000 moved in by the main exploiter</td><td class="dim">perps account_transfers</td></tr>
+<tr><td>19:09–19:12</td><td><span class="phase p2">EXTRACT</span></td><td class="mono-c">0xE9e6…3f9c · 0xdeF0…71a7</td><td>Three more accounts cash out 24,082.87 each</td><td class="dim">perps account_transfers</td></tr>
+<tr><td>19:31–19:36</td><td><span class="phase p2">EXTRACT</span></td><td class="mono-c">0x83C6…1654 · 0xb0f3…b165 · 0x1e18…9802</td><td>The five whales transfer out 24,082.87 / 24,082.87 / 21,889 + 4,642 … — <b>12 transfers totalling $251,020.94</b></td><td class="dim">perps account_transfers</td></tr>
+<tr><td>19:42</td><td><span class="phase p3">CONVERT</span></td><td class="mono-c">0x83C6…1654</td><td>Whale buys 24,101 YELLOW for 857.92 USDT (≈ 0.0356 each) — favourable price; buys continue in bulk</td><td class="dim">ledger txn 296756893</td></tr>
+<tr><td>19:39–01:40</td><td><span class="phase p3">DRAIN</span></td><td class="mono-c">0x83C6… · 0x4762… · 0xb0f3… · 0xdeF0… · 0x1e18…</td><td>Chunked withdrawals: 109 × YELLOW (6,000–8,888 each), plus USDT/ETH/WBTC</td><td class="dim">cage.pending_withdrawals</td></tr>
+<tr><td>01:00–01:59</td><td><span class="phase p3">DRAIN</span></td><td class="mono-c">0x83C6… · 0xb0f3… (peak)</td><td>Peak hour: <b>132 withdrawals, 411,757 YELLOW</b></td><td class="dim">cage.pending_withdrawals</td></tr>
+<tr><td>07:14</td><td><span class="phase p3">DRAIN</span></td><td class="dim">last whale</td><td>Last withdrawal of the night recorded</td><td class="dim">cage.pending_withdrawals</td></tr>
+<tr><td>08:03</td><td><span class="phase">REVIEW</span></td><td class="dim">investigation</td><td>Investigation snapshot — this report's data cut</td><td class="dim">DB replica read</td></tr></tbody>
 </table></div>
 <div class="call warn"><p class="call-t">The mechanism was probed for hours before the money moved</p><p>First probe at 14:22, first extraction at 18:54. The four-hour gap is the attackers learning exactly how to trigger the payout. Any monitoring on "trades with the zero-address counterparty" or "price-0 fills" would have caught this before a dollar left.</p></div>
 </section>
@@ -398,7 +397,7 @@ ol.pts b{color:var(--ink);font-weight:600}
 <h2>Exposure at snapshot</h2>
 <div class="stats">
 <div class="stat bad"><div class="v">$251,020</div><div class="k">total manufactured (perps→spot)</div></div>
-<div class="stat bad"><div class="v">~$232k</div><div class="k">already converted &amp; gone (est. YELLOW + USDT + ETH + WBTC out)</div></div>
+<div class="stat bad"><div class="v">$144,361</div><div class="k">measured system loss — pool 0005 balance</div></div>
 <div class="stat warn"><div class="v">221,831 <small>YELLOW</small></div><div class="k">0x42Cb… available · single largest unwithdrawn loot</div></div>
 <div class="stat warn"><div class="v">$229,563</div><div class="k">0xe1ae… USDT · status unknown (old account, probed)</div></div>
 </div>
@@ -606,6 +605,23 @@ perps_trade_failure_entries: only 2 rows persisted (14:22:45 settlement ·
 18:56:29 validation) — most failures stayed log-only
 extraction transfers 18:54→19:36 all INSIDE the loop window</pre>
 
+<h3>E16 · Pool 0005 measured loss breakdown (perps_ledger_entries + perps_balances)</h3>
+<pre>00000000-0000-0000-0000-000000000005 (Settlement Pool 3 — default for non-pool1/pool2 USDT markets incl. TAO)
+perps_accounts: EXISTS (service/active, opened 2026-07-27) — FSM was the missing side, not the DB
+perps_balances USDT: total_balance = −146,161.80 (updated 2026-09-18 08:06:15)
+
+window 09-17 12:00 → 09-18 03:00:
+  SETTLEMENT_CONTRA        31,961 entries  D=300,112.39  C=341,446.19  net=  −41,334
+  LIQUIDATION_COMPLETE        12 entries  D=      0.00  C=108,815.83  net= −108,816
+  ADL_TAKEN_OVER_CLOSE        23 entries  D=  7,870.40  C=  2,082.04  net=  +5,788
+  ─────────────────────────────────────────────────────────────────────────────
+  TOTAL measured window loss: −144,361
+
+12 LIQUIDATION_COMPLETE timestamps match the 12 cross take-overs one-to-one:
+  17:30:29 (−5,010) · 18:11:41 (−1,330 + −11,668) · 18:26:37 (−660)
+  18:42:23 (−13,527 + −21,605) · 18:56:29 (−6,886 + 0) · 19:12:01 (−1,044 + −3,623)
+  19:34:59 (−21,973 + −21,490)  ⇒ total −108,816</pre>
+
 <div class="call"><p class="call-t">Ledger sign convention (for anyone reading raw rows)</p><p>In these ledgers <b>debit = balance increase, credit = balance decrease</b> (verified against a known on-chain deposit). A <code>withdrawal_reserve</code> pair is: credit AVAILABLE + debit LOCKED. Quoted amounts above are already normalized to plain reading.</p></div>
 </section>
 </article>
@@ -655,7 +671,7 @@ extraction transfers 18:54→19:36 all INSIDE the loop window</pre>
 <ul class="plain">
 <li><b>✅ RESOLVED — Exact settlement flaw mechanics (v4, code-confirmed)</b> — Bug #1: Raft.Apply accepts BalanceChangeTypeTransfer with no negative-balance validation (<code>fsm/balance.go:503</code>) → attacker transfers the position's margin back to Spot, balance goes negative. Bug #2: <code>clampSettlementPrice</code> (<code>flow.go:165/732</code>) clamps the resulting negative bankruptcy price to 0 → the short settles at 0 → artificial profit ≈ entry × qty, collected via the whales' pre-positioned maker book (~860 TAO × ~$28 = $24,082.87 each). <span class="dim">The v4 "unvalidated Transfer caller" question is closed: no transfer ever occurred (E12/E14) — the settlement's stress-price accounting wrote the negative balance. Remaining: why the FSM lacked account 0005 (snapshot/load path), and the retry call site — Raft logs (action 9).</span></li>
 <li><b>✅ RESOLVED — spot_sends account list</b> — 33 addresses + PLATFORM; 13 agent-enabled owners (09-10→09-16 provisioning), wash machine mapped since 09-15, still running. <span class="dim">Page 6, evidence E8/E9.</span></li>
-<li><b>True insurance-pool loss</b> — the $251k is what reached attacker accounts; pool-side mirror losses may be larger. <span class="dim">Needs: insurance/settlement account ledger for 09-17 14:00→09-18 02:00.</span></li>
+<li><b>✅ PARTIALLY RESOLVED — System-side loss (measured)</b> — pool 0005 USDT = <b>−$146,162</b> (12 LIQUIDATION_COMPLETE = −$108,816 + SETTLEMENT_CONTRA = −$41,334). <span class="dim">Other pools (002/004) and the insurance reserves (006/007/008) pending — full multi-pool ledger sweep.</span></li>
 <li><b>Who provisioned the 13 agent accounts</b> — auth provisioning audit trail: self-service, ops-approved, or automated? Two owners are confirmed attackers; the other 11 pending KYC. <span class="dim">Needs: auth service provisioning records 09-08→09-16.</span></li>
 <li><b>0xe1ae2Bff status</b> — legitimate holder gone rogue, or a compromised long-standing account? It holds $229,563 USDT, is agent-enabled, and ran price-0 probes. <span class="dim">Needs: session/IP history, trading pattern.</span></li>
 <li><b>Send machine's purpose</b> — YELLOW price suppression for the whales' cheap buys, points/leaderboard farming, or both? <span class="dim">Needs: leaderboard/competition scoring config vs. send activity; YELLOW market price series 09-15→09-18 vs. send bursts.</span></li>
@@ -664,8 +680,8 @@ extraction transfers 18:54→19:36 all INSIDE the loop window</pre>
 <li><b>Any earlier runs</b> — was 09-17 the first attempt? <span class="dim">Needs: zero-address trade query extended back weeks (E3 query, wider window) + send machine history back to 09-15 start.</span></li>
 <li><b>Remaining loot total</b> — beyond 0x42Cb's 221,831 YELLOW and 0xe1ae's $229k, how much sits in other network accounts? <span class="dim">Needs: full balance sweep of all 33 send-network + 19 freeze-list addresses.</span></li>
 </ul>
-<div class="call"><p class="call-t">Report status</p><p>v5 — 2026-09-18, production read-replica data + code verification + ops logs. Numbers are ledger-exact; interpretations marked.</p>
-<p>v5 adds the third bug and the payout engine: the FSM was missing settlement account 0005 → stage-2 disposal failed → retries re-sent full-size IOC orders for 9 hours, sweeping ~3× the taken-over volume into the cluster's asks (E15).</p>
+<div class="call"><p class="call-t">Report status</p><p>v6 — 2026-09-18, production read-replica data + code verification + ops logs + pool 0005 loss measurement. Numbers are ledger-exact; interpretations marked.</p>
+<p>v6 adds: timeline operator column (who did what), pool 0005 measured loss −$144,361 (E16), and closes the insurance measurement question partially.</p>
 <p>The v4 "margin transferred back to Spot" reading is corrected in E12/E14: no transfer occurred — the settlement's stress-price accounting wrote the negative balance.</p>
 <p>Next update: after freeze confirmation, insurance measurement, and the Raft-log review of the 0005 account-load failure and retry call site.</p></div>
 </section>

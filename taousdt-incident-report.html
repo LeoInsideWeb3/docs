@@ -124,7 +124,7 @@ ol.pts b{color:var(--ink);font-weight:600}
 <a href="#actions" data-tab="actions"><span class="n">10</span>Action List</a>
 <a href="#open" data-tab="open"><span class="n">11</span>Open Questions</a>
 </nav>
-<div class="side-foot">2026-09-18 · v6<br>loss measured −$144k<br>operators identified<br>CONFIDENTIAL</div>
+<div class="side-foot">2026-09-18 · v7<br>3 internal MMs excluded<br>loss −$144k measured<br>CONFIDENTIAL</div>
 </aside>
 
 <div class="main">
@@ -276,7 +276,7 @@ ol.pts b{color:var(--ink);font-weight:600}
 <li><b>Bug #1 — the settlement itself writes a negative balance</b> — the liquidation settles the mule's short at the <b>worst-case stress price first</b>: 0x05Cc booked <b>REALIZED_PNL −$15,413.89</b> against a ~$900 balance (E14). Raft.Apply accepts the resulting negative balance — <code>BalanceChangeTypeTransfer</code> and settlement debits pass with <b>no negative-balance validation</b> (<code>fsm/balance.go:503</code>). Note: the mules never transferred anything out (E12) — the earlier "margin transferred back to Spot" reading is corrected: the negative balance was written by the settlement's own stress-price accounting.</li>
 <li><b>Bug #2 — the broken price is clamped to 0</b> — with negative equity, bankr computes ≤ 0 and <code>clampSettlementPrice</code> (<code>flow.go:165/:732</code>) clamps it to <b>0.000</b> (11 records) or leaves it out-of-band (108.73; equity −$14,889). The short then rebooks at that price: artificial profit ≈ entry × qty.</li>
 <li><b>Bug #3 — FSM missing the settlement account → disposal replay</b> — the FSM has <b>no account 00000000-…-0005</b> (the settlement pool). Stage-2 disposal fails on every path ("IOC execution timeout", "failed to handle liquidation trade settlement", "ADL recovery failed: account not found" — ops logs). The retry logic <b>re-sends the FULL-size IOC order</b> each cycle: the pool executed <b>1,878 fills against one maker (0x535c) over 9 hours</b>, total swept ~2,820 TAO vs ~950 TAO actually taken over — <b>~3× duplication</b> (E15).</li>
-<li><b>Every replay pays the pre-positioned book</b> — the counterparty side settles normally (their accounts exist) while the pool's side never books: the cluster's maker asks were filled again on every retry (~$24,082.87 per whale, deterministic). The perps→spot extraction ($251,020, 12 transfers) moved out <b>during the loop</b> (18:54→19:36 vs loop running 14:11→23:13).</li>
+<li><b>Every replay pays the book — two groups collected</b> — the counterparty side settles normally while the pool's side never books.<br>· <b>Internal market makers</b> (0x535c, 0x7152, 0xe1ae — confirmed internal): their resting orders at 225–231 were swept by the pool's broken IOC retries — collateral overpayment, not orchestration<br>· <b>The whales</b> (0x83C6, 0x4762, 0xb0f3, 0xdeF0, 0x1e18): deliberately placed asks at 230.5→284, <b>1–2 minutes before each take-over</b>, above the MM range — precise positioning that captured ~$24,082.87 per whale<br>· The perps→spot extraction ($251,020, 12 transfers) moved out <b>during the loop</b> (18:54→19:36 vs loop 14:11→23:13)</li>
 </ol>
 <p>Remove any one of the three bugs and the attack collapses: no negative balance → sane bankruptcy price; no clamp → settlement rejects price 0; no replay → a single disposal instead of a 9-hour payout machine.</p></div><h2>The chain, step by step (plain language)</h2>
 <ol class="steps n">
@@ -291,7 +291,7 @@ ol.pts b{color:var(--ink);font-weight:600}
 <div class="tw"><table>
 <thead><tr><th>Group</th><th>Addresses</th><th>Role</th><th>Withdrew?</th></tr></thead>
 <tbody>
-<tr><td><b>Probers / main exploiters</b></td><td class="mono-c">0x535c…f283 · 0x7152…fDFf · 0x82AB…62A0 · 0xfA11…1B0E</td><td>Ran the zero-address trades: the big ~$210k sells and the price-0 probes</td><td class="dim">Not yet at snapshot (loot likely moved on to the whale accounts)</td></tr>
+<tr><td><b>Excluded — internal market makers</b></td><td class="mono-c">0x535c…f283 · 0x7152…fDFf · 0x82AB…62A0 · 0xfA11…1B0E</td><td>Confirmed internal MM — positions liquidated normally (proper margin/price); later caught in broken liquidation path and swept by pool IOC retries (collateral, not attack)</td><td class="dim">No large withdrawals; 0x535c transferred 30k IN (MM capital); 0xe1ae holds $229k MM capital</td></tr>
 <tr><td><b>Withdrawal whales</b></td><td class="mono-c">0x83C6…1654 · 0x4762…9090 · 0xb0f3…b165 · 0xdeF0…71a7 · 0x1e18…9802</td><td>Fresh accounts that "earned" the deterministic profits, bought YELLOW, drained the vault</td><td><b>Yes — fully drained</b></td></tr>
 <tr><td><b>Price preparation</b></td><td class="mono-c">0x3030…0180 · 0x5E1c…3CB1 · 0x1b7B…9696</td><td>Millisecond YELLOW wash-sends at 18:01, one hour before the whales bought</td><td class="dim">Not directly (preparation role)</td></tr>
 <tr><td><b>Holding account</b></td><td class="mono-c">0x42Cb…146f</td><td>Extracted 23,400 at 18:56, converted, still holds <b>221,831 YELLOW</b></td><td><b>No — the biggest unwithdrawn loot</b></td></tr>
@@ -348,7 +348,7 @@ ol.pts b{color:var(--ink);font-weight:600}
 <div class="tw"><table>
 <thead><tr><th>Group</th><th>Addresses</th><th>Notes</th></tr></thead>
 <tbody>
-<tr><td><b>Agent-enabled owners (13)</b></td><td class="mono-c">0xb915…32b1 · 0x6BE4…6E68 · 0xBae1…94f1 · 0xe1ae…59Bb · 0xDa4A…fc68 · 0x55d1…b924 · 0xd12c…8444 · 0x8475…8351 · 0x4091…274E · 0xC573…9252 · 0xD47D…BFB1C · <b>0x535c…f283</b> · 0x7791…5176</td><td>agent subaccounts opened 09-10 → 09-16; <b>0x535c = main exploiter, 0xe1ae = $229k prober</b>; each also holds an older normal account (Mar–Jul)</td></tr>
+<tr><td><b>Agent-enabled owners (13)</b></td><td class="mono-c">0xb915…32b1 · 0x6BE4…6E68 · 0xBae1…94f1 · 0xe1ae…59Bb · 0xDa4A…fc68 · 0x55d1…b924 · 0xd12c…8444 · 0x8475…8351 · 0x4091…274E · 0xC573…9252 · 0xD47D…BFB1C · <b>0x535c…f283</b> · 0x7791…5176</td><td>agent subaccounts opened 09-10 → 09-16; <b>0x535c and 0xe1ae are internal MMs (excluded from suspicion)</b>; each also holds an older normal account (Mar–Jul)</td></tr>
 <tr><td><b>Wash hub &amp; pairs (normal accounts)</b></td><td class="mono-c">0x1b7B…9696 (hub, 2.5M YELLOW) · 0x5E1c…3CB1 · 0x3030…0180 · 0xfbbB…21aD · 0x7d45…c5BfF · 0xf57d…2F1F · 0x323A…eAE1 · 0x713f…3b659 (4.86M YELLOW)</td><td>March–May vintage; sending via their owners' agent sessions (owner-level check, page 6 top)</td></tr>
 <tr><td><b>Other participants</b></td><td class="mono-c">0x0cdf…4e72 · 0x3441…0357 · 0x572d…6485 · 0x6073…0717 · 0x8657…2a7e · 0xC808…3A21 · 0xdD34…3AD2 · 0xE5c3…932f · 0xf6DA…f008 · 0xf7D3…Ac52 · 0x6eF5…Df4b</td><td class="dim">lower volume; full per-address detail in the evidence pack query E8</td></tr>
 </tbody>
@@ -418,8 +418,8 @@ ol.pts b{color:var(--ink);font-weight:600}
 <thead><tr><th>Address</th><th>Opened</th><th>Role</th><th>Balance at snapshot</th><th>Action</th></tr></thead>
 <tbody>
 <tr><td class="mono-c">0x42Cb0366aEDEcf22C9849Cde1b5d91d3B485146f</td><td class="dim">09-17 18:48</td><td>Extractor, holding loot</td><td><b>221,831.64 YELLOW</b> + 183.45 USDT — fully available</td><td><span class="pill no">FREEZE — top priority</span></td></tr>
-<tr><td class="mono-c">0x535c651a1f77b1Fa53268C5df604ea0C2E36f283</td><td class="dim">—</td><td>Main exploiter (big zero-address sells, 30k moved)</td><td class="dim">&lt;100 USDT visible on spot</td><td><span class="pill no">FREEZE</span></td></tr>
-<tr><td class="mono-c">0x7152241C09FB00d49195274a0C4A99b7e178fDFf</td><td class="dim">—</td><td>Exploiter (first probe + big sells)</td><td class="dim">&lt;100 USDT visible</td><td><span class="pill no">FREEZE</span></td></tr>
+<tr><td class="mono-c">0x535c651a1f77b1Fa53268C5df604ea0C2E36f283</td><td class="dim">—</td><td>Internal market maker — collateral damage from broken liquidation</td><td class="dim">&lt;100 USDT visible on spot</td><td><span class="pill ok">EXCLUDED — MM</span></td></tr>
+<tr><td class="mono-c">0x7152241C09FB00d49195274a0C4A99b7e178fDFf</td><td class="dim">—</td><td>Internal market maker — positions caught in broken liquidation path</td><td class="dim">&lt;100 USDT visible</td><td><span class="pill ok">EXCLUDED — MM</span></td></tr>
 <tr><td class="mono-c">0x82AB8aA2870a319554cb70372474827E5eF362A0</td><td class="dim">—</td><td>Prober (price-0 + half-price fills)</td><td class="dim">&lt;100 USDT visible</td><td><span class="pill no">FREEZE</span></td></tr>
 <tr><td class="mono-c">0xfA113f1A6c42Db00454cB82d7fcF205bff251B0E</td><td class="dim">—</td><td>Prober (price-0 + half-price fills)</td><td class="dim">&lt;100 USDT visible</td><td><span class="pill no">FREEZE</span></td></tr>
 <tr><td class="mono-c">0xA22ae3Fa55819d78d4eb903618F6F23aadE8cb1e</td><td class="dim">09-17 18:47</td><td>Extractor (23,400)</td><td>194.44 USDT — converted &amp; withdrawn</td><td><span class="pill no">FREEZE</span></td></tr>
@@ -439,7 +439,7 @@ ol.pts b{color:var(--ink);font-weight:600}
 <tr><td class="mono-c">0x303029E75C94A3F75bdAe9a0129232EAf09f0180</td><td class="dim">old</td><td>YELLOW wash cluster</td><td class="dim">YELLOW holder (2.5M+ cluster member 0x1b7B separately)</td><td><span class="pill gap">FREEZE pending review</span></td></tr>
 <tr><td class="mono-c">0x5E1cA31B28a5750823F660cDFF71567835D13CB1</td><td class="dim">old</td><td>YELLOW wash cluster</td><td class="dim">—</td><td><span class="pill gap">FREEZE pending review</span></td></tr>
 <tr><td class="mono-c">0x1b7Bb48D02C012C7fFe503484319d1EAdEAd9696</td><td class="dim">2026-03-30</td><td>YELLOW wash cluster · holds 2.5M YELLOW</td><td>2,500,267 YELLOW</td><td><span class="pill gap">INVESTIGATE — may be pre-existing holder used as liquidity</span></td></tr>
-<tr><td class="mono-c">0xe1ae2Bff86D3dF8D7f7f4B37E44Bc686a68859Bb</td><td class="dim"><b>2026-03-07</b></td><td><b>Old account that ran a price-0 probe</b></td><td><b>229,563.85 USDT</b> (225,016 available)</td><td><span class="pill gap">INVESTIGATE — freeze until cleared</span></td></tr>
+<tr><td class="mono-c">0xe1ae2Bff86D3dF8D7f7f4B37E44Bc686a68859Bb</td><td class="dim"><b>2026-03-07</b></td><td><b>Internal market maker — $229k is MM trading capital</b></td><td><b>229,563.85 USDT</b> (225,016 available)</td><td><span class="pill ok">EXCLUDED — MM</span></td></tr>
 </tbody>
 </table></div>
 <div class="call"><p class="call-t">How to use this list</p><p>Freeze = block deposits-in-credit, trading, transfers, and withdrawals for both the spot and perps sides of each address, and add to the cage withdrawal blacklist. "Pending review" entries need ownership investigation before freezing — 0x1b7B holds 2.5M YELLOW from long before the incident (possible legitimate holder whose liquidity the attackers used).</p></div>
@@ -649,7 +649,7 @@ window 09-17 12:00 → 09-18 03:00:
 <li><b>On-chain tracing of withdrawn funds</b><span>424k YELLOW + USDT/ETH/WBTC recipient addresses from cage records → follow hops, exchange deposits, mixers; prepare exchange freeze requests with tx hashes.</span></li>
 <li><b>Pin the exact payout arithmetic</b><span>Replay one whale cycle from Raft logs (open → drain → liquidate → settle) to produce the court-ready step-by-step money movement for the $24,082.87 payouts.</span></li>
 <li><b>Sweep for missed patterns</b><span>Same queries across ALL markets and a longer window — establish the full attacker footprint and whether earlier/smaller runs happened before 09-17. Include the send machine across its full 09-15 → present history.</span></li>
-<li><b>Investigate the remaining unknowns</b><span>0xe1ae2Bff ($229k, agent-enabled, probed) — compromised or complicit. The 11 other agent owners — KYC and history. The 0x1b7B hub's 2.5M YELLOW origin.</span></li>
+<li><b>Investigate the remaining unknowns</b><span>0xe1ae2Bff RESOLVED: internal MM, $229k is trading capital. The 11 other agent owners — KYC and history. The 0x1b7B hub's 2.5M YELLOW origin.</span></li>
 <li><b>Customer communication</b><span>No customer funds are affected (loss is platform/insurance side); withdrawals paused platform-wide as a precaution. CS should have the one-paragraph version from page 2.</span></li>
 </ol>
 <h3>Follow-up</h3>
@@ -680,8 +680,8 @@ window 09-17 12:00 → 09-18 03:00:
 <li><b>Any earlier runs</b> — was 09-17 the first attempt? <span class="dim">Needs: zero-address trade query extended back weeks (E3 query, wider window) + send machine history back to 09-15 start.</span></li>
 <li><b>Remaining loot total</b> — beyond 0x42Cb's 221,831 YELLOW and 0xe1ae's $229k, how much sits in other network accounts? <span class="dim">Needs: full balance sweep of all 33 send-network + 19 freeze-list addresses.</span></li>
 </ul>
-<div class="call"><p class="call-t">Report status</p><p>v6 — 2026-09-18, production read-replica data + code verification + ops logs + pool 0005 loss measurement. Numbers are ledger-exact; interpretations marked.</p>
-<p>v6 adds: timeline operator column (who did what), pool 0005 measured loss −$144,361 (E16), and closes the insurance measurement question partially.</p>
+<div class="call"><p class="call-t">Report status</p><p>v7 — 2026-09-18, production read-replica data + code verification + ops logs + pool 0005 loss measurement + internal MM confirmation. Numbers are ledger-exact; interpretations marked.</p>
+<p>v7 reclassifies 0x535c, 0x7152, 0xe1ae as internal market makers: their liquidations were normal, their order sweeps were collateral from the broken IOC retries, their funds are MM capital. The attacker cluster narrows to mule + whale accounts.</p>
 <p>The v4 "margin transferred back to Spot" reading is corrected in E12/E14: no transfer occurred — the settlement's stress-price accounting wrote the negative balance.</p>
 <p>Next update: after freeze confirmation, insurance measurement, and the Raft-log review of the 0005 account-load failure and retry call site.</p></div>
 </section>

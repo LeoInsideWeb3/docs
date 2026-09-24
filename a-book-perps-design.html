@@ -107,7 +107,7 @@ ol.pts b{color:var(--ink);font-weight:600}
 <a href="#cutover" data-tab="cutover"><span class="n">9</span>切换计划</a>
 <a href="#open" data-tab="open"><span class="n">10</span>已决与待决</a>
 </nav>
-<div class="side-foot">2026-09-24 · v1.2 · 设计稿<br>契约待 MM 过会<br>已决: Principal · 币安价+显式费<br>全量切换 · 无存量 · 币安为主<br>三层测试环境方案</div>
+<div class="side-foot">2026-09-25 · v1.3 · 设计稿<br>契约待 MM 过会（含 tombstone）<br>已决: Principal · 币安价+显式费<br>全量切换 · 无存量 · 币安为主<br>三层测试环境方案</div>
 </aside>
 
 <div class="main">
@@ -209,7 +209,7 @@ ol.pts b{color:var(--ink);font-weight:600}
 <div class="arrow">↓ Kafka commands.{MKT}.OrderCommands（同一 topic，消费者换人）</div>
 <div class="layer hi">
 <div class="layer-n">mm-connector<small>新增 · 替代 Finex 的位置</small></div>
-<p class="layer-d">消费订单命令 → MM REST 提交（幂等 + expires_at）→ WS 回报驱动状态机 → 把 ack/成交/撤单/拒绝翻译成 <code>EventOrderUpdated</code>、<code>EventTradeExecuted</code>（house 合成单做对手腿）→ 发布到 <code>events.{MKT}.*</code>。内置：悬挂仲裁、超时自动拒、心跳熔断、三方对账 worker。</p>
+<p class="layer-d">消费订单命令 → MM REST 提交（幂等 + expires_at）→ WS 回报驱动状态机 → 把 ack/成交/撤单/拒绝翻译成 <code>EventOrderUpdated</code>、<code>EventTradeExecuted</code>（house 合成单做对手腿）→ 发布到 <code>events.{MKT}.*</code>。内置：UNKNOWN 悬挂仲裁（判死三条件，见 3.5）、心跳熔断、三方对账 worker。</p>
 </div>
 <div class="arrow">↓ REST / WS（第 3 页契约） · MM → 币安执行</div>
 <div class="layer hi">
@@ -340,7 +340,7 @@ ol.pts b{color:var(--ink);font-weight:600}
 }</pre>
 
 <h3>3.4 WebSocket 执行流（WS /api/v1/stream）</h3>
-<p class="section-note">connector 全程保持一条 WS（断线重连后先跑一轮在途单 GET 仲裁再恢复）。消息信封：<code>{type, client_order_id, mm_order_id, transact_time, ...}</code>。</p>
+<p class="section-note">connector 全程保持一条 WS（断线重连后先对在途与 UNKNOWN 单跑一轮 GET 仲裁再恢复）。消息信封：<code>{type, client_order_id, mm_order_id, transact_time, ...}</code>。</p>
 <div class="tw"><table>
 <thead><tr><th>type</th><th>触发</th><th>专有字段</th></tr></thead>
 <tbody>
@@ -366,10 +366,14 @@ ol.pts b{color:var(--ink);font-weight:600}
 <div class="call"><p class="call-t">为什么 role 重要</p><p>我方锁仓时按订单类型预收费率（post_only 按 maker 锁），结算时按 <b>MM 回报的币安成交角色</b>计费：限价单挂上后被动成交 → role=maker → 收 maker 费率；吃单 → taker 费率。与现网 Finex 的 maker/taker 语义完全对齐，fee_engine 无需改动。</p></div>
 
 <h3>3.5 幂等 · 悬挂 · 仲裁</h3>
+<div class="call warn"><p class="call-t">必须关闭的竞态窗口（评审意见 2026-09-25）</p><p>500ms 时 GET 查无记录 ≠ 该单不会执行：POST 可能仍在网络或 MM 队列里，800ms 才到达且未过期（默认有效期 3s）——若此时解锁保证金、用户转走资金，随后到达的成交将没有保证金背书。<b>expires_at 只约束"MM 收到时"，不约束"我方何时可判死"。</b></p></div>
 <ol class="steps">
-<li><b>提交即带 expires_at（我方时钟 + 2 × RTT + 处理余量，默认 3s）</b><span>MM 收到时已过期的请求必须返回 <code>EXPIRED</code> 拒单且<b>不得执行</b>——这是杜绝"我方已超时判死并解锁保证金、MM 却在网线里成交了"这个致命窗口的第一道闸。</span></li>
-<li><b>ack 超时（500ms）→ 转 GET 仲裁</b><span>connector 对超时订单调用 <code>GET /api/v1/orders/{client_order_id}</code>：MM 无记录 → 本地判 REJECTED + 解锁 + 发拒绝事件；有记录且在途 → 继续跟踪；有记录且已成交 → 接受全部 fills 走正常结算（解锁转结算）。</span></li>
-<li><b>WS 断线 → 重连后全量仲裁</b><span>重连第一步：对所有在途 client_order_id 逐个 GET，对齐状态与 fills 序列；fill_id 去重保证不重结算。</span></li>
+<li><b>提交即带 expires_at（我方时钟 + 2 × RTT + 处理余量，默认 3s）</b><span>MM 收到时已过期的请求必须返回 <code>EXPIRED</code> 拒单且<b>不得执行</b>——有效期是死亡判决的<b>时间前提</b>，不是充分条件（见第 2 条）。</span></li>
+<li><b>ack 超时（500ms）→ 订单进入 UNKNOWN，保证金保持锁定</b><span>超时只说明"没等到 ack"，不说明"MM 没收到"。判死必须<b>同时满足三个条件</b>：① 已过 expires_at + 时钟偏移余量（默认 +1s）；② 此时 GET 仍无记录；③ MM 对该 client_order_id 提供不可再执行的终态保证（tombstone，第 3 条）。未到期前的"查无"一律视为 UNKNOWN 持锁，对用户呈现为 pending。</span></li>
+<li><b>MM 侧 tombstone 保证（契约新增）</b><span>MM 首次对某 client_order_id 应答 GET "无记录"时必须<b>持久化该应答</b>；此后迟到的同 ID POST 一律拒绝。这把"现在查无"升级为"以后也不会执行"——没有这个保证，死亡判决不成立。</span></li>
+<li><b>MM 自身的 UNKNOWN 义务（契约新增）</b><span>MM 对币安提交结果不确定（MM→币安超时）时，不得回报 FILLED / REJECTED，必须保留在途态直到确定——同一问题下推一层，不允许 MM 用猜测关闭自己的窗口。</span></li>
+<li><b>CANCEL_REJECTED(FILLED) 不能直接忽略</b><span>本地可能尚未收到全部成交回报（WS 间隙）：先 GET 补齐 fills 序列、逐笔结算后，订单才允许进入终态。</span></li>
+<li><b>WS 断线 → 重连后全量仲裁</b><span>重连第一步：对所有在途与 UNKNOWN 状态的 client_order_id 逐个 GET，对齐状态与 fills 序列；fill_id 去重保证不重结算。</span></li>
 <li><b>结算幂等双保险</b><span>connector 合成事件的 IdempotencyKey = <code>client_order_id:fill_id</code>；PM Perp 现有 idempotency cache 天然防重（<code>Settlement.HandleTrade</code> 的 Set/Delete 逻辑复用）。</span></li>
 </ol>
 
@@ -410,7 +414,7 @@ ol.pts b{color:var(--ink);font-weight:600}
 <tr><td class="mono-c">SYSTEM_BUSY</td><td>MM 内部过载</td><td class="dim">退避；连续出现 → 熔断</td></tr>
 </tbody>
 </table></div>
-<div class="call warn"><p class="call-t">过会时需要 MM 逐条确认的点</p><p>① GTX（post_only）拒绝时回报里能否区分"会吃单"与其他拒绝原因；② IOC 部分成交的余量是否会推 ORDER_UPDATE(FILLED) + 明确的终态语义（我方余量记 StateExpired，与现网一致）；③ GET /orders 的 fills 列表是否含 role 字段（仲裁补账需要）；④ cancel-all 的生效时延保证；⑤ 币安维护窗口的预告机制。</p></div>
+<div class="call warn"><p class="call-t">过会时需要 MM 逐条确认的点</p><p>① GTX（post_only）拒绝时回报里能否区分"会吃单"与其他拒绝原因；② IOC 部分成交的余量是否会推 ORDER_UPDATE(FILLED) + 明确的终态语义（我方余量记 StateExpired，与现网一致）；③ GET /orders 的 fills 列表是否含 role 字段（仲裁补账需要）；④ cancel-all 的生效时延保证；⑤ 币安维护窗口的预告机制；⑥ <b>tombstone 持久化</b>——首次 GET 应答"无记录"后，迟到的同 ID POST 是否保证拒绝（3.5 第 3 条，判死前提）；⑦ <b>MM 侧 UNKNOWN 语义</b>——对币安提交结果不确定时是否承诺不报终态（3.5 第 4 条）。</p></div>
 </section>
 </article>
 
@@ -428,12 +432,13 @@ ol.pts b{color:var(--ink);font-weight:600}
 <thead><tr><th>我方状态</th><th>值</th><th>MM 侧对应</th><th>迁移触发</th></tr></thead>
 <tbody>
 <tr><td class="mono-c"><b>pending</b></td><td class="mono-c">0</td><td class="mono-c">提交中（POST 未返回）</td><td class="dim">connector 已消费命令、尚未收到 ack</td></tr>
+<tr><td class="mono-c"><b>UNKNOWN</b>（connector 内部）</td><td class="mono-c">映射为 pending(0)</td><td class="mono-c">ack 超时 / 仲裁未决</td><td class="dim"><b>保证金保持锁定</b>；对用户呈现 pending；判死三条件见 3.5</td></tr>
 <tr><td class="mono-c"><b>wait</b></td><td class="mono-c">100</td><td class="mono-c">OPEN / PARTIALLY_FILLED</td><td class="dim">ack 成功 → 挂单中（限价）；市价单短暂停留</td></tr>
 <tr><td class="mono-c">trigger_wait / triggered</td><td class="mono-c">50 / 150</td><td class="mono-c">不经过 MM</td><td class="dim">perp_trigger 本地管理；触发后子单进入上面的 pending→wait 流程</td></tr>
 <tr><td class="mono-c"><b>done</b></td><td class="mono-c">200</td><td class="mono-c">FILLED</td><td class="dim">末笔 TRADE_FILL 后（cumulative = qty）</td></tr>
 <tr><td class="mono-c"><b>cancel</b></td><td class="mono-c">-100</td><td class="mono-c">CANCELLED</td><td class="dim">用户撤单 / cancel-all / 熔断</td></tr>
 <tr><td class="mono-c"><b>expired</b></td><td class="mono-c">-150</td><td class="mono-c">IOC 余量 / GTX 未挂上</td><td class="dim">IOC 部分成交余量、FOK 整单拒绝走 reject</td></tr>
-<tr><td class="mono-c"><b>reject</b></td><td class="mono-c">-200</td><td class="mono-c">REJECTED（同步/异步/仲裁判死）</td><td class="dim">过滤器、EXPIRED、超时仲裁无记录等</td></tr>
+<tr><td class="mono-c"><b>reject</b></td><td class="mono-c">-200</td><td class="mono-c">REJECTED（同步/异步/仲裁判死）</td><td class="dim">过滤器、EXPIRED、判死三条件成立（3.5）等</td></tr>
 </tbody>
 </table></div>
 
@@ -466,14 +471,17 @@ ol.pts b{color:var(--ink);font-weight:600}
 <h4>撤单与超时仲裁</h4>
 <pre>用户撤单 → Kafka CommandOrderCancel → connector → DELETE /orders/{id}
    ├─CANCEL_ACCEPTED → StateCancel + 解锁余量
-   └─CANCEL_REJECTED(FILLED) → 已终态，忽略
+   └─CANCEL_REJECTED(FILLED) → <b>不直接忽略</b>：先 GET 补齐 fills → 逐笔结算 → 才进终态
+                               <span class="c">// 本地可能尚未收到全部成交回报（WS 间隙）</span>
 
-POST 超时(500ms) → GET /api/v1/orders/{client_order_id}
-   ├─MM 无记录 → StateReject + 解锁 + 事件      <span class="c">// 干净死亡</span>
-   ├─在途 → 继续跟踪（等 WS 或再次 GET）
+POST 超时(500ms) → 进入 UNKNOWN（<b>保证金保持锁定</b>）
+   判死 = 已过 expires_at+1s ∧ 此时 GET 无记录 ∧ MM tombstone 保证   <span class="c">// 三条件缺一不可</span>
+   ├─判死 → StateReject + 解锁 + 事件
+   ├─未到期 / GET 不可用 → 继续 UNKNOWN，等 WS 或到期后再仲裁
+   │    <span class="c">// "现在不存在" ≠ "以后不会执行"——POST 可能仍在网络或 MM 队列里</span>
    └─已有 fills → 接受成交照常结算                <span class="c">// fill 去重保证幂等</span>
 
-WS 断线 15s → 熔断：新单全拒 + cancel-all 在途单 + 重连后全量 GET 仲裁</pre>
+WS 断线 15s → 熔断：新单全拒 + cancel-all 在途单 + 重连后全量 GET 仲裁（含 UNKNOWN）</pre>
 
 <h4>清算平仓单（source=liquidation）</h4>
 <pre>PM Perp 清算扫描器（mark 驱动，档位判定，不变）
@@ -496,15 +504,18 @@ WS 断线 15s → 熔断：新单全拒 + cancel-all 在途单 + 重连后全量
 
 <section>
 <h2>house 账户定义</h2>
-<p class="section-note">完全沿用现有系统账户机制（<code>raft_recovery/system_accounts.go</code> 的 spec 列表 + <code>EnsureSystemAccounts</code> 幂等对账，UUID 尾号顺延 09）：</p>
+<p class="section-note">沿用现有系统账户机制（<code>raft_recovery/system_accounts.go</code> 的 spec 列表 + <code>EnsureSystemAccounts</code> 幂等对账，UUID 尾号顺延 09）。但 house 位于<b>每一笔成交的热路径</b>上，不能按"新增一个账户"估算——必须按核心结算改造做基准测试与验证（评审意见 2026-09-25）：</p>
 <pre><span class="c">// portfolio_manager_perp/perpetuals/domain/models/const.go 新增：</span>
 MMHouseAccountAppSessionID = <span class="t">"00000000-0000-0000-0000-000000000009"</span>
 MMHouseAccountID          = <span class="t">"00000000-0000-0000-0000-000000000009"</span>
 <span class="c">// owner = SystemAccountOwner (0x0)，PrincipalKindService，随 EnsureSystemAccounts 自动建账</span></pre>
 <ul class="plain">
-<li><b>语义</b>：余额 = 我们对 MM 的净债务（正=我们欠 MM，负=MM 欠我们）。周期结算时现金清零，余额归入商务结算（条款待决）。</li>
-<li><b>费用</b>：house 腿零平台费率（MM 的报酬走商务分成，不进交易费用账）。</li>
-<li><b>风控豁免</b>：不参与清算扫描、无保证金要求（与保险金/清算池同待遇）。</li>
+<li><b>语义</b>：余额 = 我们对 MM 的净债务（正 = 我们欠 MM，负 = MM 欠我们）。周期结算时现金清零，余额归入商务结算（条款待决）。</li>
+<li><b>信用敞口 ≠ 余额</b>：熔断线按<b>敞口</b>计 = 已入账余额 + 聚合对冲的未实现 MTM + 未结算 funding 应计。只看余额会在 MM 违约瞬间低估风险——用户的浮盈是我们即将兑付的负债，此刻还没入 house 账。</li>
+<li><b>热点与并发</b>：所有 USDT 计价市场共用一个 house，每笔成交都写它——Raft apply 吞吐与 dbWriter 的 <code>perps_balances</code> 热行 upsert 必须<b>实测</b>。备选：按保险金 Pool 1/2/3 先例做 per-market house 池（与币安 symbol 1:1，对账天然按市场比对，聚合求和即总敞口）。</li>
+<li><b>记账形态：双向 HEDGE 腿</b>：每笔成交<b>原子地同时</b>记用户腿与 house 腿（同一 journal），两侧已实现盈亏严格同步——多用户共用时不会出现时序错位。净仓方案需要改开平判定（IsClosingOrder）语义且破坏该同步性，弃选。house 腿零 allocated margin、零费率。</li>
+<li><b>风控豁免（显式实现，不是默认得到）</b>：允许负余额、无 MMR、不进清算扫描；合成单绕过普通下单校验；以 PrincipalKindService 沿保险金先例排除出用户统计 / 排名 / 奖励 / analytics 聚合。</li>
+<li><b>不重复计账不变量</b>：清算时用户亏损只在成交结算记一次；穿仓差额<b>只</b>由保险金 → house 划转表达，两者不得叠加。配 <code>test/v2</code> 集成场景断言。</li>
 </ul>
 
 <h2>合成成交事件</h2>
@@ -521,7 +532,7 @@ MMHouseAccountID          = <span class="t">"00000000-0000-0000-0000-00000000000
 <tr><td class="mono-c">Header.IdempotencyKey</td><td class="dim"><code>{client_order_id}:{fill_id}</code> → PM Perp 幂等缓存直接防重</td></tr>
 </tbody>
 </table></div>
-<div class="call"><p class="call-t">经济闭环（一笔用户开多的完整旅程）</p><p>用户开多 10 TAO @199 → 我方锁 IMR → MM 币安买入对冲 10 TAO。</p><p>用户平多 @205 → 合成事件结算：<b>用户 +60</b>（已实现盈亏入账），<b>house −60</b>（我们对 MM 净债务 +60）；MM 币安端对冲盈利 +60，周期结算时我方向 MM 支付 60。</p><p><b>任意时刻 house 净敞口 + 用户多空轧差 = 0</b>：两个用户互为对手时（A 买 B 卖）house 两腿对冲，MM 币安端无需下对冲单，点差与费用照收。</p></div>
+<div class="call"><p class="call-t">经济闭环（一笔用户开多的完整旅程——付款方向已按评审意见修正）</p><p>用户开多 10 TAO @199 → 我方锁 IMR → house 对用户记空头腿 → MM 币安买入 10 TAO 对冲。</p><p>用户平多 @205 → 合成事件结算：<b>用户 +60</b>（已实现盈亏入账），<b>house −60</b>（按"正 = 我方欠 MM"的约定，负值 = <b>MM 应付我方 60</b>）；MM 币安端对冲盈利 +60。</p><p>周期结算：<b>MM 向我方支付 60</b>，我方以此兑现用户盈利。用户亏损时方向相反——house 为正 = 我方欠 MM，从用户收取的亏损金在结算时偿付 MM 的对冲损失。<b>任意时刻 |house 余额| 与 MM 对冲端互为镜像</b>。</p><p>两个用户互为对手时（A 买 B 卖）house 两腿轧平，MM 币安端无需下对冲单，点差与费用照收。</p></div>
 
 <h2>funding 透传</h2>
 <ul class="plain">
@@ -572,14 +583,15 @@ MMHouseAccountID          = <span class="t">"00000000-0000-0000-0000-00000000000
 <tr><td class="mono-c">fapi exchangeInfo（REST，每 1h）</td><td>过滤器同步</td><td class="dim">LOT_SIZE / PRICE_FILTER / MIN_NOTIONAL 热加载进 trading-api MarketCache（edge 前置拦截，MM 侧 INVALID_FILTER 兜底）</td></tr>
 </tbody>
 </table></div>
-<div class="call"><p class="call-t">depth 镜像的实现要点</p><p>币安 depth20 是<b>快照流</b>（无增量对齐问题），每 100ms 全量 20 档 → 直接映射现有 OrderBookSnapshot 语义；增量由 quote 按 snapshot 差分合成，保持现网客户端的增量/快照混合消费模型。</p><p><b>注意</b>：订单簿里全是币安的单——我方用户挂单不在簿上。用户自己的挂单状态走私有流（EventOrderUpdated），前端需在镜像簿上叠加"我的挂单"展示（前端改动项，列入切换计划）。</p></div>
+<div class="call"><p class="call-t">depth 镜像的实现要点（含差分语义，评审意见 2026-09-25）</p><p>币安 depth20 是<b>快照流</b>（无增量对齐问题），每 100ms 全量 20 档 → 直接映射现有 OrderBookSnapshot 语义；增量由 quote 按 snapshot 差分合成，两条硬规则：<b>消失档位必须发 qty→0 的删除增量</b>；<b>重连后先重发全量 snapshot 重建差分基线</b>（不发跨断线窗口的巨型 diff）。保持现网客户端的增量/快照混合消费模型。</p><p><b>注意</b>：订单簿里全是币安的单——我方用户挂单不在簿上。用户自己的挂单状态走私有流（EventOrderUpdated），前端需在镜像簿上叠加"我的挂单"展示（前端改动项，列入切换计划）。</p></div>
 
-<h2>ledger：K线数据源切换</h2>
+<h2>ledger：外部 K线接入设计（不是"加一个消费者直写"）</h2>
+<p class="section-note">评审意见（2026-09-25）：现网 ledger 从 trades 生成连续聚合、高周期再依赖它；外部 1m K线无法仅靠"新增消费者直写"自然接入现有结构——需要新的存储与聚合设计。</p>
 <ol class="pts">
-<li><b>新增摄入路径</b> — quote 发布 <code>events.{MKT}.EventKlineObserved</code>（1m 基线），ledger 消费后<b>直写</b> Timescale OHLC 与 24h ticker 聚合，不再从内部成交自算。</li>
-<li><b>per-market 开关</b> — ledger 配置里 perp 市场标记数据源：A-book 市场 = 币安 K线；spot 与（过渡期）非 A-book 市场 = 内部成交聚合（现有逻辑）。</li>
-<li><b>高周期聚合</b> — 1m 基线之上的连续聚合（5m/1h/…）沿用现有 Timescale 物化视图，机制不变。</li>
-<li><b>历史衔接</b> — 内部成交聚合的历史 K线保留，切换日为分界；前端图表跨界拼接（时间轴连续，无重写）。</li>
+<li><b>新源表 + UPSERT 语义</b> — 新增外部 K线源表（symbol, bucket, OHLCV, event_time 水位）：币安 kline 事件携带当分钟<b>累计</b>成交量，未闭合 bar 在当分钟内被逐事件覆盖；重复 / 乱序按事件时间水位幂等 upsert（迟到旧值不回写已更新的 bucket）。</li>
+<li><b>断线补数</b> — WS 断线窗口由 REST <code>/fapi/v1/klines</code> 回填，走同一 upsert 路径，天然幂等；补数与实时流竞争时以水位高者胜。</li>
+<li><b>聚合链重建</b> — perp 市场的高周期 CAGG 从 trades 源改指向新源表；spot 与过渡期市场保留 trades 链——<b>两条链并存、per-market 路由</b>，不是全局切换。</li>
+<li><b>历史衔接</b> — 内部聚合的历史 K线保留，切换日为分界；前端图表跨界拼接（时间轴连续，无重写）。</li>
 <li><b>用户 trade history</b> — 不受影响：用户自己的成交记录一直由 PM Perp 持有（<code>perps_transactions</code> / position history），与公共 K线互不相干。</li>
 </ol>
 
@@ -623,7 +635,7 @@ MMHouseAccountID          = <span class="t">"00000000-0000-0000-0000-00000000000
 <tr><td class="mono-c"><b>mm-connector</b></td><td><span class="pill no">新增</span></td><td class="dim">Kafka 命令消费 + MM REST/WS 客户端 + 状态机与仲裁 + Finex 格式事件合成（house 对手腿）+ 对账 worker + 心跳熔断 + admin 观测接口</td><td class="dim">大（新服务，参照 finex 的命令入口与事件出口契约）</td></tr>
 <tr><td class="mono-c"><b>portfolio_manager_perp</b></td><td><span class="pill gap">修改</span></td><td class="dim">house 系统账户（spec + EnsureSystemAccounts）；清算 executor 出口改为 connector（liquidation 命令带 source）；takeover/ADL 代码路径下线（保留枚举与历史数据读取）；funding 账务对手方换 house</td><td class="dim">中</td></tr>
 <tr><td class="mono-c"><b>quote</b></td><td><span class="pill gap">修改</span></td><td class="dim">binance_perp 扩展五路订阅（depth/kline/ticker/aggTrade/exchangeInfo）；新 kline 事件发布；depth → orderbook topic 复刻；InternalPerpTradeCollector 按 A-book 市场停用</td><td class="dim">中</td></tr>
-<tr><td class="mono-c"><b>ledger</b></td><td><span class="pill gap">修改</span></td><td class="dim">新增 EventKlineObserved 消费路径直写 Timescale；per-market 数据源开关；24h ticker 改币安源</td><td class="dim">小</td></tr>
+<tr><td class="mono-c"><b>ledger</b></td><td><span class="pill gap">修改</span></td><td class="dim">外部 K线源表 + UPSERT/水位语义 + REST 断线补数；perp 市场聚合链改指向新源表，spot 链保留（双链 per-market 路由，见第 6 页）；24h ticker 改币安源</td><td class="dim">中（存储与聚合设计，非单纯新增消费者）</td></tr>
 <tr><td class="mono-c"><b>trading-api</b></td><td><span class="pill gap">修改</span></td><td class="dim">MarketCache 对接 exchangeInfo 热同步（前置过滤器校验）；前端契约新增"镜像簿 + 我的挂单"叠加语义说明；其余（认证/限流/锁仓流程/私有流）不变</td><td class="dim">小</td></tr>
 <tr><td class="mono-c"><b>admin</b></td><td><span class="pill gap">修改</span></td><td class="dim">MM 连接状态/对账差异/house 余额监控页；A-book 路由开关操作；对账仲裁工具</td><td class="dim">小</td></tr>
 <tr><td class="mono-c"><b>perp_trigger</b></td><td><span class="pill ok">零改动</span></td><td class="dim">触发→锁仓→命令的既有流程自动流向 connector</td><td class="dim">无</td></tr>
@@ -652,9 +664,10 @@ MMHouseAccountID          = <span class="t">"00000000-0000-0000-0000-00000000000
 <tr><td><b>清算遇断连</b></td><td class="dim">行情暴跌触发连环清算的同一时刻 MM 断连——最危险的组合</td><td class="dim">用户仓位与保证金在我方不受影响（结算暂停而非丢失）；重连后立即补发平仓单；持续恶化由保险金兜底 + 人工升级</td><td><span class="pill no">高</span></td></tr>
 <tr><td><b>延迟</b></td><td class="dim">锁仓(Raft ~10ms) + Kafka + connector + MM + 币安 RTT + 回报 → 全链 p99 目标 &lt; 1s；市价单期间价格漂移</td><td class="dim">SLA 分段监控（第 3 页）；市单滑点上限参数（待决）</td><td><span class="pill gap">中</span></td></tr>
 <tr><td><b>滑点吃穿保证金</b></td><td class="dim">锁仓按下单时校验 IMR，币安成交价劣化 → 成交后 MMR 立即越界 → 秒触发清算</td><td class="dim">锁仓端增加滑点缓冲系数（可配）；越界即走正常清算路径（非资损，是体验问题）；IMR 缓冲值入待决</td><td><span class="pill gap">中</span></td></tr>
+<tr><td><b>UNKNOWN 资金占用</b></td><td class="dim">仲裁期间保证金保持锁定——网络分区 / MM 不可用时可拖到分钟级</td><td class="dim">对用户呈现"挂单中"；熔断恢复后 UNKNOWN 清算优先于新单；锁仓缓冲含该占用</td><td><span class="pill gap">中</span></td></tr>
 <tr><td><b>对账漂移</b></td><td class="dim">我方 FSM / MM 报告 / 币安三方状态不一致（网络分区、回报丢失）</td><td class="dim">三级对账 job（第 5 页）+ fill_id 幂等 + GET 仲裁 + admin 冻结工具</td><td><span class="pill gap">中</span></td></tr>
 <tr><td><b>币安平台依赖</b></td><td class="dim">币安维护窗口 / 风控 / 地域限制直接影响我方全站</td><td class="dim">MM 提供 binance_connected 心跳字段与维护预告；维护期预先熔断（公告停交易）</td><td><span class="pill gap">中</span></td></tr>
-<tr><td><b>MM 违约</b></td><td class="dim">house 净债务累积后 MM 拒付/跑路</td><td class="dim">商务保证金条款 + 净额上限熔断（house |余额| 超阈值 → 停止交易并要求补充保证金）（条款待决）</td><td><span class="pill gap">商务</span></td></tr>
+<tr><td><b>MM 违约</b></td><td class="dim">house 净敞口累积后 MM 拒付/跑路</td><td class="dim">商务保证金条款 + <b>敞口上限</b>熔断（余额 + 未实现 MTM + funding 应计，见第 5 页；超阈值 → 停止交易并要求补充保证金）（条款待决）</td><td><span class="pill gap">商务</span></td></tr>
 </tbody>
 </table></div>
 
@@ -665,7 +678,7 @@ MMHouseAccountID          = <span class="t">"00000000-0000-0000-0000-00000000000
 <tr><td class="mono-c">心跳丢失 15s</td><td><span class="pill no">全拒</span></td><td><span class="pill no">cancel-all</span></td><td><span class="pill gap">挂起</span></td><td class="dim">重连 → 全量 GET 仲裁 → 补发清算单 → 解除</td></tr>
 <tr><td class="mono-c">连续 429 / SYSTEM_BUSY</td><td><span class="pill gap">退避</span></td><td><span class="pill ok">保留</span></td><td><span class="pill ok">重试</span></td><td class="dim">速率恢复即解除；持续 5 分钟升级为心跳级熔断</td></tr>
 <tr><td class="mono-c">持仓对账超阈值</td><td><span class="pill no">该市场冻结</span></td><td><span class="pill ok">保留</span></td><td><span class="pill gap">人工确认</span></td><td class="dim">admin 仲裁工具定位差异单 → 手工修复 → 解冻</td></tr>
-<tr><td class="mono-c">house 净额超商务上限</td><td><span class="pill no">全拒</span></td><td><span class="pill ok">保留</span></td><td><span class="pill ok">正常</span></td><td class="dim">结算/补保证金后解除（条款待决）</td></tr>
+<tr><td class="mono-c">house 敞口超商务上限</td><td><span class="pill no">全拒</span></td><td><span class="pill ok">保留</span></td><td><span class="pill ok">正常</span></td><td class="dim">结算/补保证金后解除（敞口 = 余额 + 未实现 MTM，条款待决）</td></tr>
 <tr><td class="mono-c">人工 kill-switch</td><td><span class="pill no">全拒</span></td><td><span class="pill no">cancel-all</span></td><td><span class="pill gap">挂起</span></td><td class="dim">可切回 B-book（一个版本周期内，见第 9 页）</td></tr>
 </tbody>
 </table></div>
@@ -761,7 +774,7 @@ MMHouseAccountID          = <span class="t">"00000000-0000-0000-0000-00000000000
 <h4>合规与账户归属 <span class="pill gap">阻塞生产 cutover</span></h4>
 <p class="section-note">MM 币安账户主体、地域合规、"用户订单经第三方主体执行"的监管定性——需合规团队意见，不阻塞技术开发。</p>
 
-<div class="call"><p class="call-t">文档维护</p><p>v1.2（2026-09-24）：行情与映射定为"以币安为准"并入已决；待决项分块排版。v1.1 要点：3.0 数据所有权、spot 边界清单、无存量与三层测试环境决策。</p><p>契约过会与剩余待决项落定后更新 v2 定稿；英文版 <code>docs/a-book-perps-design.en.html</code> 同步维护。关联文档：<code>docs/new-perps-rollout-plan.html</code>（市场参数与 quote 配置基线）、<code>docs/2026-09-22-attacker-position-force-close-runbook.md</code> 与 09-23 两份 MM 清仓 runbook（阶段 0）。</p></div>
+<div class="call"><p class="call-t">文档维护</p><p>v1.3（2026-09-25，评审意见吸收）：3.5 重写——UNKNOWN 状态 + 判死三条件 + MM 侧 tombstone / UNKNOWN 义务 + CANCEL_REJECTED 补账；house 经济闭环付款方向修正、信用敞口定义（余额 + MTM + funding 应计）、工程要点清单（热点实测、双向腿、风控豁免、不重复计账不变量）；ledger 外部 K线改为完整存储/聚合设计（源表 UPSERT、断线补数、双链路由）；depth 差分补删除档位与重连重置语义。v1.2：行情与映射定为"以币安为准"；待决项分块排版。v1.1：3.0 数据所有权、spot 边界清单。</p><p>契约过会与剩余待决项落定后更新 v2 定稿；英文版 <code>docs/a-book-perps-design.en.html</code> 同步维护。关联文档：<code>docs/new-perps-rollout-plan.html</code>（市场参数与 quote 配置基线）、<code>docs/2026-09-22-attacker-position-force-close-runbook.md</code> 与 09-23 两份 MM 清仓 runbook（阶段 0）。</p></div>
 </section>
 </article>
 

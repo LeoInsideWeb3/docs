@@ -107,7 +107,7 @@ ol.pts b{color:var(--ink);font-weight:600}
 <a href="#cutover" data-tab="cutover"><span class="n">9</span>Cutover Plan</a>
 <a href="#open" data-tab="open"><span class="n">10</span>Decided &amp; Open</a>
 </nav>
-<div class="side-foot">2026-09-24 · v1.2 · design draft<br>contract pending MM review<br>decided: principal · Binance price + fees<br>full switch · no legacy · Binance-first<br>3-tier test environments</div>
+<div class="side-foot">2026-09-25 · v1.3 · design draft<br>contract pending MM review (incl. tombstone)<br>decided: principal · Binance price + fees<br>full switch · no legacy · Binance-first<br>3-tier test environments</div>
 </aside>
 
 <div class="main">
@@ -209,7 +209,7 @@ ol.pts b{color:var(--ink);font-weight:600}
 <div class="arrow">↓ Kafka commands.{MKT}.OrderCommands (same topic, different consumer)</div>
 <div class="layer hi">
 <div class="layer-n">mm-connector<small>new · takes Finex's seat</small></div>
-<p class="layer-d">Consumes order commands → submits via MM REST (idempotent + expires_at) → WS reports drive the state machine → translates ack/fill/cancel/reject into <code>EventOrderUpdated</code> / <code>EventTradeExecuted</code> (house synthetic order as counterparty leg) → publishes to <code>events.{MKT}.*</code>. Built in: dangling-order arbitration, timeout auto-reject, heartbeat circuit breaker, three-way reconciliation worker.</p>
+<p class="layer-d">Consumes order commands → submits via MM REST (idempotent + expires_at) → WS reports drive the state machine → translates ack/fill/cancel/reject into <code>EventOrderUpdated</code> / <code>EventTradeExecuted</code> (house synthetic order as counterparty leg) → publishes to <code>events.{MKT}.*</code>. Built in: UNKNOWN dangling-order arbitration (three-condition death verdict, see 3.5), heartbeat circuit breaker, three-way reconciliation worker.</p>
 </div>
 <div class="arrow">↓ REST / WS (page 3 contract) · MM → Binance execution</div>
 <div class="layer hi">
@@ -340,7 +340,7 @@ ol.pts b{color:var(--ink);font-weight:600}
 }</pre>
 
 <h3>3.4 WebSocket Execution Stream (WS /api/v1/stream)</h3>
-<p class="section-note">The connector keeps one WS open for its lifetime (after reconnect, it first runs a GET arbitration pass over all in-flight orders before resuming). Message envelope: <code>{type, client_order_id, mm_order_id, transact_time, ...}</code>.</p>
+<p class="section-note">The connector keeps one WS open for its lifetime (after reconnect, it first runs a GET arbitration pass over all in-flight and UNKNOWN orders before resuming). Message envelope: <code>{type, client_order_id, mm_order_id, transact_time, ...}</code>.</p>
 <div class="tw"><table>
 <thead><tr><th>type</th><th>Trigger</th><th>Specific fields</th></tr></thead>
 <tbody>
@@ -366,10 +366,14 @@ ol.pts b{color:var(--ink);font-weight:600}
 <div class="call"><p class="call-t">Why role matters</p><p>Our lock side pre-charges fees by order type (post_only locks at the maker rate); at settlement we charge by the <b>Binance fill role the MM reports</b>: a resting limit that gets hit → role=maker → maker rate; a crossing order → taker rate. Fully aligned with Finex's maker/taker semantics today — fee_engine needs no changes.</p></div>
 
 <h3>3.5 Idempotency · Dangling Orders · Arbitration</h3>
+<div class="call warn"><p class="call-t">A race window that must be closed (review feedback 2026-09-25)</p><p>A GET at 500ms returning "not found" does not mean the order will never execute: the POST can still be in flight in the network or the MM's queue, arriving at 800ms and still unexpired (default validity 3s) — if we unlock margin at that point and the user withdraws, the later-arriving fill has no margin backing. <b>expires_at constrains "when the MM receives it", not "when we may declare it dead".</b></p></div>
 <ol class="steps">
-<li><b>Every submit carries expires_at (our clock + 2 × RTT + processing headroom, default 3s)</b><span>A request already expired on arrival must be answered with <code>EXPIRED</code> and <b>must not be executed</b> — the first gate against the fatal window of "we timed out, declared the order dead, and unlocked margin — while the MM fills it in flight".</span></li>
-<li><b>ack timeout (500ms) → switch to GET arbitration</b><span>The connector calls <code>GET /api/v1/orders/{client_order_id}</code> for the timed-out order: no MM record → locally REJECTED + unlock + reject event; record in-flight → keep tracking; record filled → accept all fills through normal settlement (lock converts to settlement).</span></li>
-<li><b>WS disconnect → full arbitration after reconnect</b><span>First step on reconnect: GET every in-flight client_order_id, aligning states and fill sequences; fill_id dedup guarantees no double settlement.</span></li>
+<li><b>Every submit carries expires_at (our clock + 2 × RTT + processing headroom, default 3s)</b><span>A request already expired on arrival must be answered with <code>EXPIRED</code> and <b>must not be executed</b> — the validity window is the <b>time precondition</b> of the death verdict, not a sufficient condition (see item 2).</span></li>
+<li><b>ack timeout (500ms) → the order enters UNKNOWN; margin stays locked</b><span>A timeout means "no ack received", not "the MM never received it". A death verdict requires <b>all three conditions</b>: ① expires_at + clock-skew headroom (default +1s) has passed; ② a GET at that point still finds no record; ③ the MM provides a non-executable terminal guarantee for that client_order_id (tombstone, item 3). Any "not found" before expiry is treated as UNKNOWN with margin locked, shown to the user as pending.</span></li>
+<li><b>MM-side tombstone guarantee (contract addition)</b><span>The first time the MM answers a GET with "no record" for a client_order_id it must <b>persist that answer</b>; any later POST with the same ID is rejected. This upgrades "not found now" into "will never execute" — without it, the death verdict does not stand.</span></li>
+<li><b>The MM's own UNKNOWN obligation (contract addition)</b><span>When the MM is uncertain about its Binance submission result (MM→Binance timeout), it must not report FILLED / REJECTED — it must keep the order in-flight until certain. The same problem is pushed down one level; the MM is not allowed to close its own window with a guess.</span></li>
+<li><b>CANCEL_REJECTED(FILLED) must not be ignored</b><span>We may not yet have received all fill reports locally (WS gap): first GET to backfill the fill sequence, settle each fill, and only then may the order go terminal.</span></li>
+<li><b>WS disconnect → full arbitration after reconnect</b><span>First step on reconnect: GET every in-flight and UNKNOWN client_order_id, aligning states and fill sequences; fill_id dedup guarantees no double settlement.</span></li>
 <li><b>Double idempotency insurance on settlement</b><span>The connector's synthesized events carry IdempotencyKey = <code>client_order_id:fill_id</code>; PM Perp's existing idempotency cache dedups natively (reusing <code>Settlement.HandleTrade</code>'s Set/Delete logic).</span></li>
 </ol>
 
@@ -410,7 +414,7 @@ ol.pts b{color:var(--ink);font-weight:600}
 <tr><td class="mono-c">SYSTEM_BUSY</td><td>MM internally overloaded</td><td class="dim">backoff; repeated occurrences → circuit break</td></tr>
 </tbody>
 </table></div>
-<div class="call warn"><p class="call-t">Points the MM must confirm one by one at the review meeting</p><p>① GTX (post_only) rejects — can the report distinguish "would take" from other reject reasons; ② IOC partial fills — does the remainder emit ORDER_UPDATE(FILLED) with unambiguous terminal semantics (we record the remainder as StateExpired, matching production); ③ GET /orders fills list — does it include the role field (needed for arbitration backfill); ④ cancel-all — guaranteed time-to-effect; ⑤ advance notice mechanism for Binance maintenance windows.</p></div>
+<div class="call warn"><p class="call-t">Points the MM must confirm one by one at the review meeting</p><p>① GTX (post_only) rejects — can the report distinguish "would take" from other reject reasons; ② IOC partial fills — does the remainder emit ORDER_UPDATE(FILLED) with unambiguous terminal semantics (we record the remainder as StateExpired, matching production); ③ GET /orders fills list — does it include the role field (needed for arbitration backfill); ④ cancel-all — guaranteed time-to-effect; ⑤ advance notice mechanism for Binance maintenance windows; ⑥ <b>tombstone persistence</b> — after answering a GET with "no record", is a later POST with the same ID guaranteed rejected (3.5 item 3, precondition for death verdicts); ⑦ <b>MM-side UNKNOWN semantics</b> — does the MM commit to never reporting a terminal state while its own Binance submission result is uncertain (3.5 item 4).</p></div>
 </section>
 </article>
 
@@ -428,12 +432,13 @@ ol.pts b{color:var(--ink);font-weight:600}
 <thead><tr><th>Our state</th><th>Value</th><th>MM side</th><th>Transition trigger</th></tr></thead>
 <tbody>
 <tr><td class="mono-c"><b>pending</b></td><td class="mono-c">0</td><td class="mono-c">submitting (POST outstanding)</td><td class="dim">connector consumed the command, no ack yet</td></tr>
+<tr><td class="mono-c"><b>UNKNOWN</b> (connector-internal)</td><td class="mono-c">mapped to pending(0)</td><td class="mono-c">ack timeout / arbitration pending</td><td class="dim"><b>margin stays locked</b>; shown to the user as pending; death verdict per 3.5</td></tr>
 <tr><td class="mono-c"><b>wait</b></td><td class="mono-c">100</td><td class="mono-c">OPEN / PARTIALLY_FILLED</td><td class="dim">ack success → resting (limit); market orders pass through briefly</td></tr>
 <tr><td class="mono-c">trigger_wait / triggered</td><td class="mono-c">50 / 150</td><td class="mono-c">never goes to the MM</td><td class="dim">managed locally by perp_trigger; the spawned child enters pending→wait above</td></tr>
 <tr><td class="mono-c"><b>done</b></td><td class="mono-c">200</td><td class="mono-c">FILLED</td><td class="dim">after the last TRADE_FILL (cumulative = qty)</td></tr>
 <tr><td class="mono-c"><b>cancel</b></td><td class="mono-c">-100</td><td class="mono-c">CANCELLED</td><td class="dim">user cancel / cancel-all / circuit break</td></tr>
 <tr><td class="mono-c"><b>expired</b></td><td class="mono-c">-150</td><td class="mono-c">IOC remainder / GTX not placed</td><td class="dim">IOC unfilled remainder; FOK full rejection goes to reject</td></tr>
-<tr><td class="mono-c"><b>reject</b></td><td class="mono-c">-200</td><td class="mono-c">REJECTED (sync / async / arbitration verdict)</td><td class="dim">filters, EXPIRED, arbitration finds no record, etc.</td></tr>
+<tr><td class="mono-c"><b>reject</b></td><td class="mono-c">-200</td><td class="mono-c">REJECTED (sync / async / arbitration verdict)</td><td class="dim">filters, EXPIRED, all three death conditions met (3.5), etc.</td></tr>
 </tbody>
 </table></div>
 
@@ -466,14 +471,17 @@ ol.pts b{color:var(--ink);font-weight:600}
 <h4>Cancels and timeout arbitration</h4>
 <pre>User cancel → Kafka CommandOrderCancel → connector → DELETE /orders/{id}
    ├─CANCEL_ACCEPTED → StateCancel + unlock remainder
-   └─CANCEL_REJECTED(FILLED) → already terminal, ignore
+   └─CANCEL_REJECTED(FILLED) → <b>not ignored</b>: GET to backfill fills → settle each → only then terminal
+                               <span class="c">// we may not have all fill reports yet (WS gap)</span>
 
-POST timeout (500ms) → GET /api/v1/orders/{client_order_id}
-   ├─no MM record → StateReject + unlock + event          <span class="c">// clean death</span>
-   ├─in-flight → keep tracking (await WS or GET again)
+POST timeout (500ms) → enters UNKNOWN (<b>margin stays locked</b>)
+   death verdict = past expires_at+1s ∧ GET still no record ∧ MM tombstone guarantee  <span class="c">// all three required</span>
+   ├─verdict stands → StateReject + unlock + event
+   ├─not yet expired / GET unavailable → stay UNKNOWN, await WS or re-arbitrate after expiry
+   │    <span class="c">// "not found now" ≠ "will never execute" — the POST can still be in flight</span>
    └─fills exist → accept them and settle normally         <span class="c">// fill dedup guarantees idempotency</span>
 
-WS silence 15s → circuit break: reject new orders + cancel-all in-flight + full GET arbitration on reconnect</pre>
+WS silence 15s → circuit break: reject new orders + cancel-all in-flight + full GET arbitration on reconnect (incl. UNKNOWN)</pre>
 
 <h4>Liquidation close order (source=liquidation)</h4>
 <pre>PM Perp liquidation scanner (mark-driven, tier evaluation — unchanged)
@@ -496,15 +504,18 @@ WS silence 15s → circuit break: reject new orders + cancel-all in-flight + ful
 
 <section>
 <h2>House Account Definition</h2>
-<p class="section-note">Reuses the existing system-account machinery exactly (the spec list in <code>raft_recovery/system_accounts.go</code> + <code>EnsureSystemAccounts</code> idempotent reconciliation; UUID suffix continues at 09):</p>
+<p class="section-note">Reuses the existing system-account machinery (the spec list in <code>raft_recovery/system_accounts.go</code> + <code>EnsureSystemAccounts</code> idempotent reconciliation; UUID suffix continues at 09). But the house sits on the <b>hot path of every single trade</b> — it cannot be estimated as "just another account"; it must be benchmarked and validated as a core-settlement change (review feedback 2026-09-25):</p>
 <pre><span class="c">// portfolio_manager_perp/perpetuals/domain/models/const.go addition:</span>
 MMHouseAccountAppSessionID = <span class="t">"00000000-0000-0000-0000-000000000009"</span>
 MMHouseAccountID          = <span class="t">"00000000-0000-0000-0000-000000000009"</span>
 <span class="c">// owner = SystemAccountOwner (0x0), PrincipalKindService, auto-provisioned via EnsureSystemAccounts</span></pre>
 <ul class="plain">
 <li><b>Semantics</b> — balance = our net debt to the MM (positive = we owe the MM; negative = the MM owes us). Zeroed by cash settlement each cycle; the balance folds into commercial settlement (terms pending).</li>
-<li><b>Fees</b> — the house leg pays zero platform fees (the MM's compensation rides the commercial split, not the trading-fee ledger).</li>
-<li><b>Risk exemption</b> — excluded from liquidation scanning, no margin requirement (same treatment as insurance/settlement pools).</li>
+<li><b>Credit exposure ≠ balance</b> — the circuit-break line is set on <b>exposure</b> = booked balance + unrealized MTM of the aggregate hedge + accrued unsettled funding. Watching only the balance understates risk at the instant of an MM default — users' floating gains are liabilities we are about to honor and are not yet booked to house.</li>
+<li><b>Hot spot &amp; concurrency</b> — every USDT-quoted market shares one house and every trade writes it: Raft apply throughput and the dbWriter's <code>perps_balances</code> hot-row upsert must be <b>measured</b>. Fallback: per-market house pools following the insurance-fund Pool 1/2/3 precedent (1:1 with Binance symbols, reconciliation compares per market, aggregation is a plain sum).</li>
+<li><b>Bookkeeping form: two-way HEDGE legs</b> — every trade <b>atomically</b> books the user leg and the house leg (same journal), keeping both sides' realized PnL strictly in sync — no timing skew with many users sharing the account. A net-position variant would require changing open/close classification (IsClosingOrder) semantics and breaks this sync; rejected. House legs carry zero allocated margin and zero fees.</li>
+<li><b>Risk exemptions (explicitly implemented, not obtained by default)</b> — negative balances allowed, no MMR, excluded from liquidation scanning; synthetic orders bypass normal order validation; PrincipalKindService excludes it from user statistics / rankings / rewards / analytics aggregation, per the insurance-fund precedent.</li>
+<li><b>No-double-booking invariant</b> — on liquidation, a user's loss is booked exactly once in trade settlement; the bankruptcy shortfall is expressed <b>only</b> via the insurance → house transfer; the two must never stack. Asserted in <code>test/v2</code> integration scenarios.</li>
 </ul>
 
 <h2>Synthesized Trade Events</h2>
@@ -521,7 +532,7 @@ MMHouseAccountID          = <span class="t">"00000000-0000-0000-0000-00000000000
 <tr><td class="mono-c">Header.IdempotencyKey</td><td class="dim"><code>{client_order_id}:{fill_id}</code> → PM Perp's idempotency cache dedups directly</td></tr>
 </tbody>
 </table></div>
-<div class="call"><p class="call-t">The economic loop (a user long, start to finish)</p><p>User opens long 10 TAO @199 → we lock IMR → MM buys the 10 TAO hedge on Binance.</p><p>User closes the long @205 → synthesized-event settlement: <b>user +60</b> (realized PnL credited), <b>house −60</b> (our net debt to the MM +60); the MM's Binance hedge earned +60, paid to him at the next cycle settlement.</p><p><b>At any instant: house net exposure + user long/short netting = 0</b>. When two users are natural counterparties (A buys, B sells) the two house legs cancel and the MM needs no Binance hedge order — spread and fees still collected.</p></div>
+<div class="call"><p class="call-t">The economic loop (a user long, start to finish — payment direction corrected per review)</p><p>User opens long 10 TAO @199 → we lock IMR → house books a short leg against the user → MM buys the 10 TAO hedge on Binance.</p><p>User closes the long @205 → synthesized-event settlement: <b>user +60</b> (realized PnL credited), <b>house −60</b> (under the "positive = we owe the MM" convention, a negative value = <b>the MM owes us 60</b>); the MM's Binance hedge earned +60.</p><p>Cycle settlement: <b>the MM pays us 60</b>, and we honor the user's gain with it. When users lose, the direction reverses — house goes positive = we owe the MM, and the losses collected from users repay the MM's hedge losses at settlement. <b>At any instant |house balance| mirrors the MM's hedge side.</b></p><p>When two users are natural counterparties (A buys, B sells) the two house legs cancel and the MM needs no Binance hedge order — spread and fees still collected.</p></div>
 
 <h2>Funding Pass-Through</h2>
 <ul class="plain">
@@ -572,13 +583,14 @@ MMHouseAccountID          = <span class="t">"00000000-0000-0000-0000-00000000000
 <tr><td class="mono-c">fapi exchangeInfo (REST, hourly)</td><td>filter sync</td><td class="dim">LOT_SIZE / PRICE_FILTER / MIN_NOTIONAL hot-loaded into trading-api's MarketCache (edge pre-check; MM-side INVALID_FILTER as backstop)</td></tr>
 </tbody>
 </table></div>
-<div class="call"><p class="call-t">Implementation notes for the depth mirror</p><p>Binance depth20 is a <b>snapshot stream</b> (no diff-alignment problem) — full 20 levels every 100ms → maps directly onto the existing OrderBookSnapshot semantics; increments are synthesized by quote as snapshot diffs, preserving the current client mix of increment/snapshot consumption.</p><p><b>Note</b>: the mirrored book contains only Binance's orders — our users' resting orders are not on it. A user's own order state arrives via the private stream (EventOrderUpdated); the frontend overlays "my orders" on the mirrored book (frontend change item, tracked in the cutover plan).</p></div>
+<div class="call"><p class="call-t">Implementation notes for the depth mirror (incl. diff semantics, review feedback 2026-09-25)</p><p>Binance depth20 is a <b>snapshot stream</b> (no diff-alignment problem) — full 20 levels every 100ms → maps directly onto the existing OrderBookSnapshot semantics; increments are synthesized by quote as snapshot diffs, with two hard rules: <b>vanishing levels must emit a qty→0 deletion increment</b>; <b>after reconnect, first re-publish a full snapshot to rebuild the diff baseline</b> (no giant diff across the outage window). The current client mix of increment/snapshot consumption is preserved.</p><p><b>Note</b>: the mirrored book contains only Binance's orders — our users' resting orders are not on it. A user's own order state arrives via the private stream (EventOrderUpdated); the frontend overlays "my orders" on the mirrored book (frontend change item, tracked in the cutover plan).</p></div>
 
-<h2>ledger: Kline Source Switch</h2>
+<h2>ledger: External Kline Ingestion Design (not "add a consumer and write directly")</h2>
+<p class="section-note">Review feedback (2026-09-25): today's ledger generates continuous aggregates from trades, and higher timeframes build on those; external 1m klines cannot slot into the existing structure merely by adding a consumer that writes directly — a new storage and aggregation design is required.</p>
 <ol class="pts">
-<li><b>New ingestion path</b> — quote publishes <code>events.{MKT}.EventKlineObserved</code> (1m base); ledger consumes and <b>writes directly</b> to Timescale OHLC and the 24h ticker aggregates instead of computing from internal trades.</li>
-<li><b>Per-market flag</b> — ledger config marks the data source per market: A-Book markets = Binance klines; spot and (transition-period) non-A-Book markets = internal trade aggregation (existing logic).</li>
-<li><b>Higher-timeframe aggregation</b> — continuous aggregates above the 1m base (5m/1h/…) keep using the existing Timescale materialized views.</li>
+<li><b>New source table + UPSERT semantics</b> — a new external-kline source table (symbol, bucket, OHLCV, event-time watermark): Binance kline events carry the <b>cumulative</b> volume of the running minute, so an unclosed bar is overwritten event by event within its minute; duplicates / out-of-order events are idempotently upserted by event-time watermark (a late old value never rewinds an updated bucket).</li>
+<li><b>Disconnect backfill</b> — WS outage windows are backfilled via REST <code>/fapi/v1/klines</code> through the same upsert path, naturally idempotent; when backfill and the live stream race, the higher watermark wins.</li>
+<li><b>Aggregation chain rebuild</b> — perp markets' higher-timeframe CAGGs are re-pointed from the trades source to the new source table; spot and transition-period markets keep the trades chain — <b>two chains coexist, routed per market</b>, not a global switch.</li>
 <li><b>History continuity</b> — klines aggregated from internal trades are retained; the switch date is the boundary; frontend charts stitch across it (continuous time axis, no rewrite).</li>
 <li><b>User trade history</b> — unaffected: user trade records have always lived in PM Perp (<code>perps_transactions</code> / position history), independent of public klines.</li>
 </ol>
@@ -623,7 +635,7 @@ MMHouseAccountID          = <span class="t">"00000000-0000-0000-0000-00000000000
 <tr><td class="mono-c"><b>mm-connector</b></td><td><span class="pill no">new</span></td><td class="dim">Kafka command consumer + MM REST/WS client + state machine and arbitration + Finex-format event synthesis (house counterparty leg) + reconciliation worker + heartbeat circuit breaker + admin observability endpoints</td><td class="dim">large (new service; mirrors finex's command ingress and event egress contracts)</td></tr>
 <tr><td class="mono-c"><b>portfolio_manager_perp</b></td><td><span class="pill gap">modify</span></td><td class="dim">house system account (spec + EnsureSystemAccounts); liquidation executor outlet switched to the connector (liquidation commands carry source); takeover/ADL code paths offline (enums and history reads retained); funding accounting counterparty becomes the house</td><td class="dim">medium</td></tr>
 <tr><td class="mono-c"><b>quote</b></td><td><span class="pill gap">modify</span></td><td class="dim">binance_perp gains five subscriptions (depth/kline/ticker/aggTrade/exchangeInfo); new kline event publication; depth → orderbook topic replication; InternalPerpTradeCollector disabled per A-Book market</td><td class="dim">medium</td></tr>
-<tr><td class="mono-c"><b>ledger</b></td><td><span class="pill gap">modify</span></td><td class="dim">new EventKlineObserved consumption path writing Timescale directly; per-market data-source flag; 24h ticker switches to Binance source</td><td class="dim">small</td></tr>
+<tr><td class="mono-c"><b>ledger</b></td><td><span class="pill gap">modify</span></td><td class="dim">external-kline source table + UPSERT/watermark semantics + REST disconnect backfill; perp-market aggregation chain re-pointed to the new source, spot chain retained (dual chains routed per market, see page 6); 24h ticker switches to Binance source</td><td class="dim">medium (storage &amp; aggregation design, not a plain new consumer)</td></tr>
 <tr><td class="mono-c"><b>trading-api</b></td><td><span class="pill gap">modify</span></td><td class="dim">MarketCache wires into exchangeInfo hot sync (upfront filter validation); frontend contract gains the "mirrored book + my orders" overlay semantics; everything else (auth / rate limits / locking flow / private streams) unchanged</td><td class="dim">small</td></tr>
 <tr><td class="mono-c"><b>admin</b></td><td><span class="pill gap">modify</span></td><td class="dim">MM connectivity / reconciliation diffs / house balance monitoring pages; A-Book route switch operations; reconciliation arbitration tooling</td><td class="dim">small</td></tr>
 <tr><td class="mono-c"><b>perp_trigger</b></td><td><span class="pill ok">zero changes</span></td><td class="dim">the existing trigger→lock→command flow simply drains into the connector</td><td class="dim">none</td></tr>
@@ -652,9 +664,10 @@ MMHouseAccountID          = <span class="t">"00000000-0000-0000-0000-00000000000
 <tr><td><b>Liquidation during disconnect</b></td><td class="dim">A crash triggering cascading liquidations at the same moment the MM goes dark — the most dangerous combination</td><td class="dim">user positions and margin sit with us, unaffected (settlement pauses, nothing is lost); close orders re-issued immediately on reconnect; sustained deterioration absorbed by the insurance fund + manual escalation</td><td><span class="pill no">high</span></td></tr>
 <tr><td><b>Latency</b></td><td class="dim">lock (Raft ~10ms) + Kafka + connector + MM + Binance RTT + reports → end-to-end p99 target &lt; 1s; price drift during market orders</td><td class="dim">segmented SLA monitoring (page 3); market-order slippage cap parameter (open)</td><td><span class="pill gap">medium</span></td></tr>
 <tr><td><b>Slippage eating through margin</b></td><td class="dim">IMR validated at placement; a worse Binance fill → MMR breached immediately post-fill → instant liquidation trigger</td><td class="dim">configurable slippage buffer added at lock time; a breach simply rides the normal liquidation path (experience issue, not a loss-of-funds issue); IMR buffer value is an open item</td><td><span class="pill gap">medium</span></td></tr>
+<tr><td><b>UNKNOWN fund occupation</b></td><td class="dim">margin stays locked during arbitration — network partitions / MM unavailability can drag it to minutes</td><td class="dim">shown to the user as "in progress"; after a circuit break, UNKNOWN resolution takes priority over new orders; the lock buffer budgets for it</td><td><span class="pill gap">medium</span></td></tr>
 <tr><td><b>Reconciliation drift</b></td><td class="dim">our FSM / MM reports / Binance disagree (network partitions, lost reports)</td><td class="dim">three-tier reconciliation jobs (page 5) + fill_id idempotency + GET arbitration + admin freeze tooling</td><td><span class="pill gap">medium</span></td></tr>
 <tr><td><b>Binance platform dependency</b></td><td class="dim">Binance maintenance windows / risk control / regional restrictions hit our whole platform</td><td class="dim">MM exposes the binance_connected heartbeat field and maintenance notices; pre-emptive circuit break during maintenance (announced trading halt)</td><td><span class="pill gap">medium</span></td></tr>
-<tr><td><b>MM default</b></td><td class="dim">MM refuses payment or disappears once net house debt accumulates</td><td class="dim">commercial collateral terms + net-balance circuit breaker (|house balance| over threshold → stop trading and demand top-up) (terms pending)</td><td><span class="pill gap">commercial</span></td></tr>
+<tr><td><b>MM default</b></td><td class="dim">MM refuses payment or disappears once net house exposure accumulates</td><td class="dim">commercial collateral terms + <b>exposure-cap</b> circuit breaker (balance + unrealized MTM + funding accruals, see page 5; over threshold → stop trading and demand top-up) (terms pending)</td><td><span class="pill gap">commercial</span></td></tr>
 </tbody>
 </table></div>
 
@@ -665,7 +678,7 @@ MMHouseAccountID          = <span class="t">"00000000-0000-0000-0000-00000000000
 <tr><td class="mono-c">heartbeat lost 15s</td><td><span class="pill no">all rejected</span></td><td><span class="pill no">cancel-all</span></td><td><span class="pill gap">suspended</span></td><td class="dim">reconnect → full GET arbitration → re-issue liquidation orders → release</td></tr>
 <tr><td class="mono-c">sustained 429 / SYSTEM_BUSY</td><td><span class="pill gap">backoff</span></td><td><span class="pill ok">kept</span></td><td><span class="pill ok">retried</span></td><td class="dim">released when rates recover; 5 minutes sustained → escalates to heartbeat-level break</td></tr>
 <tr><td class="mono-c">position reconciliation over threshold</td><td><span class="pill no">market frozen</span></td><td><span class="pill ok">kept</span></td><td><span class="pill gap">manual confirm</span></td><td class="dim">admin arbitration tooling locates the differing orders → manual fix → unfreeze</td></tr>
-<tr><td class="mono-c">house net over commercial cap</td><td><span class="pill no">all rejected</span></td><td><span class="pill ok">kept</span></td><td><span class="pill ok">normal</span></td><td class="dim">released after settlement / collateral top-up (terms pending)</td></tr>
+<tr><td class="mono-c">house exposure over commercial cap</td><td><span class="pill no">all rejected</span></td><td><span class="pill ok">kept</span></td><td><span class="pill ok">normal</span></td><td class="dim">released after settlement / collateral top-up (exposure = balance + unrealized MTM, terms pending)</td></tr>
 <tr><td class="mono-c">manual kill-switch</td><td><span class="pill no">all rejected</span></td><td><span class="pill no">cancel-all</span></td><td><span class="pill gap">suspended</span></td><td class="dim">may flip back to B-Book (within one release cycle, see page 9)</td></tr>
 </tbody>
 </table></div>
@@ -762,7 +775,7 @@ MMHouseAccountID          = <span class="t">"00000000-0000-0000-0000-00000000000
 <h4>Compliance &amp; account attribution <span class="pill gap">blocks production cutover</span></h4>
 <p class="section-note">The MM's Binance account entity, regional compliance, and the regulatory characterization of "user orders executed through a third-party entity" — needs the compliance team's opinion; does not block engineering.</p>
 
-<div class="call"><p class="call-t">Document maintenance</p><p>v1.2 (2026-09-24): market data &amp; mapping decided as Binance-first; open items restructured into readable blocks. v1.1 highlights: 3.0 data ownership, the spot boundary matrix, and the no-legacy / 3-tier decisions.</p><p>v2 final follows the contract review and the remaining open items landing; the Chinese twin is <code>docs/a-book-perps-design.html</code>. Related documents: <code>docs/new-perps-rollout-plan.html</code> (market parameters and quote config baseline), <code>docs/2026-09-22-attacker-position-force-close-runbook.md</code> plus the two 09-23 MM cleanup runbooks (phase 0).</p></div>
+<div class="call"><p class="call-t">Document maintenance</p><p>v1.3 (2026-09-25, review feedback absorbed): 3.5 rewritten — UNKNOWN state + three-condition death verdict + MM-side tombstone / UNKNOWN obligations + CANCEL_REJECTED backfill; house economic-loop payment direction corrected, credit exposure defined (balance + MTM + funding accruals), engineering checklist added (hot-row benchmarking, two-way legs, risk exemptions, no-double-booking invariant); ledger external klines upgraded to a full storage/aggregation design (source-table UPSERT, disconnect backfill, dual-chain routing); depth diffing gains deletion-level and reconnect-reset semantics. v1.2: Binance-first decided; open items restructured. v1.1: 3.0 data ownership, spot boundary matrix.</p><p>v2 final follows the contract review and the remaining open items landing; the Chinese twin is <code>docs/a-book-perps-design.html</code>. Related documents: <code>docs/new-perps-rollout-plan.html</code> (market parameters and quote config baseline), <code>docs/2026-09-22-attacker-position-force-close-runbook.md</code> plus the two 09-23 MM cleanup runbooks (phase 0).</p></div>
 </section>
 </article>
 

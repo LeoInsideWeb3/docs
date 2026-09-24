@@ -1,0 +1,716 @@
+<title>NeoDAX · 永续 A-Book 改造设计</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{--ground:#F5F7F5;--surface:#FFF;--surface-sunk:#ECEFEC;--code-bg:#161E1C;--code-ink:#D6E2DD;--ink:#151E1B;--ink-soft:#4A5854;--ink-faint:#798883;--rule:#DCE2DF;--rule-strong:#C3CCC8;--accent:#0E6A58;--accent-soft:#E0EFEA;--warn:#A15A08;--warn-soft:#F7EBDA;--danger:#973030;--danger-soft:#F7E4E2;--shadow:0 1px 2px rgba(21,30,27,.06)}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--ground:#0F1513;--surface:#171F1C;--surface-sunk:#121917;--code-bg:#0A0F0E;--code-ink:#C9D8D2;--ink:#E8EEEB;--ink-soft:#A5B3AE;--ink-faint:#7A8983;--rule:#263230;--rule-strong:#35433F;--accent:#4FC2A6;--accent-soft:#14312A;--warn:#D9964A;--warn-soft:#302315;--danger:#DE7E77;--danger-soft:#2E1918;--shadow:0 1px 2px rgba(0,0,0,.3)}}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{background:var(--ground);color:var(--ink);font-family:"IBM Plex Sans",-apple-system,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif;font-size:15px;line-height:1.62;-webkit-font-smoothing:antialiased}
+.shell{max-width:1240px;margin:0 auto;padding-inline:20px;padding-block:28px 76px;display:grid;grid-template-columns:224px minmax(0,1fr);gap:40px;align-items:start}
+.side{position:sticky;top:20px}
+.brand{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:6px}
+.brand-t{font-family:"Bricolage Grotesque","IBM Plex Sans",sans-serif;font-weight:700;font-size:19px;letter-spacing:-.01em;line-height:1.15;margin:0 0 18px}
+nav.tabs{display:grid;gap:2px}
+nav.tabs .grp{font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);font-weight:600;margin:14px 0 4px 10px}
+nav.tabs .grp:first-child{margin-top:0}
+nav.tabs a{display:flex;align-items:baseline;gap:8px;padding:7px 10px;border-radius:4px;color:var(--ink-soft);text-decoration:none;font-size:13.5px;line-height:1.3;border-left:2px solid transparent}
+nav.tabs a .n{font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--ink-faint);width:16px;flex:none}
+nav.tabs a:hover{background:var(--surface);color:var(--ink)}
+nav.tabs a.on{background:var(--accent-soft);color:var(--accent);border-left-color:var(--accent);font-weight:600}
+nav.tabs a.on .n{color:var(--accent)}
+.side-foot{margin-top:22px;font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--ink-faint);line-height:1.6;padding-left:10px}
+.main{min-width:0}
+.panel>header{margin-bottom:30px}
+.eyebrow{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--accent);margin-bottom:10px}
+h1{font-family:"Bricolage Grotesque","IBM Plex Sans",sans-serif;font-weight:700;font-size:clamp(26px,4vw,36px);line-height:1.1;letter-spacing:-.02em;margin:0 0 14px;text-wrap:balance}
+.standfirst{font-size:16px;color:var(--ink-soft);max-width:65ch;margin:0}
+.standfirst strong{color:var(--ink);font-weight:600}
+.assume{margin-top:18px;padding:13px 18px;background:var(--warn-soft);border-left:3px solid var(--warn);font-size:13.5px;color:var(--ink-soft);max-width:78ch}
+.assume b{color:var(--ink);font-weight:600}
+section{margin-top:46px;scroll-margin-top:20px}
+.panel>header+section{margin-top:0}
+h2{font-family:"Bricolage Grotesque","IBM Plex Sans",sans-serif;font-weight:700;font-size:21px;letter-spacing:-.01em;margin:0 0 6px;text-wrap:balance}
+.section-note{color:var(--ink-soft);margin:0 0 20px;max-width:68ch}
+h3{font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);margin:30px 0 12px}
+h4{font-size:15px;font-weight:600;margin:24px 0 8px}
+p{max-width:70ch}
+code,.mono{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:.87em}
+p code,td code,li code{color:var(--accent)}
+pre{background:var(--code-bg);color:var(--code-ink);padding:16px 18px;overflow-x:auto;margin:12px 0;font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:12.5px;line-height:1.6;border-radius:3px}
+pre .c{color:#6E8A80}pre .k{color:#7FD1B9}pre .t{color:#E3B778}
+.layers{display:grid;gap:10px}
+.layer{background:var(--surface);border:1px solid var(--rule);box-shadow:var(--shadow);padding:16px 20px;display:grid;grid-template-columns:158px minmax(0,1fr);gap:20px}
+.layer.hi{border-color:var(--accent)}
+.layer-n{font-family:"Bricolage Grotesque",sans-serif;font-weight:600;font-size:15px}
+.layer-n small{display:block;font-family:"IBM Plex Mono",monospace;font-weight:400;font-size:10.5px;color:var(--ink-faint);letter-spacing:.06em;margin-top:3px;text-transform:uppercase}
+.layer-d{margin:0;font-size:13.5px;color:var(--ink-soft)}
+.layer-d b{color:var(--ink);font-weight:600}
+.arrow{text-align:center;color:var(--ink-faint);font-size:11.5px;line-height:1;font-family:"IBM Plex Mono",monospace}
+.tw{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13.5px;min-width:520px}
+th{text-align:left;font-weight:600;font-size:10.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-faint);padding:0 14px 8px 0;border-bottom:1px solid var(--rule-strong);white-space:nowrap}
+td{padding:9px 14px 9px 0;border-bottom:1px solid var(--rule);vertical-align:top}
+tr:last-child td{border-bottom:none}
+td.dim{color:var(--ink-soft)}
+td.mono-c{font-family:"IBM Plex Mono",monospace;font-size:12px}
+td b{color:var(--ink);font-weight:600}
+.pill{display:inline-block;font-size:10.5px;font-weight:500;padding:1px 7px;border-radius:100px;white-space:nowrap;line-height:1.6}
+.pill.ok{background:var(--accent-soft);color:var(--accent)}
+.pill.gap{background:var(--warn-soft);color:var(--warn)}
+.pill.no{background:var(--danger-soft);color:var(--danger)}
+.call{background:var(--surface);border:1px solid var(--rule);border-left:3px solid var(--accent);padding:16px 20px;margin:16px 0;box-shadow:var(--shadow);max-width:80ch}
+.call.warn{border-left-color:var(--warn)}
+.call-t{font-weight:600;font-size:14px;margin:0 0 6px}
+.call p{margin:0;font-size:13.5px;color:var(--ink-soft)}
+.call p+p{margin-top:8px}
+.call b{color:var(--ink);font-weight:600}
+ul.plain{padding-left:0;list-style:none;margin:0;display:grid;gap:0;font-size:14px}
+ul.plain li{padding:11px 0;border-top:1px solid var(--rule);color:var(--ink-soft);max-width:72ch}
+ul.plain li:last-child{border-bottom:1px solid var(--rule)}
+ul.plain b{color:var(--ink);font-weight:600}
+ol.steps{padding-left:0;list-style:none;margin:0;counter-reset:s}
+ol.steps li{counter-increment:s;position:relative;padding:15px 0 15px 46px;border-top:1px solid var(--rule)}
+ol.steps li:last-child{border-bottom:1px solid var(--rule)}
+ol.steps li::before{content:counter(s);position:absolute;left:0;top:17px;font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--accent)}
+ol.steps b{display:block;color:var(--ink);font-weight:600;margin-bottom:3px;max-width:70ch}
+ol.steps span{display:block;color:var(--ink-soft);font-size:13.5px;max-width:70ch}
+.pager{margin-top:54px;padding-top:16px;border-top:1px solid var(--rule);display:flex;justify-content:space-between;gap:16px;font-size:13.5px}
+a{color:var(--accent)}
+a:hover{text-decoration:underline}
+.pr-meta{font-family:"IBM Plex Mono",ui-monospace,monospace;font-size:11px;color:var(--ink-faint);margin:0 0 10px}
+a.btn{display:inline-block;font-size:12px;font-weight:600;color:var(--accent);background:var(--accent-soft);padding:5px 14px;border-radius:100px;text-decoration:none;line-height:1.5}
+a.btn:hover{text-decoration:underline}
+ol.pts{padding-left:0;list-style:none;margin:6px 0 0;counter-reset:p}
+ol.pts li{counter-increment:p;position:relative;padding:5px 0 5px 26px;font-size:13.5px;color:var(--ink-soft);max-width:74ch}
+ol.pts li::before{content:counter(p);position:absolute;left:2px;top:8.5px;font-family:"IBM Plex Mono",monospace;font-size:10px;color:var(--accent)}
+ol.pts b{color:var(--ink);font-weight:600}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media(max-width:860px){.shell{grid-template-columns:minmax(0,1fr);gap:20px}.side{position:static}.brand-t{margin-bottom:10px}nav.tabs{display:flex;overflow-x:auto;gap:4px;padding-bottom:6px}nav.tabs .grp{display:none}nav.tabs a{white-space:nowrap;border-left:0;border-bottom:2px solid transparent;border-radius:4px 4px 0 0}nav.tabs a.on{border-bottom-color:var(--accent)}.side-foot{display:none}.layer{grid-template-columns:minmax(0,1fr);gap:8px}}
+</style>
+
+<div class="shell">
+<aside class="side">
+<div class="brand">NeoDAX · A-Book · Perps Redesign</div>
+<p class="brand-t">永续 A-Book 改造设计</p>
+<p class="pr-meta"><b>中文</b> · 英文版待定</p>
+<nav class="tabs" id="tabs">
+<div class="grp">设计</div>
+<a href="#overview" data-tab="overview"><span class="n">1</span>总览与决策</a>
+<a href="#arch" data-tab="arch"><span class="n">2</span>架构：现状 → 目标</a>
+<a href="#contract" data-tab="contract"><span class="n">3</span>MM 接口契约 v1</a>
+<a href="#lifecycle" data-tab="lifecycle"><span class="n">4</span>订单生命周期</a>
+<div class="grp">账务与数据</div>
+<a href="#settlement" data-tab="settlement"><span class="n">5</span>结算与账务</a>
+<a href="#marketdata" data-tab="marketdata"><span class="n">6</span>行情与数据</a>
+<a href="#services" data-tab="services"><span class="n">7</span>服务改动明细</a>
+<div class="grp">执行</div>
+<a href="#risk" data-tab="risk"><span class="n">8</span>风险与熔断</a>
+<a href="#cutover" data-tab="cutover"><span class="n">9</span>切换计划</a>
+<a href="#open" data-tab="open"><span class="n">10</span>待决事项</a>
+</nav>
+<div class="side-foot">2026-09-24 · v1 · 设计稿<br>接口契约待 MM 过会<br>决策: Principal ·<br>币安价+显式费 · 全量切换</div>
+</aside>
+
+<div class="main">
+
+<!-- ═══ 1 总览与决策 ═══ -->
+<article class="panel" id="p-overview">
+<header>
+<div class="eyebrow">1 · 总览与决策</div>
+<h1>永续全面转向 A-Book</h1>
+<p class="standfirst">平台<strong>退出永续对手方角色</strong>：订单簿、K线、24h 统计直接采用币安数据；用户订单全部经做市商（MM）在币安真实执行；平台保留账户、保证金、清算与手续费体系，赚取<strong>显式手续费</strong>，不再承担内部撮合与对手方市场风险。</p>
+<div class="assume"><b>已拍板的四项决策（2026-09-24）</b> · ① MM 角色为 <b>Principal（对手方）</b>——他用自有币安账户对冲，与我方定期结算净债务；② 用户成交价 = <b>币安真实成交价 + 显式手续费</b>（fee_engine 现有费率）；③ <b>全量切换</b>所有永续市场；④ MM 已完成与币安的对接，但 <b>NeoDAX ↔ MM 的接口尚不存在</b>——本文档第 3 页即该契约 v1 草案，是与 MM 过会的材料。</div>
+</header>
+
+<section>
+<h2>目标链路一图流</h2>
+<p class="section-note">命令面（绿框为新增）与数据面分离。命令面：<strong>资金与保证金仍 100% 由我方持有</strong>，MM 只是执行通道；数据面：用户可见行情全部来自币安镜像。</p>
+<div class="layers">
+<div class="layer">
+<div class="layer-n">用户<small>REST / WebSocket</small></div>
+<p class="layer-d">下单 / 撤单 / 查询。体验不变：还是对接 trading-api 的现有 API。</p>
+</div>
+<div class="arrow">↓ ① gRPC LockPerpAsset（保证金校验+锁定，不变） · ② Kafka CommandOrderCreate（不变）</div>
+<div class="layer hi">
+<div class="layer-n">mm-connector<small>新增服务 · 协议翻译</small></div>
+<p class="layer-d">消费与 Finex 相同的 <code>commands.{MKT}.OrderCommands</code> → 翻译成 MM REST 接口 → 接收 WS 回报 → <b>合成 Finex 格式事件</b>发回 Kafka。对下游而言它就是"撮合引擎"。</p>
+</div>
+<div class="arrow">↓ REST 提交 / WS 回报（本文档第 3 页契约）</div>
+<div class="layer hi">
+<div class="layer-n">MM<small>Principal · 已对接币安</small></div>
+<p class="layer-d">在币安 USDⓈ-M 执行我方订单（限额/市价/只挂单），回报<b>真实成交价与成交角色</b>。对冲盈亏归 MM，与我方按 house 账户净额结算（商务条款待定）。</p>
+</div>
+<div class="arrow">↓ EventOrderUpdated / EventTradeExecuted（格式与 Finex 完全一致，下游零改动）</div>
+<div class="layer">
+<div class="layer-n">PM Perp<small>结算 · 不变</small></div>
+<p class="layer-d">双参与者结算：用户 + <b>MM house 系统账户</b>（新增）。保证金、仓位、PnL、清算扫描器、funding、Scheme A 审计全部保留。</p>
+</div>
+</div>
+<div class="layers" style="margin-top:14px">
+<div class="layer hi">
+<div class="layer-n">quote<small>扩展 · 币安镜像</small></div>
+<p class="layer-d">新增订阅：depth20 订单簿、kline_1m、24h ticker、aggTrade、exchangeInfo 过滤器 → 以现有事件格式发布，<b>trading-api 与 ledger 的消费端零改动</b>。mark price 沿用多源 oracle（币安主导）。</p>
+</div>
+</div>
+
+<h2>三个必须先说清楚的前提</h2>
+<div class="call warn"><p class="call-t">前提一：切换时点所有用户持仓必须为零</p><p>全量切换要求切换瞬间<strong>全平台无未平仓位</strong>——否则历史持仓没有对应币安对冲，账实分离。内部账户清仓已在进行：attacker 账户已于 09-22 执行完毕（<code>docs/2026-09-22-attacker-position-force-close-runbook.md</code>），MM 账户 0x535c 与 0x7152 的 runbook 已就绪待执行。<strong>普通用户的存量持仓如何处置（公告强平结算 / 过渡期自平）是待决事项第 3 条</strong>。</p></div>
+<div class="call"><p class="call-t">前提二：perp_trigger 与清算扫描器原地保留</p><p>条件单的触发判定、WAL、LockPerpAsset 全在本地（<code>perp_trigger/internal/transport/consumer.go</code> 的 Trigger→Lock→CommandOrderExecute 流程不变）；PM Perp 的清算扫描器（mark 驱动、MMR 档位）不变，只是平仓指令的<strong>接收方从 Finex 换成 mm-connector</strong>。用户语义零变化。</p></div>
+<div class="call"><p class="call-t">前提三：保留一个版本周期的 B-book 回滚开关</p><p>finex-perp 引擎不立即删除代码，只下线路由。cutover 后保留一个版本周期的"路由 flag 热切回 Finex"能力（第 9 页回滚节），确认 A-Book 稳定后再清理。</p></div>
+</section>
+</article>
+
+<!-- ═══ 2 架构 ═══ -->
+<article class="panel" id="p-arch" hidden>
+<header>
+<div class="eyebrow">2 · 架构</div>
+<h1>现状 → 目标：替换"撮合引擎"，保留一切契约</h1>
+<p class="standfirst">改造的核心洞察：<strong>Finex 对外只暴露两个 Kafka 契约</strong>——入口 <code>commands.{MKT}.OrderCommands</code>、出口 <code>events.{MKT}.EventOrderUpdated</code> + <code>events.{MKT}.EventTradeExecuted</code>。把消费入口、生产出口的角色换成 mm-connector，<strong>下游全部服务零改动</strong>。</p>
+</header>
+
+<section>
+<h2>现状（B-Book 内部撮合）</h2>
+<div class="layers">
+<div class="layer">
+<div class="layer-n">trading-api<small>边缘网关</small></div>
+<p class="layer-d">① gRPC <code>LockPerpAsset</code> 锁保证金（失败即拒单）→ ② 发布 <code>CommandOrderCreate</code> 到 <code>commands.{MKT}.OrderCommands</code>；发布失败回滚解锁（<code>order_operation_core.go:328-351</code>）。</p>
+</div>
+<div class="arrow">↓ Kafka</div>
+<div class="layer">
+<div class="layer-n">Finex perp<small>内存撮合 · 3 shard</small></div>
+<p class="layer-d">价格-时间优先撮合用户之间的订单；输出订单簿增量（<code>orderbook.{MKT}</code>）与成交/订单事件。用户互为对手方。</p>
+</div>
+<div class="arrow">↓ EventTradeExecuted（maker + taker 均为内部账户）</div>
+<div class="layer">
+<div class="layer-n">PM Perp<small>双参与者结算</small></div>
+<p class="layer-d"><code>Settlement.HandleTrade</code> 对 maker/taker 双方各自更新仓位、已实现盈亏、费用、保证金；清算时保险金/清算池系统账户（owner=0x0）承接对手腿（CLEARING_MIRROR），takeover/ADL 处置坏账。</p>
+</div>
+<div class="arrow">↓ 成交事件</div>
+<div class="layer">
+<div class="layer-n">ledger / analytics<small>数据侧</small></div>
+<p class="layer-d">ledger 聚合内部成交 → Timescale K线/ticker；mark oracle 的数据源之一是 <code>InternalPerpTradeCollector</code>（内部成交自价）。</p>
+</div>
+</div>
+
+<h2>目标（A-Book 经 MM 执行）</h2>
+<div class="layers">
+<div class="layer">
+<div class="layer-n">trading-api<small>不变</small></div>
+<p class="layer-d">下单/锁仓/回滚路径完全不变。仅订单簿、K线、ticker、公共成交流的数据源换成 quote 的币安镜像（同 topic 同格式）。</p>
+</div>
+<div class="arrow">↓ Kafka commands.{MKT}.OrderCommands（同一 topic，消费者换人）</div>
+<div class="layer hi">
+<div class="layer-n">mm-connector<small>新增 · 替代 Finex 的位置</small></div>
+<p class="layer-d">消费订单命令 → MM REST 提交（幂等 + expires_at）→ WS 回报驱动状态机 → 把 ack/成交/撤单/拒绝翻译成 <code>EventOrderUpdated</code>、<code>EventTradeExecuted</code>（house 合成单做对手腿）→ 发布到 <code>events.{MKT}.*</code>。内置：悬挂仲裁、超时自动拒、心跳熔断、三方对账 worker。</p>
+</div>
+<div class="arrow">↓ REST / WS（第 3 页契约） · MM → 币安执行</div>
+<div class="layer hi">
+<div class="layer-n">PM Perp<small>结算语义不变 + house 账户</small></div>
+<p class="layer-d">仍消费 <code>EventTradeExecuted</code> 做双参与者结算——只是对手腿从"另一个用户/系统账户"固定为 <b>MM house 系统账户</b>（UUID 尾号 09，owner=0x0）。清算平仓指令发给 connector；takeover/ADL 退役，保险金只兜穿仓差额。</p>
+</div>
+<div class="arrow">↓ 币安公共流（quote 镜像，第 6 页）</div>
+<div class="layer hi">
+<div class="layer-n">quote + ledger<small>数据面切换</small></div>
+<p class="layer-d">quote 订阅币安 depth/kline/ticker/aggTrade，以现有格式发布；ledger 的 perp 市场 K线数据源从"内部成交聚合"切到"币安 K线直写"（per-market 开关）；<code>InternalPerpTradeCollector</code> 对 A-book 市场停用。</p>
+</div>
+</div>
+
+<h2>为什么否决 Kafka-native 方案</h2>
+<p class="section-note">另一条路是让 MM 直接消费/生产我们的 Kafka topic（省掉 connector）。否决理由：</p>
+<ol class="pts">
+<li><b>安全边界</b> — 需要把 Kafka 集群网络与凭证暴露给外部团队，consumer group、rebalance、lag 管理责任全部外移，事故面不可控。</li>
+<li><b>耦合演进</b> — 内部事件 schema（如 EventTradeExecuted 加字段）会直接破坏外部消费者；REST/WS 契约让我们可以独立演进内部格式。</li>
+<li><b>MM 实现成本</b> — MM 团队熟悉的是币安式 REST/WS。接口语义镜像币安（下单/撤单/执行流），他们的实现几乎是零学习成本。</li>
+<li><b>治理</b> — connector 是我们的一等公民服务：限速、熔断、对账、审计日志都在我们侧，可观测可运维。</li>
+</ol>
+
+<h2>不变与退役清单</h2>
+<div class="tw"><table>
+<thead><tr><th>组件</th><th>判定</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td class="mono-c">LockPerpAsset / UnlockPerpAsset</td><td><span class="pill ok">不变</span></td><td class="dim">资金仍在我方。校验（margin/杠杆/risk-tier/价格偏离）保留</td></tr>
+<tr><td class="mono-c">perp_trigger 服务</td><td><span class="pill ok">零改动</span></td><td class="dim">触发→锁仓→CommandOrderExecute，命令自然流入 connector</td></tr>
+<tr><td class="mono-c">PM Perp 结算/Scheme A 审计</td><td><span class="pill ok">不变</span></td><td class="dim">双参与者模型照旧，对手腿换成 house 账户</td></tr>
+<tr><td class="mono-c">fee_engine</td><td><span class="pill ok">不变</span></td><td class="dim">用户费率照收；house 侧零费率</td></tr>
+<tr><td class="mono-c">清算扫描器 + MMR 档位</td><td><span class="pill ok">不变</span></td><td class="dim">触发条件、风控档位全保留；只有平仓指令出口改变</td></tr>
+<tr><td class="mono-c">Finex perp 撮合引擎</td><td><span class="pill no">退役</span></td><td class="dim">下线路由，代码保留一个版本周期作回滚开关；<b>Finex spot 不受影响</b></td></tr>
+<tr><td class="mono-c">takeover / ADL</td><td><span class="pill no">退役</span></td><td class="dim">B-Book 独有机制（保护内部对手方）；A-Book 下穿仓由保险金直付 house 账户</td></tr>
+<tr><td class="mono-c">清算 IOC 内部撮合</td><td><span class="pill no">退役</span></td><td class="dim">改为 source=liquidation 的市价平仓单经 MM 执行</td></tr>
+<tr><td class="mono-c">内部 MM 报价账户</td><td><span class="pill no">退役</span></td><td class="dim">0x535c / 0x7152 等内部做市账户完成清仓后关闭（runbook 已就绪）</td></tr>
+</tbody>
+</table></div>
+</section>
+</article>
+
+<!-- ═══ 3 MM 接口契约 ═══ -->
+<article class="panel" id="p-contract" hidden>
+<header>
+<div class="eyebrow">3 · MM 接口契约 v1</div>
+<h1>NeoDAX ↔ MM 通信契约（过会材料）</h1>
+<p class="standfirst">这是整个项目<strong>第一个要落地的东西</strong>。设计原则：<strong>语义镜像币安 USDⓈ-M API</strong>（下单/撤单/执行回报流），MM 按他熟悉的模型实现；我方 mm-connector 作为唯一调用方，MM 不接触我方 Kafka。</p>
+<div class="assume"><b>契约要点速览</b> · REST 提交/查询 + WebSocket 回报 · <code>client_order_id</code> 幂等（=我方订单 UUID）· <code>expires_at</code> 防悬挂 · ack ≤ 500ms、市单成交回报 ≤ 3s · HMAC 认证 · 全部数值用<b>字符串小数</b>（与我方 decimal 精度模型一致，禁止 float）。</div>
+</header>
+
+<section>
+<h3>3.1 传输与认证</h3>
+<div class="tw"><table>
+<thead><tr><th>项</th><th>约定</th><th>说明</th></tr></thead>
+<tbody>
+<tr><td><b>方向</b></td><td class="mono-c">我方 connector → MM 服务</td><td class="dim">MM 提供并托管 API；域名/端口/IP 白名单由 MM 给出</td></tr>
+<tr><td><b>认证</b></td><td class="mono-c">HMAC-SHA256 签名头</td><td class="dim">复用我方 auth 服务的 API-key 模式：X-Mm-Api-Key / X-Mm-Timestamp / X-Mm-Signature（timestamp ±5s 窗口防重放）；可选叠加 mTLS（部署期定）</td></tr>
+<tr><td><b>数值</b></td><td class="mono-c">字符串十进制</td><td class="dim">qty/price 全部字符串，精度服从币安 exchangeInfo 过滤器；禁止 JSON number</td></tr>
+<tr><td><b>时钟</b></td><td class="mono-c">GET /api/v1/time</td><td class="dim">expires_at 语义依赖双端时钟对齐；connector 启动与每小时校准偏移</td></tr>
+<tr><td><b>幂等</b></td><td class="mono-c">client_order_id</td><td class="dim">= 我方订单 UUID；同 ID 重复提交返回首次结果（不同参数返回 DUPLICATE_ORDER 错误）</td></tr>
+</tbody>
+</table></div>
+
+<h3>3.2 REST 端点总表</h3>
+<div class="tw"><table>
+<thead><tr><th>端点</th><th>用途</th><th>关键点</th></tr></thead>
+<tbody>
+<tr><td class="mono-c"><b>POST /api/v1/orders</b></td><td>提交订单</td><td class="dim">幂等；同步返回 ack 或 reject（详见 3.3）</td></tr>
+<tr><td class="mono-c">DELETE /api/v1/orders/{client_order_id}</td><td>撤单</td><td class="dim">在途单撤销；已终态返回 CANCEL_REJECTED</td></tr>
+<tr><td class="mono-c">POST /api/v1/orders/cancel-all</td><td>按市场批量撤单</td><td class="dim">熔断/停市用；body 可带 market 过滤</td></tr>
+<tr><td class="mono-c"><b>GET /api/v1/orders/{client_order_id}</b></td><td>权威状态查询</td><td class="dim"><b>悬挂仲裁唯一依据</b>：返回订单终态 + 全部 fills（详见 3.5）</td></tr>
+<tr><td class="mono-c">GET /api/v1/positions</td><td>MM 币安对冲仓位报告</td><td class="dim">对账 worker 周期拉取，与我方 house 净敞口比对</td></tr>
+<tr><td class="mono-c">GET /api/v1/account</td><td>MM 账户权益报告</td><td class="dim">equity / available / 更新时间；商务结算参考</td></tr>
+<tr><td class="mono-c">GET /api/v1/health</td><td>健康检查</td><td class="dim">心跳探测；含币安连接状态字段</td></tr>
+<tr><td class="mono-c">GET /api/v1/time</td><td>服务端时钟</td><td class="dim">时钟校准</td></tr>
+</tbody>
+</table></div>
+
+<h3>3.3 提交订单 schema</h3>
+<pre><span class="c">// POST /api/v1/orders —— 请求体</span>
+{
+  <span class="k">"client_order_id"</span>: <span class="t">"3f9c2a48-9d21-4b6e-8f2a-2c1d5e7b9a03"</span>,  <span class="c">// 我方订单 UUID，幂等键</span>
+  <span class="k">"market"</span>:           <span class="t">"TAOUSDT-PERP"</span>,                       <span class="c">// 我方 symbol（双保险，两列都给）</span>
+  <span class="k">"binance_symbol"</span>:   <span class="t">"TAOUSDT"</span>,
+  <span class="k">"side"</span>:             <span class="t">"buy"</span>,                                  <span class="c">// buy|sell（我方已按 HEDGE 方向翻译，见 3.6）</span>
+  <span class="k">"type"</span>:             <span class="t">"LIMIT"</span>,                                <span class="c">// LIMIT|MARKET|POST_ONLY</span>
+  <span class="k">"qty"</span>:              <span class="t">"19.75"</span>,                                <span class="c">// 基础资产数量，字符串小数</span>
+  <span class="k">"price"</span>:            <span class="t">"199.50"</span>,                               <span class="c">// LIMIT/POST_ONLY 必填</span>
+  <span class="k">"time_in_force"</span>:    <span class="t">"GTC"</span>,                                  <span class="c">// GTC|IOC|FOK</span>
+  <span class="k">"expires_at"</span>:       <span class="t">"2026-10-01T08:00:00.500Z"</span>,           <span class="c">// 悬挂防护：此后 MM 必须拒收（见 3.5）</span>
+  <span class="k">"source"</span>:           <span class="t">"user"</span>                                  <span class="c">// user|liquidation|trigger_spawned</span>
+}
+
+<span class="c">// 200 —— 同步 ack（不代表成交）</span>
+{
+  <span class="k">"client_order_id"</span>: <span class="t">"3f9c2a48-..."</span>,
+  <span class="k">"mm_order_id"</span>:      <span class="t">"MM-88231746"</span>,          <span class="c">// MM 内部订单号</span>
+  <span class="k">"state"</span>:            <span class="t">"OPEN"</span>,                  <span class="c">// OPEN|PARTIALLY_FILLED|FILLED|REJECTED</span>
+  <span class="k">"binance_order_id"</span>: 3512345678,
+  <span class="k">"transact_time"</span>:    <span class="t">"2026-10-01T08:00:00.312Z"</span>
+}
+
+<span class="c">// 4xx —— 同步拒绝（保证金已锁的由 connector 自动解锁+回事件）</span>
+{
+  <span class="k">"client_order_id"</span>: <span class="t">"3f9c2a48-..."</span>,
+  <span class="k">"state"</span>:            <span class="t">"REJECTED"</span>,
+  <span class="k">"error_code"</span>:       <span class="t">"PRICE_FILTER"</span>,           <span class="c">// 见 3.7 错误码表</span>
+  <span class="k">"message"</span>:          <span class="t">"price violates tick size"</span>
+}</pre>
+
+<h3>3.4 WebSocket 执行流（WS /api/v1/stream）</h3>
+<p class="section-note">connector 全程保持一条 WS（断线重连后先跑一轮在途单 GET 仲裁再恢复）。消息信封：<code>{type, client_order_id, mm_order_id, transact_time, ...}</code>。</p>
+<div class="tw"><table>
+<thead><tr><th>type</th><th>触发</th><th>专有字段</th></tr></thead>
+<tbody>
+<tr><td class="mono-c"><b>TRADE_FILL</b></td><td>币安逐笔成交</td><td class="mono-c">fill_id, qty, price, role(maker|taker), transact_time</td></tr>
+<tr><td class="mono-c">ORDER_UPDATE</td><td>状态迁移</td><td class="mono-c">state(OPEN→PARTIALLY_FILLED→FILLED), cumulative_qty</td></tr>
+<tr><td class="mono-c">ORDER_ACK</td><td>异步 ack（与 REST 结果二选一，先到为准）</td><td class="mono-c">mm_order_id, binance_order_id</td></tr>
+<tr><td class="mono-c">ORDER_REJECT</td><td>异步拒绝</td><td class="mono-c">error_code, message</td></tr>
+<tr><td class="mono-c">CANCEL_ACCEPTED</td><td>撤单成功</td><td class="mono-c">remaining_qty</td></tr>
+<tr><td class="mono-c">CANCEL_REJECTED</td><td>撤单失败</td><td class="mono-c">reason(FILLED|UNKNOWN_ORDER|...)</td></tr>
+<tr><td class="mono-c">HEARTBEAT</td><td>每 5s</td><td class="mono-c">server_time, binance_connected(bool)</td></tr>
+</tbody>
+</table></div>
+<pre><span class="c">// TRADE_FILL —— 核心消息：用户成交价 = 此处的 price（币安真实成交价）</span>
+{
+  <span class="k">"type"</span>:            <span class="t">"TRADE_FILL"</span>,
+  <span class="k">"client_order_id"</span>: <span class="t">"3f9c2a48-..."</span>,
+  <span class="k">"fill_id"</span>:         <span class="t">"MM-F-001283"</span>,   <span class="c">// MM 侧唯一，幂等去重用</span>
+  <span class="k">"qty"</span>:             <span class="t">"5.00"</span>,
+  <span class="k">"price"</span>:           <span class="t">"199.40"</span>,         <span class="c">// 币安成交价（可能多笔不同价）</span>
+  <span class="k">"role"</span>:            <span class="t">"taker"</span>,          <span class="c">// maker|taker → 决定我方收哪种费率</span>
+  <span class="k">"transact_time"</span>:   <span class="t">"2026-10-01T08:00:00.871Z"</span>
+}</pre>
+<div class="call"><p class="call-t">为什么 role 重要</p><p>我方锁仓时按订单类型预收费率（post_only 按 maker 锁），结算时按 <b>MM 回报的币安成交角色</b>计费：限价单挂上后被动成交 → role=maker → 收 maker 费率；吃单 → taker 费率。与现网 Finex 的 maker/taker 语义完全对齐，fee_engine 无需改动。</p></div>
+
+<h3>3.5 幂等 · 悬挂 · 仲裁</h3>
+<ol class="steps">
+<li><b>提交即带 expires_at（我方时钟 + 2 × RTT + 处理余量，默认 3s）</b><span>MM 收到时已过期的请求必须返回 <code>EXPIRED</code> 拒单且<b>不得执行</b>——这是杜绝"我方已超时判死并解锁保证金、MM 却在网线里成交了"这个致命窗口的第一道闸。</span></li>
+<li><b>ack 超时（500ms）→ 转 GET 仲裁</b><span>connector 对超时订单调用 <code>GET /api/v1/orders/{client_order_id}</code>：MM 无记录 → 本地判 REJECTED + 解锁 + 发拒绝事件；有记录且在途 → 继续跟踪；有记录且已成交 → 接受全部 fills 走正常结算（解锁转结算）。</span></li>
+<li><b>WS 断线 → 重连后全量仲裁</b><span>重连第一步：对所有在途 client_order_id 逐个 GET，对齐状态与 fills 序列；fill_id 去重保证不重结算。</span></li>
+<li><b>结算幂等双保险</b><span>connector 合成事件的 IdempotencyKey = <code>client_order_id:fill_id</code>；PM Perp 现有 idempotency cache 天然防重（<code>Settlement.HandleTrade</code> 的 Set/Delete 逻辑复用）。</span></li>
+</ol>
+
+<h3>3.6 我方内部字段的翻译边界</h3>
+<p class="section-note">接口保持最小——只传执行必需的字段。以下概念是我方记账内部属性，<strong>不出门</strong>，由 connector 在合成事件时回填：</p>
+<div class="tw"><table>
+<thead><tr><th>我方字段</th><th>翻译规则</th></tr></thead>
+<tbody>
+<tr><td class="mono-c">direction (HEDGE long/short)</td><td class="dim">开多→buy；平多(reduce_only)→sell；开空→sell；平空→buy。MM 只见 buy/sell</td></tr>
+<tr><td class="mono-c">margin_mode / leverage</td><td class="dim">保证金与杠杆是我方对用户的授信概念；MM 币安侧对冲结构由 MM 自理</td></tr>
+<tr><td class="mono-c">position_mode (ONE_WAY/HEDGE)</td><td class="dim">同上，纯内部</td></tr>
+<tr><td class="mono-c">reduce_only</td><td class="dim">翻译进 side（见 direction 行）；liquidation 指令带 source 标记优先级</td></tr>
+<tr><td class="mono-c">post_only</td><td class="dim">映射 type=POST_ONLY；MM 在币安用 GTX 语义（只挂不吃，否则拒）</td></tr>
+</tbody>
+</table></div>
+
+<h3>3.7 SLA · 限速 · 错误码</h3>
+<div class="tw"><table>
+<thead><tr><th>指标</th><th>SLO</th><th>违约动作</th></tr></thead>
+<tbody>
+<tr><td>POST /orders 同步响应</td><td class="mono-c">p99 ≤ 500ms</td><td class="dim">超时 → GET 仲裁（3.5）</td></tr>
+<tr><td>MARKET 单末笔成交回报</td><td class="mono-c">p99 ≤ 3s</td><td class="dim">超时 → GET 仲裁 + 告警</td></tr>
+<tr><td>WS 心跳</td><td class="mono-c">每 5s；15s 无消息判断连</td><td class="dim">断连 → 新单全拒 + cancel-all 在途单（第 8 页熔断矩阵）</td></tr>
+<tr><td>限速</td><td class="mono-c">我方 ≤ 50 req/s/市场（可谈）</td><td class="dim">429 → connector 退避重试；连续 429 升级告警</td></tr>
+<tr><td>GET 仲裁可用性</td><td class="mono-c">断连恢复后立即可用</td><td class="dim">不可用 → 保持熔断，人工介入</td></tr>
+</tbody>
+</table></div>
+<div class="tw"><table>
+<thead><tr><th>error_code</th><th>语义</th><th>我方动作</th></tr></thead>
+<tbody>
+<tr><td class="mono-c">DUPLICATE_ORDER</td><td>同 client_order_id 不同参数</td><td class="dim">严重告警（意味着我方 UUID 冲突）</td></tr>
+<tr><td class="mono-c">EXPIRED</td><td>超过 expires_at</td><td class="dim">判 REJECTED + 解锁（预期路径）</td></tr>
+<tr><td class="mono-c">INVALID_FILTER</td><td>数量/价格/名义违反币安过滤器（附 filter 名）</td><td class="dim">判 REJECTED + 解锁；我方 edge 应已前置拦截（第 6 页 exchangeInfo 同步）</td></tr>
+<tr><td class="mono-c">MARKET_NOT_SUPPORTED</td><td>MM 不支持该市场</td><td class="dim">熔断该市场 + 告警</td></tr>
+<tr><td class="mono-c">INSUFFICIENT_LIQUIDITY</td><td>FOK 无法整单成交</td><td class="dim">判 REJECTED + 解锁（语义正确）</td></tr>
+<tr><td class="mono-c">RATE_LIMITED</td><td>触发限速</td><td class="dim">退避重试</td></tr>
+<tr><td class="mono-c">UNKNOWN_ORDER</td><td>撤单/查询不存在的单</td><td class="dim">走仲裁确认终态</td></tr>
+<tr><td class="mono-c">SYSTEM_BUSY</td><td>MM 内部过载</td><td class="dim">退避；连续出现 → 熔断</td></tr>
+</tbody>
+</table></div>
+<div class="call warn"><p class="call-t">过会时需要 MM 逐条确认的点</p><p>① GTX（post_only）拒绝时回报里能否区分"会吃单"与其他拒绝原因；② IOC 部分成交的余量是否会推 ORDER_UPDATE(FILLED) + 明确的终态语义（我方余量记 StateExpired，与现网一致）；③ GET /orders 的 fills 列表是否含 role 字段（仲裁补账需要）；④ cancel-all 的生效时延保证；⑤ 币安维护窗口的预告机制。</p></div>
+</section>
+</article>
+
+<!-- ═══ 4 订单生命周期 ═══ -->
+<article class="panel" id="p-lifecycle" hidden>
+<header>
+<div class="eyebrow">4 · 订单生命周期</div>
+<h1>状态机映射与关键时序</h1>
+<p class="standfirst">我方订单状态机<strong>完全不变</strong>（<code>internal/protocol/order.go:201-217</code> 的枚举与语义照旧），MM 状态只是它的外部投影。用户 API、事件流、trade history 的行为与现网一致。</p>
+</header>
+
+<section>
+<h2>状态映射表</h2>
+<div class="tw"><table>
+<thead><tr><th>我方状态</th><th>值</th><th>MM 侧对应</th><th>迁移触发</th></tr></thead>
+<tbody>
+<tr><td class="mono-c"><b>pending</b></td><td class="mono-c">0</td><td class="mono-c">提交中（POST 未返回）</td><td class="dim">connector 已消费命令、尚未收到 ack</td></tr>
+<tr><td class="mono-c"><b>wait</b></td><td class="mono-c">100</td><td class="mono-c">OPEN / PARTIALLY_FILLED</td><td class="dim">ack 成功 → 挂单中（限价）；市价单短暂停留</td></tr>
+<tr><td class="mono-c">trigger_wait / triggered</td><td class="mono-c">50 / 150</td><td class="mono-c">不经过 MM</td><td class="dim">perp_trigger 本地管理；触发后子单进入上面的 pending→wait 流程</td></tr>
+<tr><td class="mono-c"><b>done</b></td><td class="mono-c">200</td><td class="mono-c">FILLED</td><td class="dim">末笔 TRADE_FILL 后（cumulative = qty）</td></tr>
+<tr><td class="mono-c"><b>cancel</b></td><td class="mono-c">-100</td><td class="mono-c">CANCELLED</td><td class="dim">用户撤单 / cancel-all / 熔断</td></tr>
+<tr><td class="mono-c"><b>expired</b></td><td class="mono-c">-150</td><td class="mono-c">IOC 余量 / GTX 未挂上</td><td class="dim">IOC 部分成交余量、FOK 整单拒绝走 reject</td></tr>
+<tr><td class="mono-c"><b>reject</b></td><td class="mono-c">-200</td><td class="mono-c">REJECTED（同步/异步/仲裁判死）</td><td class="dim">过滤器、EXPIRED、超时仲裁无记录等</td></tr>
+</tbody>
+</table></div>
+
+<h2>关键时序</h2>
+<h4>限价单 GTC（挂单后被动成交）</h4>
+<pre>用户 → trading-api ──LockPerpAsset──▶ PM Perp(锁定 IMR+费用)          <span class="c">≈ 10ms</span>
+      └─CommandOrderCreate→Kafka ─▶ mm-connector
+                                    ├─POST /orders (expires_at=+3s) ─▶ MM  <span class="c">≈ 50-300ms</span>
+                                    │     MM 在币安挂单(GTX 常规 GTC 限价)
+                                    │◀─ ack{state:OPEN} ──────────────
+                                    ├─EventOrderUpdated(StateWait)→Kafka ─▶ 用户 WS 看到挂单
+      <span class="c">…（价格到达）…</span>
+                                    │◀─ WS TRADE_FILL{price,role:maker} ──
+                                    ├─合成 EventTradeExecuted(用户单 + house 合成单)
+                                    │   → PM Perp 结算：仓位/盈亏/费用(maker 费率)/解锁余量
+                                    └─EventOrderUpdated(StateDone)→Kafka ─▶ 用户 WS 成交推送</pre>
+
+<h4>市价单（可能多笔成交）</h4>
+<pre>同上提交路径，type=MARKET, tif=IOC 语义
+   MM 立即在币安吃单 → WS 多笔 TRADE_FILL（不同价格/数量）
+   connector 逐笔合成事件（IdempotencyKey=order_uuid:fill_id）逐笔结算
+   末笔 → StateDone；保证金锁定按累计成交释放，费用按每笔 role 计费</pre>
+
+<h4>post_only（GTX）</h4>
+<pre>type=POST_ONLY → MM 币安 GTX 下单
+   ├─会吃单（盘口已越过）→ MM 回 REJECT(POST_ONLY_WOULD_TAKE 类错误码)
+   │    → connector 判 StateReject + UnlockPerpAsset + 拒绝事件   <span class="c">// 与现网 Finex postOnly() 语义一致</span>
+   └─挂上 → 与普通限价单相同，成交时 role 恒为 maker</pre>
+
+<h4>撤单与超时仲裁</h4>
+<pre>用户撤单 → Kafka CommandOrderCancel → connector → DELETE /orders/{id}
+   ├─CANCEL_ACCEPTED → StateCancel + 解锁余量
+   └─CANCEL_REJECTED(FILLED) → 已终态，忽略
+
+POST 超时(500ms) → GET /api/v1/orders/{client_order_id}
+   ├─MM 无记录 → StateReject + 解锁 + 事件      <span class="c">// 干净死亡</span>
+   ├─在途 → 继续跟踪（等 WS 或再次 GET）
+   └─已有 fills → 接受成交照常结算                <span class="c">// fill 去重保证幂等</span>
+
+WS 断线 15s → 熔断：新单全拒 + cancel-all 在途单 + 重连后全量 GET 仲裁</pre>
+
+<h4>清算平仓单（source=liquidation）</h4>
+<pre>PM Perp 清算扫描器（mark 驱动，档位判定，不变）
+   → 不再生成清算 IOC 给 Finex
+   → connector 收到 source=liquidation 的 MARKET 平仓单（reduce 语义）
+   → MM 币安市价平对冲 → 回报成交 → EventTradeExecuted(ExecType=liquidation)
+   → PM Perp 结算用户腿 + house 腿
+   → 穿仓（用户保证金不足）→ 保险金账户向 house 账户补差额    <span class="c">// CLEARING_MIRROR 语义保留</span></pre>
+<div class="call"><p class="call-t">改单</p><p>不支持。与现网一致：撤单 + 重下。清算/批量平仓（batch close）走同一命令路径，connector 逐单提交。</p></div>
+</section>
+</article>
+
+<!-- ═══ 5 结算与账务 ═══ -->
+<article class="panel" id="p-settlement" hidden>
+<header>
+<div class="eyebrow">5 · 结算与账务</div>
+<h1>MM house 账户：复式记账的最后一块拼图</h1>
+<p class="standfirst">Principal 模式下，MM 的对冲盈亏发生在币安（他的钱），但<strong>我们的账本必须记下对用户的每笔支付义务从哪来</strong>。解法：一个新系统账户——<strong>MM house 账户</strong>——作为每笔成交的对手腿，天然保留 Scheme A 复式记账与审计链。</p>
+</header>
+
+<section>
+<h2>house 账户定义</h2>
+<p class="section-note">完全沿用现有系统账户机制（<code>raft_recovery/system_accounts.go</code> 的 spec 列表 + <code>EnsureSystemAccounts</code> 幂等对账，UUID 尾号顺延 09）：</p>
+<pre><span class="c">// portfolio_manager_perp/perpetuals/domain/models/const.go 新增：</span>
+MMHouseAccountAppSessionID = <span class="t">"00000000-0000-0000-0000-000000000009"</span>
+MMHouseAccountID          = <span class="t">"00000000-0000-0000-0000-000000000009"</span>
+<span class="c">// owner = SystemAccountOwner (0x0)，PrincipalKindService，随 EnsureSystemAccounts 自动建账</span></pre>
+<ul class="plain">
+<li><b>语义</b>：余额 = 我们对 MM 的净债务（正=我们欠 MM，负=MM 欠我们）。周期结算时现金清零，余额归入商务结算（条款待决）。</li>
+<li><b>费用</b>：house 腿零平台费率（MM 的报酬走商务分成，不进交易费用账）。</li>
+<li><b>风控豁免</b>：不参与清算扫描、无保证金要求（与保险金/清算池同待遇）。</li>
+</ul>
+
+<h2>合成成交事件</h2>
+<p class="section-note">connector 把每笔 TRADE_FILL 翻译成一个 <code>EventTradeExecuted</code>（<code>internal/protocol/events.go:283</code>），字段映射：</p>
+<div class="tw"><table>
+<thead><tr><th>事件字段</th><th>来源</th></tr></thead>
+<tbody>
+<tr><td class="mono-c">ID / TradeUUID</td><td class="dim">connector 本地序号 + 新生成 UUID（与 Finex 多实例同语义）</td></tr>
+<tr><td class="mono-c">Market / Price / Amount</td><td class="dim">我方 symbol / MM 回报的币安成交价 / 成交量</td></tr>
+<tr><td class="mono-c">Maker / Taker</td><td class="dim"><b>用户订单原样回填</b>（锁仓时已带全部字段）；按 role 决定谁占 maker 位</td></tr>
+<tr><td class="mono-c">对手腿（合成单）</td><td class="dim">AppSessionID = house UUID，UUID 由 fill_id 派生，Locked=0，费率=0，State=StateDone</td></tr>
+<tr><td class="mono-c">TakerType</td><td class="dim">用户订单类型（market/limit…）</td></tr>
+<tr><td class="mono-c">ExecType</td><td class="dim">user 单=<code>trade</code>；清算单=<code>liquidation</code>（现枚举已有）</td></tr>
+<tr><td class="mono-c">Header.IdempotencyKey</td><td class="dim"><code>{client_order_id}:{fill_id}</code> → PM Perp 幂等缓存直接防重</td></tr>
+</tbody>
+</table></div>
+<div class="call"><p class="call-t">经济闭环（一笔用户开多的完整旅程）</p><p>用户开多 10 TAO @199 → 我方锁用户 IMR → 币安 MM 买入对冲 10 TAO → 用户平多 @205 → 合成事件结算：用户 +60 已实现（余额增加），house −60（我们欠 MM +60）；MM 币安端对冲盈利 +60。周期结算时我们向 MM 支付 60（净额并入商务结算）。<b>任意时刻 house 净敞口 + 用户多空互相轧差 = 0</b>——两个用户互为对手时（A 买 B 卖）house 两腿对冲，MM 币安端也无需下对冲单，点差与费用照收。</p></div>
+
+<h2>funding 透传</h2>
+<ul class="plain">
+<li><b>rate 与周期</b> — 直接采用币安值：mark oracle 的 funding 字段已有币安源；<code>perps_markets.funding_interval_seconds</code> 已支持可变周期（rollout 已按币安 fundingInfo 种入 4h/8h）。PM Perp 的 funding worker、<code>funding_payments</code> 结算逻辑不变。</li>
+<li><b>账务路径</b> — 用户付/收资金费计入 house 账户（不再需要向用户对手方收取，因为对手是 house）；MM 币安端对冲的资金费收付与用户侧<b>名义相同时点相同</b>，方向相反自然轧平；残差（用户仓位变动时点差）入 house 余额，随周期结算。</li>
+<li><b>cap / 利率</b> — 透传模式下 cap 恒等于币安实际值，我方不再需要自设 cap（现表值即币安值，无需改动）。</li>
+</ul>
+
+<h2>清算与保险金</h2>
+<ol class="pts">
+<li><b>扫描器不变</b> — stage1 cross/isolated executor 的触发判定、MMR 档位、告警带（80/90/95）全部保留。</li>
+<li><b>平仓出口改变</b> — 不再发清算 IOC 进 Finex；改为向 connector 提交 <code>source=liquidation</code> 的市价平仓单，MM 币安 unwind 对冲，回报结算（ExecType=liquidation，Scheme A 的 journal_id 归组逻辑复用）。</li>
+<li><b>穿仓处置</b> — 用户损失超出其保证金的部分：保险金账户 → house 账户划转（现 <code>CLEARING_MIRROR</code> 的 SettleLiquidatedPosition 路径语义保留，对手从"清算池承接仓位"简化为"差额直付"）。</li>
+<li><b>退役</b> — takeover（保险金承接仓位）与 ADL（对手方自动减仓）代码路径下线：A-Book 没有需要保护的内部对手方。保险金唯一职责变为兜穿仓差额。</li>
+</ol>
+
+<h2>对账体系</h2>
+<div class="tw"><table>
+<thead><tr><th>任务</th><th>频率</th><th>比对内容</th><th>差异处置</th></tr></thead>
+<tbody>
+<tr><td><b>持仓对账</b></td><td class="mono-c">每 1 分钟</td><td class="dim">house 账户净敞口（FSM）vs GET /positions（MM 币安仓位）</td><td class="dim">超阈值(如 0.5% 或名义额) → 告警 + 冻结该市场新单</td></tr>
+<tr><td><b>成交对账</b></td><td class="mono-c">每 5 分钟</td><td class="dim">窗口内 fills 逐笔比对（fill_id 集合）</td><td class="dim">缺笔 → GET 仲裁补收；多笔 → 幂等层天然拦截 + 告警</td></tr>
+<tr><td><b>资金费对账</b></td><td class="mono-c">每周期</td><td class="dim">用户资金费总额 vs MM 币安资金费报表</td><td class="dim">残差入 house 余额；持续偏差 → 商务复核</td></tr>
+<tr><td><b>周期净额结算</b></td><td class="mono-c">商务约定（如 T+1）</td><td class="dim">house 余额 + 费用分成 → 应收应付</td><td class="dim">人工/自动出金流程（条款待决）</td></tr>
+</tbody>
+</table></div>
+</section>
+</article>
+
+<!-- ═══ 6 行情与数据 ═══ -->
+<article class="panel" id="p-marketdata" hidden>
+<header>
+<div class="eyebrow">6 · 行情与数据</div>
+<h1>数据面：一切用户可见行情来自币安</h1>
+<p class="standfirst">原则：<strong>quote 侧接入币安公共流，以现有事件格式与现有 topic 发布</strong>——trading-api 的 WS 订阅、ledger 的存储、对外的 gRPC 契约全部不动，只有数据源头换血。</p>
+</header>
+
+<section>
+<h2>quote 新增订阅（binance_perp provider 扩展）</h2>
+<div class="tw"><table>
+<thead><tr><th>币安流</th><th>用途</th><th>我方落点</th></tr></thead>
+<tbody>
+<tr><td class="mono-c">&lt;symbol&gt;@depth20@100ms</td><td>订单簿镜像</td><td class="dim">聚合进现有 <code>orderbook.{MKT}</code> topic 的 snapshot/increment 格式 → trading-api WS 零改动</td></tr>
+<tr><td class="mono-c">&lt;symbol&gt;@kline_1m</td><td>K线</td><td class="dim">新事件 → ledger 直写 Timescale（见下）</td></tr>
+<tr><td class="mono-c">&lt;symbol&gt;@ticker</td><td>24h 统计</td><td class="dim">复用 <code>events.EventTickerUpdated</code> 路径</td></tr>
+<tr><td class="mono-c">&lt;symbol&gt;@aggTrade</td><td>公共成交带</td><td class="dim">trading-api WS 公共 trades channel 数据源</td></tr>
+<tr><td class="mono-c">&lt;symbol&gt;@markPrice</td><td>mark / index / funding</td><td class="dim">现有多源 mark oracle 的币安主源（已有），不变</td></tr>
+<tr><td class="mono-c">fapi exchangeInfo（REST，每 1h）</td><td>过滤器同步</td><td class="dim">LOT_SIZE / PRICE_FILTER / MIN_NOTIONAL 热加载进 trading-api MarketCache（edge 前置拦截，MM 侧 INVALID_FILTER 兜底）</td></tr>
+</tbody>
+</table></div>
+<div class="call"><p class="call-t">depth 镜像的实现要点</p><p>币安 depth20 是快照流（无增量对齐问题），每 100ms 全量 20 档 → 直接映射现有 OrderBookSnapshot 语义；增量（OrderBookIncrement）由 quote 按 snapshot 差分合成，保持现网客户端的增量/快照混合消费模型。<b>注意</b>：订单簿里全是币安的单，我方用户单不在簿上——用户自己的挂单状态走私有流（EventOrderUpdated），前端需要在 UI 层把"我的挂单"叠加在镜像簿上展示（前端改动项，列入切换计划）。</p></div>
+
+<h2>ledger：K线数据源切换</h2>
+<ol class="pts">
+<li><b>新增摄入路径</b> — quote 发布 <code>events.{MKT}.EventKlineObserved</code>（1m 基线），ledger 消费后<b>直写</b> Timescale OHLC 与 24h ticker 聚合，不再从内部成交自算。</li>
+<li><b>per-market 开关</b> — ledger 配置里 perp 市场标记数据源：A-book 市场 = 币安 K线；spot 与（过渡期）非 A-book 市场 = 内部成交聚合（现有逻辑）。</li>
+<li><b>高周期聚合</b> — 1m 基线之上的连续聚合（5m/1h/…）沿用现有 Timescale 物化视图，机制不变。</li>
+<li><b>历史衔接</b> — 内部成交聚合的历史 K线保留，切换日为分界；前端图表跨界拼接（时间轴连续，无重写）。</li>
+<li><b>用户 trade history</b> — 不受影响：用户自己的成交记录一直由 PM Perp 持有（<code>perps_transactions</code> / position history），与公共 K线互不相干。</li>
+</ol>
+
+<h2>mark price 与风控数据</h2>
+<ul class="plain">
+<li><b>多源 oracle 保留</b> — Binance 主导权重，OKX/Bybit 备份；<b>min_sources = 1 铁律不变</b>（rollout 手册的永久锁定条款继续有效）。</li>
+<li><b>InternalPerpTradeCollector 停用</b> — A-book 市场"内部成交自价"源下线（用户成交稀疏且价格即币安价，无信息量）。</li>
+<li><b>清算基准价</b> — 与币安 liquidation 行为天然对齐（同用币安 mark），消除"我方清算价 ≠ 对冲市场清算价"的错位风险——这是 A-Book 的一个隐藏收益。</li>
+<li><b>exchangeInfo 变更</b> — 币安调过滤器时 quote 1h 内自动同步；若收紧导致在途挂单违规，由 MM 侧 INVALID_FILTER 回报自然清理。</li>
+</ul>
+</section>
+</article>
+
+<!-- ═══ 7 服务改动明细 ═══ -->
+<article class="panel" id="p-services" hidden>
+<header>
+<div class="eyebrow">7 · 服务改动明细</div>
+<h1>逐服务盘点：保留 · 修改 · 新增 · 退役</h1>
+<p class="standfirst">按改动量从大到小排列。<strong>核心结论：没有任何一个服务被推倒重写</strong>——改动最重的是新服务 mm-connector，其次是 PM Perp 的清算出口与 house 账户。</p>
+</header>
+
+<section>
+<div class="tw"><table>
+<thead><tr><th>服务</th><th>动作</th><th>改动内容</th><th>量级</th></tr></thead>
+<tbody>
+<tr><td class="mono-c"><b>mm-connector</b></td><td><span class="pill no">新增</span></td><td class="dim">Kafka 命令消费 + MM REST/WS 客户端 + 状态机与仲裁 + Finex 格式事件合成（house 对手腿）+ 对账 worker + 心跳熔断 + admin 观测接口</td><td class="dim">大（新服务，参照 finex 的命令入口与事件出口契约）</td></tr>
+<tr><td class="mono-c"><b>portfolio_manager_perp</b></td><td><span class="pill gap">修改</span></td><td class="dim">house 系统账户（spec + EnsureSystemAccounts）；清算 executor 出口改为 connector（liquidation 命令带 source）；takeover/ADL 代码路径下线（保留枚举与历史数据读取）；funding 账务对手方换 house</td><td class="dim">中</td></tr>
+<tr><td class="mono-c"><b>quote</b></td><td><span class="pill gap">修改</span></td><td class="dim">binance_perp 扩展五路订阅（depth/kline/ticker/aggTrade/exchangeInfo）；新 kline 事件发布；depth → orderbook topic 复刻；InternalPerpTradeCollector 按 A-book 市场停用</td><td class="dim">中</td></tr>
+<tr><td class="mono-c"><b>ledger</b></td><td><span class="pill gap">修改</span></td><td class="dim">新增 EventKlineObserved 消费路径直写 Timescale；per-market 数据源开关；24h ticker 改币安源</td><td class="dim">小</td></tr>
+<tr><td class="mono-c"><b>trading-api</b></td><td><span class="pill gap">修改</span></td><td class="dim">MarketCache 对接 exchangeInfo 热同步（前置过滤器校验）；前端契约新增"镜像簿 + 我的挂单"叠加语义说明；其余（认证/限流/锁仓流程/私有流）不变</td><td class="dim">小</td></tr>
+<tr><td class="mono-c"><b>admin</b></td><td><span class="pill gap">修改</span></td><td class="dim">MM 连接状态/对账差异/house 余额监控页；A-book 路由开关操作；对账仲裁工具</td><td class="dim">小</td></tr>
+<tr><td class="mono-c"><b>perp_trigger</b></td><td><span class="pill ok">零改动</span></td><td class="dim">触发→锁仓→命令的既有流程自动流向 connector</td><td class="dim">无</td></tr>
+<tr><td class="mono-c"><b>fee_engine / analytics / competitions</b></td><td><span class="pill ok">零改动</span></td><td class="dim">费用投影与统计照常消费事件（格式未变）；analytics 的 insurance fund equity 视图继续有效</td><td class="dim">无</td></tr>
+<tr><td class="mono-c"><b>finex（perp 部分）</b></td><td><span class="pill no">退役</span></td><td class="dim">perp shard 下线路由（spot shard 不动）；代码 + 配置保留一个版本周期作回滚开关，之后清理（WAL/快照随实例归档）</td><td class="dim">下线操作</td></tr>
+</tbody>
+</table></div>
+<div class="call"><p class="call-t">Kafka topic 面变化</p><p><b>不变</b>：<code>commands.{MKT}.OrderCommands</code>（消费者从 finex 换成 connector）、<code>events.{MKT}.EventOrderUpdated</code> / <code>EventTradeExecuted</code>（生产者换成 connector）、<code>orderbook.{MKT}</code>（生产者换成 quote）、<code>perp_trigger.Persistence</code>。<b>新增</b>：<code>events.{MKT}.EventKlineObserved</code>、MM 观测/对账内部 topic。<b>停用</b>：finex perp 的 WAL/快照不再增长。<code>kafka_topic_init</code> 的 -perp-markets 清单不变（topic 均已存在，只是换了生产/消费角色）。</p></div>
+</section>
+</article>
+
+<!-- ═══ 8 风险与熔断 ═══ -->
+<article class="panel" id="p-risk" hidden>
+<header>
+<div class="eyebrow">8 · 风险与熔断</div>
+<h1>单点依赖是最大风险，熔断设计必须先行</h1>
+<p class="standfirst">A-Book 把"市场风险"换成了"<strong>依赖风险</strong>"。撮合不再会出错——但 MM 会断连、币安会风控、网线会延迟。这一页的设计目标是：<strong>任何单一故障都不造成资金损失，只造成服务降级</strong>。</p>
+</header>
+
+<section>
+<h2>风险清单</h2>
+<div class="tw"><table>
+<thead><tr><th>风险</th><th>场景</th><th>缓解</th><th>等级</th></tr></thead>
+<tbody>
+<tr><td><b>MM 单点</b></td><td class="dim">MM 断连/系统故障/币安封其账户 → 全站永续无法执行</td><td class="dim">心跳熔断（15s）→ 新单全拒、在途单 cancel-all；SLA 条款；长期解：二级 LP（待决）</td><td><span class="pill no">高</span></td></tr>
+<tr><td><b>清算遇断连</b></td><td class="dim">行情暴跌触发连环清算的同一时刻 MM 断连——最危险的组合</td><td class="dim">用户仓位与保证金在我方不受影响（结算暂停而非丢失）；重连后立即补发平仓单；持续恶化由保险金兜底 + 人工升级</td><td><span class="pill no">高</span></td></tr>
+<tr><td><b>延迟</b></td><td class="dim">锁仓(Raft ~10ms) + Kafka + connector + MM + 币安 RTT + 回报 → 全链 p99 目标 &lt; 1s；市价单期间价格漂移</td><td class="dim">SLA 分段监控（第 3 页）；市单滑点上限参数（待决事项 4）</td><td><span class="pill gap">中</span></td></tr>
+<tr><td><b>滑点吃穿保证金</b></td><td class="dim">锁仓按下单时校验 IMR，币安成交价劣化 → 成交后 MMR 立即越界 → 秒触发清算</td><td class="dim">锁仓端增加滑点缓冲系数（可配）；越界即走正常清算路径（非资损，是体验问题）；IMR 缓冲值入待决</td><td><span class="pill gap">中</span></td></tr>
+<tr><td><b>对账漂移</b></td><td class="dim">我方 FSM / MM 报告 / 币安三方状态不一致（网络分区、回报丢失）</td><td class="dim">三级对账 job（第 5 页）+ fill_id 幂等 + GET 仲裁 + admin 冻结工具</td><td><span class="pill gap">中</span></td></tr>
+<tr><td><b>币安平台依赖</b></td><td class="dim">币安维护窗口 / 风控 / 地域限制直接影响我方全站</td><td class="dim">MM 提供 binance_connected 心跳字段与维护预告；维护期预先熔断（公告停交易）</td><td><span class="pill gap">中</span></td></tr>
+<tr><td><b>MM 违约</b></td><td class="dim">house 净债务累积后 MM 拒付/跑路</td><td class="dim">商务保证金条款 + 净额上限熔断（house |余额| 超阈值 → 停止交易并要求补充保证金）（条款待决）</td><td><span class="pill gap">商务</span></td></tr>
+</tbody>
+</table></div>
+
+<h2>熔断矩阵</h2>
+<div class="tw"><table>
+<thead><tr><th>触发</th><th>新单</th><th>在途单</th><th>清算</th><th>恢复动作</th></tr></thead>
+<tbody>
+<tr><td class="mono-c">心跳丢失 15s</td><td><span class="pill no">全拒</span></td><td><span class="pill no">cancel-all</span></td><td><span class="pill gap">挂起</span></td><td class="dim">重连 → 全量 GET 仲裁 → 补发清算单 → 解除</td></tr>
+<tr><td class="mono-c">连续 429 / SYSTEM_BUSY</td><td><span class="pill gap">退避</span></td><td><span class="pill ok">保留</span></td><td><span class="pill ok">重试</span></td><td class="dim">速率恢复即解除；持续 5 分钟升级为心跳级熔断</td></tr>
+<tr><td class="mono-c">持仓对账超阈值</td><td><span class="pill no">该市场冻结</span></td><td><span class="pill ok">保留</span></td><td><span class="pill gap">人工确认</span></td><td class="dim">admin 仲裁工具定位差异单 → 手工修复 → 解冻</td></tr>
+<tr><td class="mono-c">house 净额超商务上限</td><td><span class="pill no">全拒</span></td><td><span class="pill ok">保留</span></td><td><span class="pill ok">正常</span></td><td class="dim">结算/补保证金后解除（条款待决）</td></tr>
+<tr><td class="mono-c">人工 kill-switch</td><td><span class="pill no">全拒</span></td><td><span class="pill no">cancel-all</span></td><td><span class="pill gap">挂起</span></td><td class="dim">可切回 B-book（一个版本周期内，见第 9 页）</td></tr>
+</tbody>
+</table></div>
+<div class="call warn"><p class="call-t">清算挂起的边界说明</p><p>清算挂起期间用户保证金率继续恶化（mark 不停），恢复后按更差价格平仓——损失由保险金吸收的部分会变大，但<b>不会出现无主仓位</b>（我方账本始终自洽）。这是"服务降级不资损"原则的代价，需在保险金容量测算中纳入（待决事项 5）。</p></div>
+</section>
+</article>
+
+<!-- ═══ 9 切换计划 ═══ -->
+<article class="panel" id="p-cutover" hidden>
+<header>
+<div class="eyebrow">9 · 切换计划</div>
+<h1>六阶段：从清仓到开放</h1>
+<p class="standfirst">阶段 0–1 是<strong>业务与契约</strong>（不含代码），阶段 2–3 是<strong>工程与联调</strong>，阶段 4–5 是<strong>生产切换</strong>。顺序不可乱，每阶段有明确出口条件。</p>
+</header>
+
+<section>
+<h2>阶段总览</h2>
+<ol class="steps">
+<li><b>阶段 0 · 存量清仓（进行中）</b><span>attacker 账户已执行（09-22）；MM 账户 0x535c / 0x7152 runbook 就绪待执行；<b>普通用户存量持仓处置方案是本阶段出口条件</b>（公告强平结算 vs 过渡期，待决事项 3）。出口：全平台 perps 持仓 = 0、所有市场订单簿干净。</span></li>
+<li><b>阶段 1 · 契约过会（本文档第 3 页）</b><span>与 MM 逐条过 SLA / 错误码 / 悬挂仲裁语义 / cancel-all 时延 / GTX 拒绝可区分性（3.7 过会清单）；MM 确认实现排期与沙箱环境。出口：双方签字版契约 v1 + MM 沙箱可用。</span></li>
+<li><b>阶段 2 · 开发</b><span>里程碑：① mm-connector MVP（提交/回报/合成事件/幂等）→ ② PM Perp house 账户 + 清算出口切换 → ③ quote 五路订阅 + ledger K线路径 → ④ 熔断/对账/admin 工具 → ⑤ 端到端用例打通。每里程碑配集成测试进 <code>test/v2</code> 场景。</span></li>
+<li><b>阶段 3 · staging 联调</b><span>MM 沙箱（或币安 testnet）全链路：下单/部分成交/撤单/超时仲裁/断线重连/清算演练/对账差异注入/限速退避。出口：用例清单全绿 + 双方联调报告。</span></li>
+<li><b>阶段 4 · 生产 cutover（顺序铁律）</b><span>① 公告停新单（trading-api 禁交易开关）→ ② 等在途单终结 / cancel-all → ③ 启用 mm-connector 路由（消费 OrderCommands）→ ④ quote 行情切换（depth/kline/ticker 上线）→ ⑤ finex-perp shard 停止 → ⑥ 验证清单（见下）→ ⑦ 公告开放交易。<b>finex-perp 停在 connector 验证通过之后</b>，顺序反了会出现双消费者。</span></li>
+<li><b>阶段 5 · 开放与观察期</b><span>开放后 72 小时盯盘：延迟分位、对账差异率、费率正确性抽查、清算演练一次（受控账户）。观察期结束 → 移除 B-book 回滚开关的决策评审。</span></li>
+</ol>
+
+<h2>cutover 验证清单</h2>
+<ul class="plain">
+<li><b>订单簿镜像</b> — 前端 depth 与币安同 symbol 一致；增量/快照混合流无跳变；延迟 &lt; 300ms。</li>
+<li><b>下单全链路</b> — 限价挂单/成交、市价多笔成交、post_only 拒绝、FOK 整单拒、IOC 余量过期，五类各至少一笔。</li>
+<li><b>撤单与仲裁</b> — 正常撤单、撤单竞态（已成交）、人为制造 POST 超时走 GET 仲裁路径。</li>
+<li><b>结算正确性</b> — 抽查成交的仓位/盈亏/费用（maker/taker 费率按 role）；house 账户余额与手工推演一致。</li>
+<li><b>K线连续性</b> — 切换日前后 1m K线拼接无缺口；高周期聚合正常出值。</li>
+<li><b>清算演练</b> — 受控账户打到 MMR 触发：平仓单经 MM 执行、ExecType=liquidation、穿仓差额进 house、Scheme A journal 完整。</li>
+<li><b>熔断演练</b> — 断开 MM 沙箱：15s 熔断生效、新单全拒、cancel-all、重连仲裁恢复。</li>
+<li><b>对账零差异</b> — 持仓/成交两个 job 首轮全绿。</li>
+</ul>
+
+<h2>回滚（一个版本周期内有效）</h2>
+<pre><span class="c"># 触发条件：A-Book 出现无法快速修复的系统性问题（对账持续漂移 / MM 长期不可用）</span>
+① trading-api 停新单 + cancel-all
+② 等在途单终结（若存在持仓：记录并人工对冲决策——回滚要求持仓尽量为零）
+③ 路由 flag 切回 finex-perp：connector 停止消费 OrderCommands，finex-perp shard 重启加载市场
+④ quote 行情切回（orderbook 生产者换回 finex；K线恢复内部聚合——期间币安 K线已写入的历史保留）
+⑤ 验证 → 开放
+
+<span class="c"># 回滚后 A-Book 已发生的历史数据不动（trade history / house 账户余额 / 审计）</span></pre>
+<div class="call warn"><p class="call-t">回滚的硬约束</p><p>回滚时若存在 A-Book 期间开立的持仓，切回 B-book 后 Finex 内部撮合将没有对手流动性——<b>回滚窗口内应把持仓视为需要人工处置的例外</b>。这就是"保留期一个版本周期"的原因：时间越长，回滚的现实性越低，靠观察期把问题暴露在早期。</p></div>
+</section>
+</article>
+
+<!-- ═══ 10 待决事项 ═══ -->
+<article class="panel" id="p-open" hidden>
+<header>
+<div class="eyebrow">10 · 待决事项</div>
+<h1>架构已定，这些需要人来拍板</h1>
+<p class="standfirst">按阻塞程度排序。前两项阻塞阶段 1，其余可与开发并行但须在 cutover 前落定。</p>
+</header>
+
+<section>
+<ol class="steps">
+<li><b>TBTCUSDT-PERP 的处置（阻塞：全量切换范围）</b><span>TBTC 在 Binance / OKX / Bybit 三家都没有合约（2026-09-18 实测，见 rollout 手册前置检查第 4 条），无法走 A-Book。选项：<b>a)</b> 下架（推荐——现网已靠 30 天零源宽限存活，本就是遗留问题）；b) 唯一例外保留 B-book（需保留 finex-perp 一个 shard + 内部对手方机制，与"退役"目标冲突）。<b>决策影响整页第 2/7 节的退役清单。</b></span></li>
+<li><b>MM 商务条款（阻塞：阶段 1 签字）</b><span>① 费率分成模型（我方手续费收入如何分）② 结算周期与净额上限（house |余额| 熔断线）③ MM 保证金数额与形式 ④ SLA 违约责任 ⑤ MM 币安账户被风控时的责任划分。这些不进 wire 契约，但决定熔断阈值参数。</span></li>
+<li><b>存量用户持仓处置（阻塞：阶段 0 出口）</b><span>方案 a：公告期（如 72h）用户自平 + 到期强平结算；方案 b：切换日按币安 mark 直接结算清零。涉及公告文案、结算价争议预案。内部账户清仓 runbook 已就绪（0x535c / 0x7152），用户侧方案是空白。</span></li>
+<li><b>市价单滑点保护</b><span>是否在 API 层给市价单加 max_slippage 参数（超限拒单）？币安无此原生语义，需 MM 配合（超滑点回报特殊错误码）或我方事后仲裁。影响用户体验与资损边界，建议一期先上锁仓缓冲系数，二期再议。</span></li>
+<li><b>MM 断连时清算的应急容量</b><span>熔断挂起期间的穿仓扩大由保险金吸收——需要按"断连 30 分钟 + 行情 ±20%"做保险金容量压力测算；长期解：签约二级 LP（同契约换实现）。</span></li>
+<li><b>币安 testnet 可用性</b><span>币安 futures testnet 的 symbol 覆盖与深度有限（TradFi 系合约可能缺席）；staging 联调若 testnet 不够用，需 MM 沙箱（模拟回报流）补位——阶段 1 与 MM 确认。</span></li>
+<li><b>合规与账户归属</b><span>MM 在币安的账户主体、地域合规、以及"我们的用户订单经第三方主体执行"的监管定性——需合规团队出具意见（不阻塞技术，阻塞生产 cutover）。</span></li>
+<li><b>现有市场 Binance 存在性终核</b><span>rollout 已核实 13 新市场 + 1000PEPE 全有；存量 10 个（BTC/ETH/BNB/SOL/XRP/DOGE/LINK/SUI/TAO/HYPE）按 #98 quote 配置佐证存在，cutover 前逐一复核 fapi exchangeInfo 并把 symbol 映射表（含 1000PEPE↔1000PEPEUSDT 这类非平凡映射）固化进 quote 配置。</span></li>
+</ol>
+<div class="call"><p class="call-t">文档维护</p><p>本设计稿（v1, 2026-09-24）在契约过会与各待决项落定后更新为 v2 定稿；英文版随后补齐。关联文档：<code>docs/new-perps-rollout-plan.html</code>（市场参数与 quote 配置基线）、<code>docs/2026-09-22-attacker-position-force-close-runbook.md</code> 与 <code>docs/2026-09-23-mm-account-tao-position-cleanup-runbook.md</code> / <code>docs/2026-09-23-mm-0x7152-position-cleanup-runbook.md</code>（阶段 0 清仓）。</p></div>
+</section>
+</article>
+
+</div><!-- main -->
+</div><!-- shell -->
+
+<script>
+(function(){
+  var tabs=document.querySelectorAll('nav.tabs a');
+  var panels=document.querySelectorAll('article.panel');
+  function show(id){
+    panels.forEach(function(p){p.hidden=p.id!=='p-'+id;});
+    tabs.forEach(function(a){a.classList.toggle('on',a.getAttribute('href')==='#'+id);});
+    window.scrollTo({top:0,behavior:'instant'});
+  }
+  tabs.forEach(function(a){
+    a.addEventListener('click',function(e){e.preventDefault();show(this.getAttribute('href').slice(1));});
+  });
+  show('overview');
+})();
+</script>

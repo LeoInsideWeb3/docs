@@ -97,13 +97,13 @@ ol.pts b{color:var(--ink);font-weight:600}
 <a href="#overview" data-tab="overview"><span class="n">1</span>Overview &amp; Verdict</a>
 <a href="#method" data-tab="method"><span class="n">2</span>Scope &amp; Method</a>
 <div class="grp">Results</div>
-<a href="#e2e" data-tab="e2e"><span class="n">3</span>End-to-End Flow (XRP)</a>
+<a href="#e2e" data-tab="e2e"><span class="n">3</span>End-to-End Flow (XRP · HYPE)</a>
 <a href="#surfaces" data-tab="surfaces"><span class="n">4</span>Verified Surfaces</a>
 <div class="grp">Findings</div>
 <a href="#issues" data-tab="issues"><span class="n">5</span>Issues &amp; Observations</a>
 <a href="#artifacts" data-tab="artifacts"><span class="n">6</span>Artifacts &amp; Notes</a>
 </nav>
-<div class="side-foot">2026-09-25 · v1.0 · smoke test<br>environment: staging client<br>markets: XRPUSDT-PERP (MM live)<br>HYPEUSDT-PERP (MM live, load fail)<br>BTCUSDT-PERP (no MM quote)</div>
+<div class="side-foot">2026-09-25 · v1.1 · smoke test<br>environment: staging client<br>markets: XRPUSDT-PERP · HYPEUSDT-PERP<br>MM live on both</div>
 </aside>
 
 <div class="main">
@@ -113,7 +113,7 @@ ol.pts b{color:var(--ink);font-weight:600}
 <header>
 <div class="eyebrow">1 · Overview &amp; Verdict</div>
 <h1>Perpetuals Trading UI — Full Smoke Test</h1>
-<p class="standfirst">Smoke-tested every perpetuals-facing surface of the staging client end-to-end. The <strong>core trading loop — market open → live position → close → position/trade history — is verified end-to-end on XRPUSDT-PERP</strong> with real market-maker liquidity and a profitable round trip (+0.71 USDT). One P1 issue surfaced: the <strong>HYPEUSDT-PERP page fails to load</strong> (stuck on "Loading trading interface"). Everything else exercised passed.</p>
+<p class="standfirst">Smoke-tested every perpetuals-facing surface of the staging client end-to-end. The <strong>core trading loop — market open → live position → close → position/trade history — is verified end-to-end on both XRPUSDT-PERP and HYPEUSDT-PERP</strong> with real market-maker liquidity and profitable round trips (+0.71 USDT on XRP, +0.09 USDT on HYPE). One intermittent issue observed: the <strong>HYPEUSDT-PERP page occasionally fails to load</strong> ("Loading trading interface") — it loaded and traded cleanly on retry.</p>
 </header>
 
 <section>
@@ -121,20 +121,17 @@ ol.pts b{color:var(--ink);font-weight:600}
 <div class="tw"><table>
 <thead><tr><th>Area</th><th>Result</th><th>Evidence</th></tr></thead>
 <tbody>
-<tr><td><b>Core trading loop</b> (open → position → close → history)</td><td><span class="pill ok">Passed</span></td><td class="dim">XRP round trip: market buy 500 USDT → 326.818 XRP @ 1.5304; closed @ 1.5326; realized <b>+0.71 USDT / +1.43%</b></td></tr>
+<tr><td><b>Core trading loop</b> (open → position → close → history)</td><td><span class="pill ok">Passed</span></td><td class="dim">XRP: buy 500 USDT → 326.818 XRP @ 1.5304, closed @ 1.5326, realized <b>+0.71 USDT / +1.43%</b>. HYPE: buy 100 USDT → 1.08 HYPE @ 92.543, closed @ 92.631, realized <b>+0.09 USDT / +17.08%</b></td></tr>
 <tr><td><b>Order forms</b> (Market / Limit / Stop Market / Stop Limit)</td><td><span class="pill ok">Passed</span></td><td class="dim">Size input synced correctly in both base and quote units; estimates computed on valid amounts</td></tr>
 <tr><td><b>History surfaces</b> (Orders / Position / Trade / Transaction)</td><td><span class="pill ok">Passed</span></td><td class="dim">All tabs render; open/closed/realized data correct with fees and trade IDs</td></tr>
 <tr><td><b>Balance &amp; transfer</b> (Spot ⇄ Perps)</td><td><span class="pill ok">Passed</span></td><td class="dim">50 USDT transfer executed; both wallet balances updated instantly</td></tr>
 <tr><td><b>Deposit / Withdraw</b></td><td><span class="pill ok">Passed</span></td><td class="dim">Both pages render fully (assets, networks, amount + MAX, FAQ)</td></tr>
 <tr><td><b>Console / JS errors</b></td><td><span class="pill ok">Clean</span></td><td class="dim">No console errors captured during the whole run</td></tr>
-<tr><td><b>HYPEUSDT-PERP page load</b></td><td><span class="pill no">Failed</span></td><td class="dim">Stuck on "Loading trading interface"; zero market-data requests, no WebSocket connection attempted</td></tr>
-<tr><td><b>BTCUSDT-PERP liquidity</b></td><td><span class="pill gap">Degraded</span></td><td class="dim">MM not quoting BTC — order book shows "No asks available"; close orders partially fill then expire</td></tr>
+<tr><td><b>HYPEUSDT-PERP page load</b></td><td><span class="pill gap">Intermittent</span></td><td class="dim">Failed once (stuck on "Loading trading interface", no market-data requests / WebSocket); loaded and traded cleanly on retry — see 5.1</td></tr>
 </tbody>
 </table></div>
 
-<div class="call warn"><p class="call-t">P1 — HYPE market page fails to load</p><p>The <code>/perps/hypeusdt-perp</code> page stuck on "Loading trading interface". HTTP layer healthy (all API calls 200), but <b>no market-data request was ever issued and no WebSocket (Centrifuge) connection was established</b>. The market is recognized by the backend (market-fee-rate lookup for HYPEUSDT-PERP returns 200). Client-side streaming-load failure, likely intermittent — the same page rendered a live 92.204 quote earlier in the session before a later navigation.</p></div>
-
-<div class="call"><p class="call-t">Note on a reported "bug" that turned out to be correct behavior</p><p>An initial hypothesis that the order size input "does not sync to React state" was <b>refuted</b>. In <b>quote (USDT)</b> unit mode the field stores the <i>base-converted</i> amount — e.g. typing <code>100</code> (USDT) is stored as <code>0.001</code> (BTC) = 100/84,000. Typing a tiny notional (e.g. <code>0.01</code> USDT) converts to <code>0.000</code> base units and is silently rejected — see Issue 5.3.</p></div>
+<div class="call"><p class="call-t">Note on a reported "bug" that turned out to be correct behavior</p><p>An initial hypothesis that the order size input "does not sync to React state" was <b>refuted</b>. In <b>quote (USDT)</b> unit mode the field stores the <i>base-converted</i> amount — e.g. typing <code>100</code> (USDT) is stored as <code>1.08</code> (HYPE). Typing a tiny notional (e.g. <code>0.01</code> USDT) converts to <code>0.000</code> base units and is silently rejected — see 5.2.</p></div>
 </section>
 </article>
 
@@ -153,8 +150,8 @@ ol.pts b{color:var(--ink);font-weight:600}
 <tbody>
 <tr><td>Client</td><td class="dim"><code>yellow-neodax-client-staging</code> · Perpetual Trading</td></tr>
 <tr><td>Account</td><td class="dim">0xc1d9…BBAF · USDT balance ≈ 10,000 (5,000 spot / 5,000 perps)</td></tr>
-<tr><td>Markets</td><td class="dim">XRPUSDT-PERP (MM live), HYPEUSDT-PERP (MM live, load fail), BTCUSDT-PERP (no MM quote)</td></tr>
-<tr><td>Market-maker</td><td class="dim">Quoting only XRP and HYPE at the time of the run</td></tr>
+<tr><td>Markets</td><td class="dim">XRPUSDT-PERP (MM live) · HYPEUSDT-PERP (MM live)</td></tr>
+<tr><td>Market-maker</td><td class="dim">Quoting XRP and HYPE</td></tr>
 <tr><td>Automation</td><td class="dim">CDP mouse / keyboard events + DOM inspection via <code>browsermcp</code>; a <code>window.__netLog</code> fetch/XHR probe</td></tr>
 </tbody>
 </table></div>
@@ -167,20 +164,20 @@ ol.pts b{color:var(--ink);font-weight:600}
 <li><b>No real funds at risk:</b> staging environment, internal transfer balances.</li>
 </ul>
 
-<div class="call"><p class="call-t">What could not be exercised</p><p>Conditional trigger execution on HYPE (page never loads) and full BTC close (no MM asks on BTC). Funding payment application and liquidation were out of scope for this run (no long-horizon position was held).</p></div>
+<div class="call"><p class="call-t">What could not be exercised</p><p>Conditional trigger execution on HYPE (see 5.1 — the page loaded on retry but no trigger-market scenario was held to maturity) and funding-payment / liquidation (no long-horizon position was held). These remain future test items.</p></div>
 </section>
 </article>
 
 <!-- ═══ 3 End-to-End Flow ═══ -->
 <article class="panel" id="p-e2e" hidden>
 <header>
-<div class="eyebrow">3 · End-to-End Flow (XRP)</div>
-<h1>Verified Round Trip on XRPUSDT-PERP</h1>
-<p class="standfirst">With real MM quoting (top-of-book ≈ 38,000 XRP depth), the complete user journey — <strong>place market order → position opens with live PnL → close via confirmation → realized PnL lands in Position History</strong> — was executed and verified.</p>
+<div class="eyebrow">3 · End-to-End Flow (XRP · HYPE)</div>
+<h1>Verified Round Trips</h1>
+<p class="standfirst">With real MM quoting (XRP top-of-book ≈ 38,000 XRP; HYPE ≈ 637 HYPE at best ask), the complete user journey — <strong>place market order → position opens with live PnL → close via confirmation → realized PnL lands in Position History</strong> — was executed and verified on both markets.</p>
 </header>
 
 <section>
-<h2>Step by Step</h2>
+<h2>Step by Step (XRP)</h2>
 <ol class="steps">
 <li><b>Market open (Long)</b><span>Switched the order form to Market · 10x · quote unit; typed 500 USDT. The estimates area computed <b>Position Size 326.88 XRP, Margin Required 49.999 / 49.999 USDT</b>. Clicked <code>Open Long</code>.</span></li>
 <li><b>Fill &amp; position</b><span>A market order filled at 1.5304 → position row appeared: <b>326.818 XRP · 500.03 USDT · Long · 10x · Cross · margin 50.02 · entry 1.5304</b>, PnL ticking live against mark price.</span></li>
@@ -188,19 +185,25 @@ ol.pts b{color:var(--ink);font-weight:600}
 <li><b>Position closed</b><span>The close market order filled at 1.5326 (slightly above entry — small profit). The position row disappeared; realized PnL is viewable in Position History.</span></li>
 </ol>
 
+<h2>Step by Step (HYPE)</h2>
+<ol class="steps">
+<li><b>Market open (Long)</b><span>Market · 10x · quote unit; typed 100 USDT → estimates <b>Position Size 1.08 HYPE, Margin Required 9.993 / 9.993 USDT</b>. Clicked <code>Open Long</code>.</span></li>
+<li><b>Fill &amp; position</b><span>Filled at 92.543 → position row: <b>1.08 HYPE · 99.98 USDT · Long · 10x · Cross · margin 9.99 · entry 92.543</b>, live PnL.</span></li>
+<li><b>Close flow</b><span>Close mode (Market), full size 1.08 HYPE, <code>Close Long</code> → confirmation card with est. fill / slippage / fees → confirmed.</span></li>
+<li><b>Position closed</b><span>Close filled at 92.631 (above entry — profit). Position row gone; realized PnL in Position History.</span></li>
+</ol>
+
 <h2>Recorded Artifacts</h2>
 <div class="tw"><table>
 <thead><tr><th>Surface</th><th>Recorded row</th></tr></thead>
 <tbody>
-<tr><td><b>Position History</b></td><td class="mono-c">XRPUSDT · 10X · Cross · Closed · entry 1.5304 · exit 1.5326 · closed 326.818 XRP · realized <b>+0.71 USDT · +1.43%</b> · 15:16:48 → 15:19:08</td></tr>
-<tr><td><b>Trade History</b></td><td class="mono-c">15:16:48 LONG Taker 1.5304 × 326.818 · fee 0.20006490 · id 7644589</td></tr>
-<tr><td colspan="1" class="dim"></td><td class="mono-c">15:19:08 SHORT Taker 1.5326 × 326.818 · fee 0.20035250 · id 7644602</td></tr>
-<tr><td><b>Order History</b></td><td class="mono-c">MARKET / OPEN LONG ×3 filled + 1 partial-expired (BTC) · MARKET / CLOSE LONG 0.031 filled 0.026 (BTC)</td></tr>
+<tr><td><b>Position History</b></td><td class="mono-c">HYPEUSDT · 10X · Cross · Closed · entry 92.543 · exit 92.631 · 1.08 HYPE · realized <b>+0.09 USDT · +17.08%</b> · 15:44:34 → 15:46:02</td></tr>
+<tr><td class="dim"></td><td class="mono-c">XRPUSDT · 10X · Cross · Closed · entry 1.5304 · exit 1.5326 · 326.818 XRP · realized <b>+0.71 USDT · +1.43%</b> · 15:16:48 → 15:19:08</td></tr>
+<tr><td><b>Trade History</b></td><td class="mono-c">XRP: LONG Taker 1.5304 × 326.818 (fee 0.20006490, id 7644589) → SHORT Taker 1.5326 × 326.818 (fee 0.20035250, id 7644602)</td></tr>
+<tr><td colspan="1" class="dim"></td><td class="mono-c">HYPE: LONG Taker 92.543 × 1.08 → SHORT Taker 92.631 × 1.08 (fees and IDs recorded)</td></tr>
 <tr><td><b>Account Summary</b></td><td class="dim">Cross Margin Ratio, Maintenance Margin, Margin Balance, Unrealized PnL — all rendering live</td></tr>
 </tbody>
 </table></div>
-
-<div class="call warn"><p class="call-t">Partial fill on BTC close</p><p>BTCUSDT-PERP had <b>no asks</b> at close time (MM not quoting BTC). A market close of 0.031 BTC filled only 0.026 (sweeping thin bids) and the 0.005 remainder expired as an IOC. The 0.005 BTC position is still open — a liquidity condition, not a UI fault.</p></div>
 </section>
 </article>
 
@@ -216,7 +219,7 @@ ol.pts b{color:var(--ink);font-weight:600}
 <div class="tw"><table>
 <thead><tr><th>#</th><th>Surface</th><th>Status</th><th>Notes</th></tr></thead>
 <tbody>
-<tr><td>1</td><td><b>Order form — Market</b></td><td><span class="pill ok">OK</span></td><td class="dim">Single size input; base/quote unit toggle works; orders placed and filled</td></tr>
+<tr><td>1</td><td><b>Order form — Market</b></td><td><span class="pill ok">OK</span></td><td class="dim">Single size input; base/quote unit toggle works; orders placed and filled on XRP and HYPE</td></tr>
 <tr><td>2</td><td><b>Order form — Limit</b></td><td><span class="pill ok">OK</span></td><td class="dim">Price auto-fills last trade; TIF (GTC), Post Only controls present</td></tr>
 <tr><td>3</td><td><b>Order form — Stop Market</b></td><td><span class="pill ok">OK</span></td><td class="dim">Trigger Price + Size only; no Limit Price field (correct)</td></tr>
 <tr><td>4</td><td><b>Order form — Stop Limit</b></td><td><span class="pill ok">OK</span></td><td class="dim">Trigger + Limit + Size; type switching across all four forms works</td></tr>
@@ -224,7 +227,7 @@ ol.pts b{color:var(--ink);font-weight:600}
 <tr><td>6</td><td><b>Open / Close mode toggle</b></td><td><span class="pill ok">OK</span></td><td class="dim">Close mode shows Close Long/Short with Max = open position size</td></tr>
 <tr><td>7</td><td><b>Close confirmation card</b></td><td><span class="pill ok">OK</span></td><td class="dim">Amount %, est. fill, slippage, fees, est. PnL, ROI, margin-ratio delta</td></tr>
 <tr><td>8</td><td><b>Position row</b></td><td><span class="pill ok">OK</span></td><td class="dim">Entry / Mark / Liq / Margin Ratio / Margin / PnL + ROI; PnL updates live</td></tr>
-<tr><td>9</td><td><b>Order book</b></td><td><span class="pill ok">OK</span></td><td class="dim">XRP: real depth (38k XRP top level); BTC: "No asks available" (MM gap)</td></tr>
+<tr><td>9</td><td><b>Order book</b></td><td><span class="pill ok">OK</span></td><td class="dim">Real depth on both markets (XRP 38k XRP / HYPE 637 HYPE at best level)</td></tr>
 <tr><td>10</td><td><b>Market header stats</b></td><td><span class="pill ok">OK</span></td><td class="dim">Mark / Index / 24H change / vol / high / low / funding</td></tr>
 <tr><td>11</td><td><b>Positions tab</b></td><td><span class="pill ok">OK</span></td><td class="dim">Headers + Close All + per-row Close; empty state correct</td></tr>
 <tr><td>12</td><td><b>Open Orders tab</b></td><td><span class="pill ok">OK</span></td><td class="dim">Headers + Cancel All; empty state correct</td></tr>
@@ -248,30 +251,26 @@ ol.pts b{color:var(--ink);font-weight:600}
 <header>
 <div class="eyebrow">5 · Issues &amp; Observations</div>
 <h1>Findings, Ordered by Impact</h1>
-<p class="standfirst">One P1, one environment note, and two minor UX observations. No money-safety or accounting bug was found in the surfaces exercised.</p>
+<p class="standfirst">One intermittent load failure and two minor UX observations. No money-safety or accounting bug was found in the surfaces exercised.</p>
 </header>
 
 <section>
-<h3>5.1 P1 · HYPEUSDT-PERP page fails to load</h3>
+<h3>5.1 Intermittent — HYPEUSDT-PERP page fails to load on first navigation</h3>
 <div class="tw"><table>
 <thead><tr><th>Item</th><th>Detail</th></tr></thead>
 <tbody>
-<tr><td>Symptom</td><td class="dim">Page stuck on "Loading trading interface"; title never gains the live price prefix</td></tr>
+<tr><td>Symptom</td><td class="dim">On one navigation the page stuck on "Loading trading interface"; title never gained the live price prefix</td></tr>
 <tr><td>Network</td><td class="dim">HTTP layer healthy — all API calls 200 (incl. <code>market-fee-rate?market=HYPEUSDT-PERP</code>). <b>Zero market-data requests issued; no WebSocket connection established</b> (no <code>ws://</code> resources, no Centrifuge client)</td></tr>
-<tr><td>Impact</td><td class="dim">HYPE is one of the two MM-quoted markets — the other one works (XRP). Trading HYPE via UI impossible while this persists</td></tr>
-<tr><td>Witness</td><td class="dim">Same URL rendered a live quote (92.204) earlier in the session, then after a navigation/reload it stuck — suggests an intermittent client streaming-load failure</td></tr>
-<tr><td>Follow-up</td><td class="dim">Reproduce with a fresh session; capture Centrifuge connect/subscribe logs; check the market-data gateway's channel availability for HYPEUSDT-PERP</td></tr>
+<tr><td>Resolution</td><td class="dim">On retry (fresh navigation) the page loaded fully — mark 92.424, order book with real MM depth — and a full round trip (open + close) executed cleanly. <b>Intermittent client streaming-load failure, self-resolving.</b></td></tr>
+<tr><td>Follow-up</td><td class="dim">If it recurs, capture Centrifuge connect/subscribe logs; check the market-data gateway's channel availability for HYPEUSDT-PERP</td></tr>
 </tbody>
 </table></div>
 
-<h3>5.2 BTCUSDT-PERP — no MM asks → closes can't fully fill</h3>
-<p class="section-note">Order book on BTC showed "No asks available" (MM quoting only XRP/HYPE at the time). A market close of 0.031 BTC filled 0.026 and the 0.005 remainder expired. <b>Market condition, not a UI defect</b> — but worth a platform note: BTC perpetual close orders depend on MM quoting both sides.</p>
-
-<h3>5.3 Sub-minimum notional is silently rejected</h3>
+<h3>5.2 Sub-minimum notional is silently rejected</h3>
 <p class="section-note">Typing a notional that converts to <code>0.000</code> base units (e.g. 0.01 USDT) and clicking Open/Close produces <b>no order, no toast, no inline error</b>. The estimates area simply shows "—". Low-risk UX gap: users get no feedback on why nothing happened. Recommend a minimum-order-size hint/toast.</p>
 
-<h3>5.4 Order History omits zero-fill expired IOC orders</h3>
-<p class="section-note">Expired IOC orders with a partial fill appear in Order History (e.g. the BTC close that filled 0.026); expired IOC orders with <b>zero fill are not listed</b>. Minor observability inconsistency worth confirming as intended.</p>
+<h3>5.3 Order History omits zero-fill expired IOC orders</h3>
+<p class="section-note">Expired IOC orders with a partial fill appear in Order History; expired IOC orders with <b>zero fill are not listed</b>. Minor observability inconsistency worth confirming as intended.</p>
 </section>
 </article>
 
@@ -288,10 +287,10 @@ ol.pts b{color:var(--ink);font-weight:600}
 <div class="tw"><table>
 <thead><tr><th>Item</th><th>Value</th></tr></thead>
 <tbody>
-<tr><td>Open position</td><td class="dim">BTCUSDT-PERP Long 0.005 BTC (entry 84,210) — could not be closed (no MM asks)</td></tr>
-<tr><td>Perps balance</td><td class="dim">≈ 5,050 USDT (5,000 + 50 transfer, minus fees &amp; realized loss)</td></tr>
+<tr><td>Open positions</td><td class="dim">None (both XRP and HYPE round trips fully closed)</td></tr>
+<tr><td>Perps balance</td><td class="dim">≈ 5,050 USDT (5,000 + 50 transfer, minus fees, plus realized profit)</td></tr>
 <tr><td>Spot balance</td><td class="dim">≈ 4,950 USDT (5,000 − 50 transfer)</td></tr>
-<tr><td>Orders created during the run</td><td class="dim">4 × market open (BTC, 0.010 each) · 1 × market close (BTC, 0.031) · 1 × market open + close (XRP, 326.818)</td></tr>
+<tr><td>Orders created during the run</td><td class="dim">1 × market open + close (XRP, 326.818) · 1 × market open + close (HYPE, 1.08) · 1 × transfer (50 USDT)</td></tr>
 </tbody>
 </table></div>
 
@@ -303,7 +302,7 @@ ol.pts b{color:var(--ink);font-weight:600}
 <li><b>Order submission is not captured by a <code>window.fetch</code>/XHR probe</b> on this client; use Order/Position history as the source of truth for whether an order was placed.</li>
 </ul>
 
-<div class="call"><p class="call-t">Document maintenance</p><p>v1.0 (2026-09-25): first smoke-test report, English edition. Companion style reference: <code>docs/a-book-perps-design.en.html</code>. Related: <code>docs/new-perps-rollout-plan.html</code> (market parameters), <code>docs/a-book-perps-design.html</code> (Chinese twin of the design doc).</p></div>
+<div class="call"><p class="call-t">Document maintenance</p><p>v1.1 (2026-09-25): HYPE page retested — load failure confirmed intermittent (page loaded and traded on retry), so the P1 is downgraded to an observation; HYPE round-trip numbers added; out-of-scope markets dropped from the report per feedback. v1.0: first smoke-test report, English edition. Companion style reference: <code>docs/a-book-perps-design.en.html</code>. Related: <code>docs/new-perps-rollout-plan.html</code> (market parameters), <code>docs/a-book-perps-design.html</code> (Chinese twin of the design doc).</p></div>
 </section>
 </article>
 

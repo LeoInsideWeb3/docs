@@ -104,10 +104,10 @@ ol.pts b{color:var(--ink);font-weight:600}
 <a href="#services" data-tab="services"><span class="n">7</span>Service Changes</a>
 <div class="grp">Execution</div>
 <a href="#risk" data-tab="risk"><span class="n">8</span>Risks &amp; Circuit Breakers</a>
-<a href="#cutover" data-tab="cutover"><span class="n">9</span>Cutover Plan</a>
+<a href="#cutover" data-tab="cutover"><span class="n">9</span>Rollout &amp; Estimate</a>
 <a href="#open" data-tab="open"><span class="n">10</span>Decided &amp; Open</a>
 </nav>
-<div class="side-foot">2026-09-28 · v1.4 · design draft<br>forced isolated + one-way<br>own Binance master account<br>in-house MM holds liquidation stops<br>decided: Binance price + fees<br>full switch · no legacy · Binance-first</div>
+<div class="side-foot">2026-09-28 · v1.5 · design draft<br>A-Book + B-Book per market<br>own Binance master account<br>hedge + one-way · isolated on A-Book<br>local liquidation trigger<br>spot A-Book = phase 2</div>
 </aside>
 
 <div class="main">
@@ -116,59 +116,67 @@ ol.pts b{color:var(--ink);font-weight:600}
 <article class="panel" id="p-overview">
 <header>
 <div class="eyebrow">1 · Overview &amp; Decisions</div>
-<h1>Moving All Perpetuals to A-Book</h1>
-<p class="standfirst">The platform <strong>exits the counterparty role for perpetuals</strong>: the order book, klines, and 24h statistics come straight from Binance; every user order is genuinely executed on <strong>the platform's own Binance master account</strong> through our in-house market maker (MM); the platform keeps accounts, margin, liquidation pricing, and the fee system, earning <strong>explicit fees</strong> instead of carrying internal matching and counterparty market risk. Since v1.4 <strong>every A-Book position is isolated and one-way</strong>: we compute each position's liquidation price, the MM holds a matching stop order on Binance, and that stop's real fill <em>is</em> the user's liquidation.</p>
+<h1>Adding A-Book Next to B-Book, Per Market</h1>
+<p class="standfirst">The platform gains a second execution model and chooses it <strong>per market</strong>. <strong>B-Book</strong> is today's system: Finex matches users against each other and against internal market-making accounts, and the platform is the counterparty. <strong>A-Book</strong> forwards every user order to <strong>the platform's own Binance master account</strong> through our in-house market maker (MM): the order book, klines, and mark price come from Binance, and the platform stops being the counterparty on that market. Accounts, margin, liquidation, and fees stay in our system for both models.</p>
 <div class="tw"><table>
 <thead><tr><th>Decision</th><th>Outcome</th><th>Meaning</th></tr></thead>
 <tbody>
-<tr><td><b>Binance account</b></td><td><span class="pill ok">Our own master account</span></td><td class="dim">All user orders land on one platform-owned Binance account; Binance sees only its net position and balance, never individual users (decided 2026-09-28)</td></tr>
-<tr><td><b>MM role</b></td><td><span class="pill ok">In-house execution agent</span></td><td class="dim">Our own MM system operates the master account: forwards user orders and holds the liquidation stops. It is not a counterparty — no commercial settlement, no MM credit exposure</td></tr>
-<tr><td><b>Margin &amp; position mode</b></td><td><span class="pill ok">Forced isolated + one-way</span></td><td class="dim">Cross margin and hedge mode are disabled on A-Book markets; one user × one market = at most one position = one liquidation price (decided 2026-09-28)</td></tr>
-<tr><td><b>Liquidation execution</b></td><td><span class="pill ok">Local liq price → Binance stop</span></td><td class="dim">PM Perp computes each position's isolated liquidation price and publishes it; the MM places and maintains the stop on Binance; the stop's actual fill price is the user's liquidation price</td></tr>
-<tr><td><b>Fill price</b></td><td><span class="pill ok">Real Binance fill price + explicit fees</span></td><td class="dim">Rates come from the existing fee_engine; no spread baked into price</td></tr>
-<tr><td><b>Switch scope</b></td><td><span class="pill ok">Full switch</span></td><td class="dim">All perp markets move to A-Book at once; no legacy positions (fresh start)</td></tr>
-<tr><td><b>Market data &amp; mapping</b></td><td><span class="pill ok">Binance-first</span></td><td class="dim">Execution / market data / klines / mark price all keyed to Binance; maintain only our ↔ Binance symbol mapping</td></tr>
-<tr><td><b>Interface status</b></td><td><span class="pill gap">NeoDAX ↔ MM not built</span></td><td class="dim">MM is already connected to Binance; the NeoDAX ↔ MM contract (orders + liquidation protections) is page 3 of this document (review material)</td></tr>
+<tr><td><b>Book selection</b></td><td><span class="pill ok">Per market, A and B coexist</span></td><td class="dim">Each perp market is configured as A-Book or B-Book (e.g. BTC / ETH on A, the rest on B); a market may switch only while it has zero open positions (decided 2026-09-28)</td></tr>
+<tr><td><b>Binance account</b></td><td><span class="pill ok">Our own master account</span></td><td class="dim">All A-Book user orders land on one platform-owned Binance account; Binance sees only its net position and balance, never individual users</td></tr>
+<tr><td><b>MM role</b></td><td><span class="pill ok">In-house execution agent</span></td><td class="dim">Our own MM system (built by a separate team) forwards orders and reports fills. It is not a counterparty — no commercial settlement, no MM credit exposure</td></tr>
+<tr><td><b>Position mode</b></td><td><span class="pill ok">Hedge + one-way</span></td><td class="dim">Both stay available to users. The master account runs one-way on Binance and holds only the net of all user legs (a user long 0.5 and short 1 → master short 0.5)</td></tr>
+<tr><td><b>Margin mode</b></td><td><span class="pill ok">Forced isolated on A-Book</span></td><td class="dim">Cross margin is disabled on A-Book markets; B-Book markets keep both modes</td></tr>
+<tr><td><b>Liquidation</b></td><td><span class="pill ok">Local trigger, market close via MM</span></td><td class="dim">PM Perp's scanner watches Binance mark; at the liquidation price it sends a market close through the MM and settles at the real fill price. Binance stop orders are not used (per-symbol cap, see 3.8)</td></tr>
+<tr><td><b>Fill price</b></td><td><span class="pill ok">Real Binance fill price + explicit fees</span></td><td class="dim">Rates come from the existing fee_engine; our rates must stay above what Binance charges the master account</td></tr>
+<tr><td><b>Rollout</b></td><td><span class="pill ok">Market by market</span></td><td class="dim">First batch of 2–3 markets; spot A-Book is phase 2</td></tr>
+<tr><td><b>Interface status</b></td><td><span class="pill gap">NeoDAX ↔ MM not built</span></td><td class="dim">MM is already connected to Binance; the NeoDAX ↔ MM contract is page 3 of this document (review material)</td></tr>
 </tbody>
 </table></div>
+<div class="call"><p class="call-t">What A-Book changes — and what it does not</p><p><b>Changes</b>: where fills happen (Binance instead of our Finex book) and who carries the market risk. Our master account holds the opposite of our users' net position, so user profits come from the Binance market, not from the platform. Users trade against Binance depth, and a thin internal book can no longer be pushed around (the 09-18 TAO attack) or frozen (the 07-15 ETH mark incident).</p><p><b>Does not change</b>: every piece of business logic — balances, margin, positions, liquidation, fees, risk checks — stays in our system, because Binance knows only our master account. The MM is an execution channel that plays Finex's role for A-Book markets.</p><p><b>Trade-off</b>: revenue on A-Book markets is fees only, and every fill pays Binance fees. Hence per-market choice: A-Book where risk transfer or liquidity matters most, B-Book where the platform prefers to keep the spread or Binance has no market (e.g. YELLOW).</p></div>
+<div class="call warn"><p class="call-t">Isolated at the system level, dependent at the business level</p><p>An MM failure never blocks our services: trading-api does not wait on the MM (it locks margin and publishes to Kafka; the connector calls the MM asynchronously), and queries, deposits, withdrawals, transfers and B-Book markets keep working.</p><p>But on an A-Book market the fill <em>happens</em> at Binance, so we can never assume an outcome. A timed-out order goes UNKNOWN with margin still locked until the MM confirms (3.5); a timed-out cancel is not reported as cancelled; a liquidation close that cannot be sent is real exposure. A long MM outage halts A-Book markets the same way a Finex outage halts B-Book markets. Breakers, UNKNOWN arbitration, reconciliation and liquidation re-issue are launch prerequisites, not options.</p></div>
 </header>
 
 <section>
 <h2>Target Flow at a Glance</h2>
-<p class="section-note">Command plane and data plane are separate (green boxes are new). Command plane: <strong>funds and margin stay 100% with us</strong> — the MM is only an execution channel. Data plane: everything the user sees comes from the Binance mirror.</p>
+<p class="section-note">Command plane and data plane are separate (green boxes are new). Command plane: <strong>funds and margin stay 100% with us</strong> — the MM is only an execution channel. Data plane: on A-Book markets everything the user sees comes from the Binance mirror. B-Book markets keep today's Finex path unchanged.</p>
 <div class="layers">
 <div class="layer">
 <div class="layer-n">User<small>REST / WebSocket</small></div>
-<p class="layer-d">Place / cancel / query. Experience unchanged: still trading-api's existing APIs.</p>
+<p class="layer-d">Place / cancel / query. Experience unchanged: still trading-api's existing APIs, same for A-Book and B-Book markets.</p>
 </div>
-<div class="arrow">↓ ① gRPC LockPerpAsset (margin check + lock, unchanged) · ② Kafka CommandOrderCreate (unchanged)</div>
+<div class="arrow">↓ ① gRPC LockPerpAsset (margin check + lock, unchanged) · ② Kafka CommandOrderCreate to <code>commands.{MKT}.OrderCommands</code> (unchanged)</div>
+<div class="layer hi">
+<div class="layer-n">Per-market routing<small>book flag</small></div>
+<p class="layer-d">Each market's command topic has exactly one consumer: <b>Finex</b> for a B-Book market, <b>mm-connector</b> for an A-Book market. The market's book flag decides which one is active.</p>
+</div>
+<div class="arrow">↓ A-Book markets</div>
 <div class="layer hi">
 <div class="layer-n">mm-connector<small>new service · protocol translation</small></div>
-<p class="layer-d">Consumes the same <code>commands.{MKT}.OrderCommands</code> as Finex → translates to MM REST → receives WS reports → <b>synthesizes Finex-format events</b> back onto Kafka. To everything downstream it <i>is</i> the matching engine.</p>
+<p class="layer-d">Consumes <code>commands.{MKT}.OrderCommands</code> for A-Book markets → translates to MM REST → receives WS reports → <b>synthesizes Finex-format events</b> back onto Kafka. To everything downstream it <i>is</i> the matching engine.</p>
 </div>
-<div class="arrow">↓ REST submit / WS reports / protection targets (page 3 contract)</div>
+<div class="arrow">↓ REST submit / WS reports (page 3 contract)</div>
 <div class="layer hi">
 <div class="layer-n">MM<small>in-house · our Binance master account</small></div>
-<p class="layer-d">Forwards our orders to Binance USDⓈ-M (limit / market / post-only), reporting <b>real fill prices and roles</b>. Also holds <b>one liquidation stop per position</b> on Binance, kept in sync with the liquidation price we publish; a triggered stop is reported back as a liquidation fill.</p>
+<p class="layer-d">Forwards our orders to Binance USDⓈ-M (limit / market / post-only) on a one-way master account, reporting <b>real fill prices and roles</b>. Liquidation closes arrive as ordinary <code>source=liquidation</code> market orders.</p>
 </div>
 <div class="arrow">↓ EventOrderUpdated / EventTradeExecuted (byte-identical format to Finex — zero downstream changes)</div>
 <div class="layer">
-<div class="layer-n">PM Perp<small>settlement · + isolated liq pricing</small></div>
-<p class="layer-d">Two-participant settlement: user + <b>house system account</b> (new, mirrors the master account). Margin, isolated positions, PnL, funding, and Scheme A audit stay; the liquidation scanner turns into the <b>liquidation-price calculator + shadow monitor</b> — the close itself happens on Binance.</p>
+<div class="layer-n">PM Perp<small>settlement · per-market liquidation outlet</small></div>
+<p class="layer-d">Two-participant settlement: user + <b>house system account</b> (new, mirrors the master account) on A-Book markets; unchanged on B-Book markets. Margin, positions, PnL, funding, the liquidation scanner and Scheme A audit all stay; only where the liquidation close goes depends on the market's book.</p>
 </div>
 </div>
 <div class="layers" style="margin-top:14px">
 <div class="layer hi">
 <div class="layer-n">quote<small>extended · Binance mirror</small></div>
-<p class="layer-d">New subscriptions: depth20 order book, kline_1m, 24h ticker, aggTrade, exchangeInfo filters → published in existing event formats, <b>zero changes for trading-api and ledger consumers</b>. On A-Book markets the mark price is Binance's mark directly (the same reference the stops trigger on, page 6).</p>
+<p class="layer-d">New subscriptions for A-Book markets: depth20 order book, kline_1m, 24h ticker, aggTrade, exchangeInfo filters → published in existing event formats, <b>zero changes for trading-api and ledger consumers</b>. A-Book markets use Binance mark directly; B-Book markets keep the multi-source oracle (page 6).</p>
 </div>
 </div>
 
-<h2>Three Preconditions Worth Stating Up Front</h2>
-<div class="call warn"><p class="call-t">Precondition 1: zero open positions platform-wide at the switch instant (confirmed — fresh start)</p><p>At the switch instant <b>there must be no open positions platform-wide</b> — legacy positions would have no Binance hedge, splitting books from reality.</p><p>Internal-account cleanup in progress: attacker executed (09-22), 0x535c / 0x7152 runbooks ready. <b>No user positions need disposal</b> (halted state treated as a fresh start, confirmed 2026-09-24).</p></div>
-<div class="call"><p class="call-t">Precondition 2: user conditional orders stay local; liquidation moves to Binance-resident stops</p><p>User TP/SL trigger evaluation, WAL, and LockPerpAsset stay local (the <code>perp_trigger</code> Trigger→Lock→CommandOrderExecute flow is unchanged).</p><p>Liquidation changes shape (v1.4): PM Perp keeps computing each position's isolated liquidation price (MMR tiers), but <strong>no longer fires close orders itself</strong> — it publishes the price as a protection target, and the MM's stop on Binance executes the close. The scanner stays on as a shadow monitor (alerts only), so the same position can never be closed twice.</p></div>
-<div class="call warn"><p class="call-t">Precondition 4: isolated + one-way are enforced, not defaulted</p><p>A-Book markets reject cross-margin and hedge-mode settings server-side (PM Perp + trading-api validation); the frontend hides the Cross/Hedge toggles. One user × one market holds at most one position, so it maps to exactly one liquidation price and one stop.</p></div>
-<div class="call"><p class="call-t">Precondition 3: keep a B-book rollback switch for one release cycle</p><p>The finex-perp engine is <b>routed off but not deleted</b>.</p><p>For one release cycle after cutover we keep a hot "route flag flips back to Finex" capability (page 9); cleanup happens after the observation window once A-Book is stable.</p></div>
+<h2>Four Preconditions Worth Stating Up Front</h2>
+<div class="call warn"><p class="call-t">Precondition 1: a market switches book only at zero open positions</p><p>An A-Book position has a real Binance position behind it; a B-Book position does not. Moving a market between books with positions open would split books from reality, so the first version allows a switch only when that market has <b>no open positions and no resting orders</b>.</p><p>The initial launch meets this trivially: trading is halted and treated as a fresh start (confirmed 2026-09-24).</p></div>
+<div class="call"><p class="call-t">Precondition 2: triggers and liquidation stay local</p><p>User TP/SL trigger evaluation, WAL, and LockPerpAsset stay local (the <code>perp_trigger</code> Trigger→Lock→CommandOrderExecute flow is unchanged).</p><p>The PM Perp liquidation scanner keeps deciding when a position is liquidated (Binance mark on A-Book markets, MMR tiers). On an A-Book market its close order goes to mm-connector instead of Finex. We do not use Binance stop orders for liquidation: Binance caps open conditional orders per symbol per account (10 at the time of writing), far below one per user on a shared master account.</p></div>
+<div class="call"><p class="call-t">Precondition 3: both books are permanent</p><p>Finex perp, takeover/ADL, and the internal market-making accounts <b>stay</b> — they serve B-Book markets. The book flag is a long-lived per-market setting, not a one-off rollback switch.</p></div>
+<div class="call warn"><p class="call-t">Precondition 4: isolated margin is enforced on A-Book markets</p><p>A-Book markets reject cross-margin settings server-side (PM Perp + trading-api validation) and the frontend hides the Cross toggle. Hedge and one-way both remain available: the master account holds only the net of all user legs.</p></div>
 </section>
 </article>
 
@@ -176,8 +184,8 @@ ol.pts b{color:var(--ink);font-weight:600}
 <article class="panel" id="p-arch" hidden>
 <header>
 <div class="eyebrow">2 · Architecture</div>
-<h1>Today → Target: Replace the Matching Engine, Keep Every Contract</h1>
-<p class="standfirst">The core insight: <strong>Finex exposes exactly two Kafka contracts</strong> — ingress <code>commands.{MKT}.OrderCommands</code>, egress <code>events.{MKT}.EventOrderUpdated</code> + <code>events.{MKT}.EventTradeExecuted</code>. Swap the role that consumes the ingress and produces the egress to mm-connector, and <strong>every downstream service needs zero changes</strong>.</p>
+<h1>Today → Target: A Second Matching Seat, Chosen Per Market</h1>
+<p class="standfirst">The core insight: <strong>Finex exposes exactly two Kafka contracts</strong> — ingress <code>commands.{MKT}.OrderCommands</code>, egress <code>events.{MKT}.EventOrderUpdated</code> + <code>events.{MKT}.EventTradeExecuted</code>. Topics are already per market, so an A-Book market simply hands that seat to mm-connector while B-Book markets keep Finex — and <strong>every downstream service needs zero changes</strong> either way.</p>
 </header>
 
 <section>
@@ -204,13 +212,14 @@ ol.pts b{color:var(--ink);font-weight:600}
 </div>
 </div>
 
-<h2>Target (A-Book via MM execution)</h2>
+<h2>Target (per market: B-Book via Finex, A-Book via MM)</h2>
+<p class="section-note">B-Book markets run exactly the "Today" path above. The layers below apply to A-Book markets only.</p>
 <div class="layers">
 <div class="layer">
 <div class="layer-n">trading-api<small>unchanged</small></div>
-<p class="layer-d">Order placement / margin locking / rollback paths completely unchanged. Only the data source for order book, klines, ticker, and the public trade tape switches to quote's Binance mirror (same topics, same formats).</p>
+<p class="layer-d">Order placement / margin locking / rollback paths completely unchanged. On A-Book markets only the data source for order book, klines, ticker, and the public trade tape switches to quote's Binance mirror (same topics, same formats).</p>
 </div>
-<div class="arrow">↓ Kafka commands.{MKT}.OrderCommands (same topic, different consumer)</div>
+<div class="arrow">↓ Kafka commands.{MKT}.OrderCommands (same topic; consumer chosen by the market's book flag)</div>
 <div class="layer hi">
 <div class="layer-n">mm-connector<small>new · takes Finex's seat</small></div>
 <p class="layer-d">Consumes order commands → submits via MM REST (idempotent + expires_at) → WS reports drive the state machine → translates ack/fill/cancel/reject into <code>EventOrderUpdated</code> / <code>EventTradeExecuted</code> (house synthetic order as counterparty leg) → publishes to <code>events.{MKT}.*</code>. Built in: UNKNOWN dangling-order arbitration (three-condition death verdict, see 3.5), heartbeat circuit breaker, three-way reconciliation worker.</p>
@@ -218,7 +227,7 @@ ol.pts b{color:var(--ink);font-weight:600}
 <div class="arrow">↓ REST / WS (page 3 contract) · MM → Binance execution</div>
 <div class="layer hi">
 <div class="layer-n">PM Perp<small>settlement semantics unchanged + house account</small></div>
-<p class="layer-d">Still consumes <code>EventTradeExecuted</code> for two-participant settlement — except the counterparty leg is now always the <b>house system account</b> (UUID suffix 09, owner=0x0), which mirrors our Binance master account. After every position change it recomputes the isolated liquidation price and emits a protection target to the connector; liquidation fills come back as <code>ExecType=liquidation</code>. Takeover/ADL retire; the insurance fund only covers bankruptcy shortfalls.</p>
+<p class="layer-d">Still consumes <code>EventTradeExecuted</code> for two-participant settlement — except the counterparty leg is now always the <b>house system account</b> (UUID suffix 09, owner=0x0), which mirrors our Binance master account. The scanner's liquidation close for an A-Book position goes to the connector as a <code>source=liquidation</code> market order and settles as <code>ExecType=liquidation</code>; bankruptcy shortfalls are paid from the insurance fund to house. Takeover/ADL are not used on A-Book markets (still used on B-Book markets).</p>
 </div>
 <div class="arrow">↓ Binance public streams (quote mirror, page 6)</div>
 <div class="layer hi">
@@ -236,21 +245,22 @@ ol.pts b{color:var(--ink);font-weight:600}
 <li><b>Governance</b> — the connector is a first-class service on our side: rate limiting, circuit breaking, reconciliation, and audit logs all live with us — observable and operable.</li>
 </ol>
 
-<h2>Keep vs Retire</h2>
+<h2>What Each Book Uses</h2>
 <div class="tw"><table>
-<thead><tr><th>Component</th><th>Verdict</th><th>Notes</th></tr></thead>
+<thead><tr><th>Component</th><th>B-Book markets</th><th>A-Book markets</th></tr></thead>
 <tbody>
-<tr><td class="mono-c">LockPerpAsset / UnlockPerpAsset</td><td><span class="pill ok">unchanged</span></td><td class="dim">Funds stay with us. Validation (margin / leverage / risk-tier / price deviation) retained</td></tr>
-<tr><td class="mono-c">perp_trigger service</td><td><span class="pill ok">near-zero changes</span></td><td class="dim">Trigger→lock→CommandOrderExecute flows to the connector naturally; one addition: cancel the user's waiting TP/SL on a market when that position is liquidated</td></tr>
-<tr><td class="mono-c">PM Perp settlement / Scheme A audit</td><td><span class="pill ok">unchanged</span></td><td class="dim">Two-participant model as-is; counterparty leg becomes the house account</td></tr>
-<tr><td class="mono-c">fee_engine</td><td><span class="pill ok">unchanged</span></td><td class="dim">User rates charged as today; house side zero-rated</td></tr>
-<tr><td class="mono-c">MMR tiers + isolated liq-price formula</td><td><span class="pill ok">kept · now the output</span></td><td class="dim">Tiers and the isolated formula stay; the result is published as the protection target instead of driving a local close</td></tr>
-<tr><td class="mono-c">Liquidation scanner (close executor)</td><td><span class="pill gap">shadow mode</span></td><td class="dim">Stops issuing close orders on A-Book markets (the Binance stop closes); keeps scanning to alert when mark has crossed a liq price but no liquidation fill has arrived</td></tr>
-<tr><td class="mono-c">Cross margin / hedge mode</td><td><span class="pill no">disabled on A-Book</span></td><td class="dim">Code and enums retained; A-Book markets accept only isolated + one-way (validation + UI)</td></tr>
-<tr><td class="mono-c">Finex perp matching engine</td><td><span class="pill no">retired</span></td><td class="dim">Routed off; code kept one release cycle as the rollback switch; <b>Finex spot unaffected</b></td></tr>
-<tr><td class="mono-c">takeover / ADL</td><td><span class="pill no">retired</span></td><td class="dim">B-Book-only machinery (protects internal counterparties); under A-Book bankruptcy shortfalls are paid straight to the house account from the insurance fund</td></tr>
-<tr><td class="mono-c">Liquidation IOC internal matching</td><td><span class="pill no">retired</span></td><td class="dim">Replaced by the per-position stop the MM holds on Binance (fills reported as source=liquidation)</td></tr>
-<tr><td class="mono-c">Internal MM quoting accounts</td><td><span class="pill no">retired</span></td><td class="dim">0x535c / 0x7152 and other internal MM accounts close after cleanup (runbooks ready)</td></tr>
+<tr><td class="mono-c">LockPerpAsset / UnlockPerpAsset</td><td><span class="pill ok">unchanged</span></td><td class="dim">unchanged — funds stay with us; validation (margin / leverage / risk-tier / price deviation) retained, plus a slippage buffer on market orders</td></tr>
+<tr><td class="mono-c">perp_trigger service</td><td><span class="pill ok">unchanged</span></td><td class="dim">unchanged — Trigger→lock→CommandOrderExecute flows to the connector naturally; on liquidation the user's waiting TP/SL on that market is cancelled (both books)</td></tr>
+<tr><td class="mono-c">PM Perp settlement / Scheme A audit</td><td><span class="pill ok">unchanged</span></td><td class="dim">two-participant model as-is; counterparty leg is the house account</td></tr>
+<tr><td class="mono-c">fee_engine</td><td><span class="pill ok">unchanged</span></td><td class="dim">user rates charged as today; house side zero-rated; rates must exceed Binance's rate for the master account</td></tr>
+<tr><td class="mono-c">Liquidation scanner + MMR tiers</td><td><span class="pill ok">unchanged</span></td><td class="dim">same trigger logic on Binance mark; the close order goes to the connector instead of Finex</td></tr>
+<tr><td class="mono-c">Hedge / one-way position modes</td><td><span class="pill ok">both</span></td><td class="dim">both; the master account is one-way and holds the net of all user legs</td></tr>
+<tr><td class="mono-c">Cross / isolated margin</td><td><span class="pill ok">both</span></td><td class="dim">isolated only (validation + UI)</td></tr>
+<tr><td class="mono-c">Finex perp matching engine</td><td><span class="pill ok">used</span></td><td class="dim">not used (routed off for that market); <b>Finex spot unaffected</b></td></tr>
+<tr><td class="mono-c">takeover / ADL</td><td><span class="pill ok">used</span></td><td class="dim">not used — no internal counterparties to protect; shortfalls go insurance fund → house</td></tr>
+<tr><td class="mono-c">Liquidation IOC internal matching</td><td><span class="pill ok">used</span></td><td class="dim">replaced by a source=liquidation market close executed on Binance via the MM</td></tr>
+<tr><td class="mono-c">Internal market-making accounts</td><td><span class="pill ok">used (liquidity)</span></td><td class="dim">not used — liquidity is Binance depth</td></tr>
+<tr><td class="mono-c">Mark price source</td><td><span class="pill ok">multi-source oracle</span></td><td class="dim">Binance mark</td></tr>
 </tbody>
 </table></div>
 </section>
@@ -262,7 +272,7 @@ ol.pts b{color:var(--ink);font-weight:600}
 <div class="eyebrow">3 · MM Interface Contract v1</div>
 <h1>NeoDAX ↔ MM Communication Contract (review material)</h1>
 <p class="standfirst">This is the <strong>first thing the project must land</strong>. Design principle: <strong>semantically mirror the Binance USDⓈ-M API</strong> (orders / cancels / execution report stream) so the MM implements against a model he already knows; our mm-connector is the sole caller, and the MM never touches our Kafka.</p>
-<div class="assume"><b>Contract at a glance</b><br>REST submit/query + WebSocket reports · HMAC auth<br><code>client_order_id</code> idempotency (= our order UUID) · <code>expires_at</code> dangling protection<br>ack ≤ 500ms · market-order fill reports ≤ 3s · all numerics as decimal strings (no floats)<br><b>v1.4</b>: + liquidation protection targets (3.8) — we publish the price, the MM owns the Binance stop · the MM operates <b>our own</b> Binance master account</div>
+<div class="assume"><b>Contract at a glance</b><br>REST submit/query + WebSocket reports · HMAC auth<br><code>client_order_id</code> idempotency (= our order UUID) · <code>expires_at</code> dangling protection<br>ack ≤ 500ms · market-order fill reports ≤ 3s · all numerics as decimal strings (no floats)<br><b>v1.5</b>: the MM operates <b>our own</b> one-way Binance master account · netted-account rules (3.8) · liquidation closes are ordinary <code>source=liquidation</code> market orders</div>
 </header>
 
 <section>
@@ -274,8 +284,7 @@ ol.pts b{color:var(--ink);font-weight:600}
 <tr><td>User orders / positions / balances / trade history</td><td><span class="pill ok">our PM Perp</span></td><td class="dim"><code>perps_orders</code> / <code>perps_positions</code> / <code>perps_balances</code> / <code>perps_transactions</code> + Raft FSM — current production structure unchanged</td></tr>
 <tr><td>User read APIs (REST / WS private streams)</td><td><span class="pill ok">local</span></td><td class="dim">trading-api → PM Perp gRPC, same as today; <b>never queries the MM</b> — an MM outage affects placement, not queries</td></tr>
 <tr><td>MM-side order / position state</td><td><span class="pill gap">MM (execution feedback)</span></td><td class="dim">Only an <b>input</b> to our state machine, not a ledger; GET is for arbitration and reconciliation only (below)</td></tr>
-<tr><td>Liquidation price per position</td><td><span class="pill ok">our PM Perp</span></td><td class="dim">Computed locally (isolated formula + MMR tiers); the same value is shown to the user and published to the MM</td></tr>
-<tr><td>Binance stop orders (protections)</td><td><span class="pill gap">MM (placement &amp; maintenance)</span></td><td class="dim">The MM owns how the stop lives on Binance (algo API, replace ordering, rate limits); we own the target and verify it via reconciliation (3.8)</td></tr>
+<tr><td>Liquidation decision per position</td><td><span class="pill ok">our PM Perp</span></td><td class="dim">Computed and triggered locally (isolated formula + MMR tiers, Binance mark); the MM only executes the resulting close order</td></tr>
 <tr><td>Binance master account (positions / wallet)</td><td><span class="pill ok">platform-owned</span></td><td class="dim">Our own account: besides MM reports, we reconcile against it directly with a <b>read-only API key</b> (page 5)</td></tr>
 </tbody>
 </table></div>
@@ -311,8 +320,6 @@ ol.pts b{color:var(--ink);font-weight:600}
 <tr><td class="mono-c"><b>GET /api/v1/orders/{client_order_id}</b></td><td>Authoritative state query</td><td class="dim"><b>The sole basis for dangling-order arbitration</b>: returns final state + all fills (see 3.5)</td></tr>
 <tr><td class="mono-c">GET /api/v1/positions</td><td>Master account net position report</td><td class="dim">Pulled periodically by the reconciliation worker, compared against the sum of users' signed positions (cross-checked with our read-only Binance key)</td></tr>
 <tr><td class="mono-c">GET /api/v1/account</td><td>Master account margin report</td><td class="dim">wallet balance / margin balance / maintenance margin / margin ratio; drives the master-account circuit breaker (page 8)</td></tr>
-<tr><td class="mono-c"><b>PUT /api/v1/protections/{position_key}</b></td><td>Upsert liquidation protection target</td><td class="dim">Target-state semantics with a monotonic version; qty=0 means remove (see 3.8)</td></tr>
-<tr><td class="mono-c">GET /api/v1/protections</td><td>Protection state list</td><td class="dim">Applied version / Binance stop id / trigger price / qty per position; basis of protection reconciliation</td></tr>
 <tr><td class="mono-c">GET /api/v1/health</td><td>Health check</td><td class="dim">Heartbeat probe; includes Binance connectivity status</td></tr>
 <tr><td class="mono-c">GET /api/v1/time</td><td>Server clock</td><td class="dim">Clock calibration</td></tr>
 </tbody>
@@ -324,7 +331,7 @@ ol.pts b{color:var(--ink);font-weight:600}
   <span class="k">"client_order_id"</span>: <span class="t">"3f9c2a48-9d21-4b6e-8f2a-2c1d5e7b9a03"</span>,  <span class="c">// our order UUID, idempotency key</span>
   <span class="k">"market"</span>:           <span class="t">"TAOUSDT-PERP"</span>,                       <span class="c">// our symbol (belt and braces — both given)</span>
   <span class="k">"binance_symbol"</span>:   <span class="t">"TAOUSDT"</span>,
-  <span class="k">"side"</span>:             <span class="t">"buy"</span>,                                  <span class="c">// buy|sell (one-way only, see 3.6)</span>
+  <span class="k">"side"</span>:             <span class="t">"buy"</span>,                                  <span class="c">// buy|sell (we translate hedge direction, see 3.6)</span>
   <span class="k">"type"</span>:             <span class="t">"LIMIT"</span>,                                <span class="c">// LIMIT|MARKET|POST_ONLY</span>
   <span class="k">"qty"</span>:              <span class="t">"19.75"</span>,                                <span class="c">// base-asset quantity, decimal string</span>
   <span class="k">"price"</span>:            <span class="t">"199.50"</span>,                               <span class="c">// required for LIMIT/POST_ONLY</span>
@@ -393,9 +400,9 @@ ol.pts b{color:var(--ink);font-weight:600}
 <div class="tw"><table>
 <thead><tr><th>Our field</th><th>Translation rule</th></tr></thead>
 <tbody>
-<tr><td class="mono-c">direction</td><td class="dim">A-Book is one-way only (v1.4): orders are plain buy/sell against the user's single net position. The MM only ever sees buy/sell</td></tr>
+<tr><td class="mono-c">direction (hedge long/short)</td><td class="dim">open long→buy; close long→sell; open short→sell; close short→buy. The MM only ever sees buy/sell on a one-way master account, which nets every leg (see 3.8)</td></tr>
 <tr><td class="mono-c">margin_mode / leverage</td><td class="dim">Always isolated on A-Book; margin and leverage are our credit concepts toward users. The master account's own Binance leverage/margin settings are an operations concern (page 8), never derived from a user</td></tr>
-<tr><td class="mono-c">position_mode</td><td class="dim">Fixed ONE_WAY on A-Book — purely internal, never sent</td></tr>
+<tr><td class="mono-c">position_mode (ONE_WAY/HEDGE)</td><td class="dim">A user setting, purely internal; the master account is always one-way</td></tr>
 <tr><td class="mono-c">reduce_only</td><td class="dim">Enforced on our side (quantity capped at the user's position) and <b>never forwarded</b>: on a netted master account Binance's reduceOnly refers to the account's net position, not the user's, and would wrongly reject</td></tr>
 <tr><td class="mono-c">post_only</td><td class="dim">Maps to type=POST_ONLY; the MM uses Binance GTX semantics (rest-only, otherwise rejected)</td></tr>
 </tbody>
@@ -425,45 +432,18 @@ ol.pts b{color:var(--ink);font-weight:600}
 <tr><td class="mono-c">SYSTEM_BUSY</td><td>MM internally overloaded</td><td class="dim">backoff; repeated occurrences → circuit break</td></tr>
 </tbody>
 </table></div>
-<div class="call warn"><p class="call-t">Points the MM must confirm one by one at the review meeting</p><p>① GTX (post_only) rejects — can the report distinguish "would take" from other reject reasons; ② IOC partial fills — does the remainder emit ORDER_UPDATE(FILLED) with unambiguous terminal semantics (we record the remainder as StateExpired, matching production); ③ GET /orders fills list — does it include the role field (needed for arbitration backfill); ④ cancel-all — guaranteed time-to-effect; ⑤ advance notice mechanism for Binance maintenance windows; ⑥ <b>tombstone persistence</b> — after answering a GET with "no record", is a later POST with the same ID guaranteed rejected (3.5 item 3, precondition for death verdicts); ⑦ <b>MM-side UNKNOWN semantics</b> — does the MM commit to never reporting a terminal state while its own Binance submission result is uncertain (3.5 item 4); ⑧ <b>protection obligations</b> — every item in the 3.8 obligations list, especially "at most one live stop per position" and full-qty completion after a partial trigger; ⑨ <b>client id on Binance</b> — our order UUID is exactly 36 characters, Binance's <code>newClientOrderId</code> maximum; the MM must not add a prefix and must keep the id ↔ order mapping for attribution.</p></div>
+<div class="call warn"><p class="call-t">Points the MM must confirm one by one at the review meeting</p><p>① GTX (post_only) rejects — can the report distinguish "would take" from other reject reasons; ② IOC partial fills — does the remainder emit ORDER_UPDATE(FILLED) with unambiguous terminal semantics (we record the remainder as StateExpired, matching production); ③ GET /orders fills list — does it include the role field (needed for arbitration backfill); ④ cancel-all — guaranteed time-to-effect; ⑤ advance notice mechanism for Binance maintenance windows; ⑥ <b>tombstone persistence</b> — after answering a GET with "no record", is a later POST with the same ID guaranteed rejected (3.5 item 3, precondition for death verdicts); ⑦ <b>MM-side UNKNOWN semantics</b> — does the MM commit to never reporting a terminal state while its own Binance submission result is uncertain (3.5 item 4); ⑧ <b>netted-account rules</b> — every item in 3.8, especially never using reduceOnly / closePosition / symbol-wide cancel and completing the full quantity of a liquidation close; ⑨ <b>client id on Binance</b> — our order UUID is exactly 36 characters, Binance's <code>newClientOrderId</code> maximum; the MM must not add a prefix and must keep the id ↔ order mapping for attribution.</p></div>
 
-<h3>3.8 Liquidation Protection Contract (v1.4)</h3>
-<p class="section-note">Division of labour decided 2026-09-28: <b>we compute the liquidation price, the MM keeps a Binance stop at that price</b>. We publish a desired state per position; the MM converges Binance to it. We never place, replace, or cancel Binance stops ourselves.</p>
-<pre><span class="c">// PUT /api/v1/protections/{position_key} — position_key = {app_session_id}:{market}</span>
-{
-  <span class="k">"position_key"</span>:  <span class="t">"8c1e…:TAOUSDT-PERP"</span>,
-  <span class="k">"version"</span>:       1042,                      <span class="c">// monotonic per position; older versions must be ignored</span>
-  <span class="k">"binance_symbol"</span>: <span class="t">"TAOUSDT"</span>,
-  <span class="k">"side"</span>:          <span class="t">"sell"</span>,                    <span class="c">// closing side: long → sell, short → buy</span>
-  <span class="k">"qty"</span>:           <span class="t">"19.75"</span>,                   <span class="c">// full position size; "0" = remove the protection</span>
-  <span class="k">"trigger_price"</span>: <span class="t">"181.35"</span>,                  <span class="c">// our isolated liquidation price</span>
-  <span class="k">"working_type"</span>:  <span class="t">"MARK_PRICE"</span>,              <span class="c">// same reference as the mark we show users</span>
-  <span class="k">"reason"</span>:        <span class="t">"fill"</span>                     <span class="c">// fill|margin_change|leverage|funding|resync</span>
-}
-
-<span class="c">// WS reports added to the 3.4 stream</span>
-PROTECTION_APPLIED   {position_key, version, binance_stop_id, trigger_price, qty}
-PROTECTION_TRIGGERED {position_key, version, binance_stop_id, transact_time}   <span class="c">// sent before the fills</span>
-TRADE_FILL           {…, source:"liquidation", position_key, version}          <span class="c">// the close fills, 3.4 format</span>
-PROTECTION_REJECTED  {position_key, version, error_code}                       <span class="c">// e.g. cap reached — alert</span></pre>
-<h4>Our obligations</h4>
+<h3>3.8 Netted Master Account Rules (v1.5)</h3>
+<p class="section-note">Every A-Book order from every user lands on one one-way Binance account, which holds only the <b>net</b> of all user legs across both position modes. Example: a single hedge-mode user long 0.5 and short 1 leaves the master account short 0.5. That is correct and needs no special handling, but it makes the following rules mandatory for the MM.</p>
 <ul class="plain">
-<li><b>Publish on every change</b> — after each fill (partial fills included), margin add/remove, leverage change, funding settlement, and fee debit that moves the liquidation price. Position back to zero → publish qty=0.</li>
-<li><b>Coalesce on our side too</b> — at most one outstanding version per position; newer targets supersede older ones before they are sent. The MM still applies only the highest version it has seen.</li>
-<li><b>Periodic full resync</b> — every N minutes and after every WS reconnect, re-publish the latest version for every open position (idempotent on the MM side).</li>
-<li><b>Freeze on trigger</b> — on <code>PROTECTION_TRIGGERED</code> the position enters the liquidating state (the existing isolated liquidation lock): new orders on that user × market are rejected until the liquidation settles.</li>
+<li><b>Plain buy/sell only</b> — never send <code>reduceOnly</code> or <code>closePosition</code>, and never cancel by symbol. All three act on the account's net position, i.e. on other users' exposure. Reduce-only is enforced on our side (quantity capped at the user's leg).</li>
+<li><b>Cancel one order at a time</b> — by client_order_id only; a symbol-wide cancel would cancel every user's orders on that market.</li>
+<li><b>Liquidation closes complete in full</b> — a <code>source=liquidation</code> market close that only partially fills keeps executing until the requested quantity is done, each fill reported as usual; if it cannot complete, report the remainder explicitly so we re-issue.</li>
+<li><b>Priority</b> — liquidation closes go ahead of user orders in the MM's rate-limit budget.</li>
+<li><b>No Binance conditional orders for our users</b> — user TP/SL and liquidation triggers are evaluated locally (perp_trigger / PM Perp scanner). Binance caps open conditional orders per symbol per account (10 at the time of writing) and moved them to the Algo Service (<code>/fapi/v1/algoOrder</code>); neither fits one shared account serving many users.</li>
 </ul>
-<h4>MM obligations (review items)</h4>
-<ul class="plain">
-<li><b>Exactly one live stop per position</b> — replace is <b>cancel-then-place</b>, never place-then-cancel: two live stops can both trigger and close the position twice. The short unprotected gap is accepted.</li>
-<li><b>Cancel result "unknown order" = possibly triggered</b> — do not place the new stop until the fate of the old one is known (triggered → report the liquidation instead).</li>
-<li><b>Price already through</b> — if Binance rejects the stop because the trigger would fire immediately, close at market right away and report it as a liquidation.</li>
-<li><b>Full-quantity completion</b> — if a triggered stop only partially fills, keep closing the remainder at market until the protected quantity is flat; mark the last fill as final.</li>
-<li><b>Netted-account rules</b> — the master account nets all users: never use <code>closePosition</code> or symbol-wide cancel, and do not rely on <code>reduceOnly</code> (all three act on the account's net position, i.e. on other users).</li>
-<li><b>Binance limits are the MM's problem, visible to us</b> — conditional orders now go through the Algo Service (<code>/fapi/v1/algoOrder</code>, <code>clientAlgoId</code>) and Binance caps open conditional orders per symbol per account (10 at the time of writing), far below "one per user". How the MM covers every position (sub-accounts, local triggering, …) is its design choice, but a position it cannot protect must be reported via <code>PROTECTION_REJECTED</code>, never silently dropped.</li>
-<li><b>Attribution</b> — every stop and every liquidation fill carries position_key + version, so the fill settles against the right user without parsing Binance ids.</li>
-</ul>
-<div class="call"><p class="call-t">Liquidation price definition (isolated, one-way)</p><p>We reuse PM Perp's existing isolated liquidation-price calculation (the value already shown to users), with MMR from the market's risk tiers. For reference: long ≈ (entry × qty − isolated margin) / (qty × (1 − MMR)); short ≈ (entry × qty + isolated margin) / (qty × (1 + MMR)), where isolated margin already reflects margin added or removed, funding paid or received, and fees debited. The trigger sits at the <b>maintenance</b> level, not at bankruptcy, which leaves a buffer for slippage between trigger and fill.</p></div>
+<div class="call warn"><p class="call-t">Fees on netted flow</p><p>Both legs of a hedged user really trade on Binance, so the master account pays Binance fees on each leg while its net position barely moves. Our user fee rates on A-Book markets must stay above the master account's Binance rates (maker and taker), or every fill loses money. This is a pricing decision to confirm with the business before launch.</p></div>
 </section>
 </article>
 
@@ -532,31 +512,23 @@ POST timeout (500ms) → enters UNKNOWN (<b>margin stays locked</b>)
 
 WS silence 15s → circuit break: reject new orders + cancel-all in-flight + full GET arbitration on reconnect (incl. UNKNOWN)</pre>
 
-<h4>Fill → liquidation price → protection update (v1.4)</h4>
-<pre>TRADE_FILL (user order) → connector → EventTradeExecuted → PM Perp settles
-   → position qty / average entry updated (isolated, one-way)
-   → isolated liquidation price recomputed (MMR tier of the new notional)
-   → protection target {version+1, qty, trigger_price} → connector → PUT /protections
-   → MM: cancel old stop → place new stop → PROTECTION_APPLIED{version}
-   <span class="c">// partial fills of one order coalesce: only the latest version is ever in flight</span>
-   <span class="c">// position back to 0 → qty=0 → MM only cancels</span>
-
-Also recomputed on: margin add/remove · leverage change · funding settlement · fee debit</pre>
-
-<h4>Liquidation (Binance stop triggers)</h4>
-<pre>Binance mark reaches trigger_price → the MM's stop fires on Binance
-   → PROTECTION_TRIGGERED{position_key, version}
-        → PM Perp locks the position (isolated liquidation lock); new orders on this user × market rejected
-   → TRADE_FILL{source:"liquidation"} × n (MM completes the full quantity)
+<h4>Liquidation close (A-Book market, source=liquidation)</h4>
+<pre>PM Perp liquidation scanner (Binance mark, MMR tiers — same trigger logic as B-Book)
+   → position reaches its liquidation price → isolated liquidation lock taken
+        <span class="c">// new orders on this user × market rejected; the lock also guarantees one close per position</span>
+   → source=liquidation MARKET close → connector → MM → Binance
+   → TRADE_FILL × n (MM completes the full quantity, 3.8)
         → EventTradeExecuted(ExecType=liquidation) → PM Perp settles at the <b>actual fill price</b>
         → realized PnL booked; liquidation fee charged; remaining isolated margin returned to available balance
         → loss beyond the isolated margin → insurance fund → house   <span class="c">// CLEARING_MIRROR semantics retained</span>
    → cancel the user's other orders on this market, one by one by client_order_id
         (resting limits via connector DELETE; waiting TP/SL via perp_trigger)
         <span class="c">// otherwise a later fill silently reopens a position; never use symbol-wide cancel</span>
-   → lock released</pre>
-<div class="call warn"><p class="call-t">The local scanner never closes A-Book positions</p><p>If both the Binance stop and our scanner could close, the same position could be closed twice — and on a netted account the second close opens a real, unowned position. On A-Book markets the scanner only watches: mark past a liquidation price with no <code>PROTECTION_TRIGGERED</code> within T seconds raises an alert and the admin <b>emergency close</b> tool (manual, source=liquidation) takes over.</p></div>
-<div class="call"><p class="call-t">Order amendment</p><p>Not supported — same as today: cancel and re-place. Emergency closes and batch closes flow through the same command path; the connector submits one by one.</p></div>
+   → lock released
+
+On B-Book markets the same scanner sends the close to Finex exactly as today (IOC, takeover/ADL).</pre>
+<div class="call warn"><p class="call-t">A close that does not come back</p><p>If the close is rejected, times out into UNKNOWN, or is cut short, the position stays locked and the scanner re-issues the remaining quantity after arbitration (3.5) — never a second parallel close. A liquidation overdue alert fires when mark has been past the liquidation price for T seconds without a completed close.</p></div>
+<div class="call"><p class="call-t">Order amendment</p><p>Not supported — same as today: cancel and re-place. Liquidation / batch close flow through the same command path; the connector submits one by one.</p></div>
 </section>
 </article>
 
@@ -565,7 +537,7 @@ Also recomputed on: margin add/remove · leverage change · funding settlement �
 <header>
 <div class="eyebrow">5 · Settlement &amp; Accounting</div>
 <h1>The House Account: the Last Piece of Double-Entry</h1>
-<p class="standfirst">Every user fill is a real trade on <strong>our own Binance master account</strong> — but <strong>our books must record where every payment obligation to users comes from</strong>. The solution: one new system account — the <strong>house account</strong> — as the counterparty leg of every trade. It is the ledger mirror of the master account, preserving Scheme A double-entry and the audit chain by construction.</p>
+<p class="standfirst">On an A-Book market every user fill is a real trade on <strong>our own Binance master account</strong> — but <strong>our books must record where every payment obligation to users comes from</strong>. The solution: one new system account — the <strong>house account</strong> — as the counterparty leg of every A-Book trade. It is the ledger mirror of the master account, preserving Scheme A double-entry and the audit chain by construction. B-Book markets settle exactly as today.</p>
 </header>
 
 <section>
@@ -598,23 +570,23 @@ MMHouseAccountID          = <span class="t">"00000000-0000-0000-0000-00000000000
 <tr><td class="mono-c">Header.IdempotencyKey</td><td class="dim"><code>{client_order_id}:{fill_id}</code> → PM Perp's idempotency cache dedups directly</td></tr>
 </tbody>
 </table></div>
-<div class="call"><p class="call-t">The economic loop (a user long, start to finish — v1.4, own master account)</p><p>User opens long 10 TAO @199 (isolated) → we lock the isolated margin → the MM buys 10 TAO on our master account → house books the short leg against the user → PM Perp publishes the protection (stop at the liquidation price).</p><p>User closes the long @205 → <b>user +60</b> (realized PnL credited), <b>house −60</b>; on Binance the master account sold the 10 TAO for +60. The cash backing the user's gain is already in our own account — nothing to collect from anyone.</p><p>When users lose, the direction reverses: house gains, and the master account's Binance loss on that flow equals it. <b>At any instant house mirrors the master account's user-flow position and PnL.</b></p><p>When two users are natural counterparties (A buys, B sells) both orders are still forwarded to Binance as-is; they simply net inside the master account's position. We never internalize matching.</p></div>
+<div class="call"><p class="call-t">The economic loop (a user long, start to finish — v1.4, own master account)</p><p>User opens long 10 TAO @199 (isolated) → we lock the isolated margin → the MM buys 10 TAO on our master account → house books the short leg against the user → the scanner starts watching the position's liquidation price.</p><p>User closes the long @205 → <b>user +60</b> (realized PnL credited), <b>house −60</b>; on Binance the master account sold the 10 TAO for +60. The cash backing the user's gain is already in our own account — nothing to collect from anyone.</p><p>When users lose, the direction reverses: house gains, and the master account's Binance loss on that flow equals it. <b>At any instant house mirrors the master account's user-flow position and PnL.</b></p><p>When two users are natural counterparties (A buys, B sells) both orders are still forwarded to Binance as-is; they simply net inside the master account's position. We never internalize matching on an A-Book market. The same holds for one hedge-mode user holding both legs: both legs trade on Binance, the account nets them, and both pay fees (3.8).</p></div>
 
 <h2>Funding Pass-Through</h2>
 <ul class="plain">
 <li><b>Rate &amp; interval</b> — Binance values used directly: the mark oracle's funding field already has a Binance source; <code>perps_markets.funding_interval_seconds</code> already supports variable intervals (the rollout seeded 4h/8h per Binance fundingInfo). PM Perp's funding worker and <code>funding_payments</code> settlement logic unchanged.</li>
 <li><b>Accounting path</b> — user funding paid/received books against the house account. Binance charges the master account on its <b>net</b> position while we charge each user on their own position; with users on both sides these differ (longs and shorts net on Binance but each pays or receives with us). The difference is house PnL, booked explicitly per funding event and reconciled against the master account's Binance funding records.</li>
-<li><b>Liquidation prices move with funding</b> — each funding settlement changes isolated margins, so every open position is recomputed and a new protection version published in one batch. Only positions whose liquidation price moved by more than a threshold (N ticks) are re-published, and the batch is paced to stay within Binance limits around the funding timestamp.</li>
+<li><b>Liquidation prices move with funding</b> — each funding settlement changes isolated margins; the scanner simply evaluates against the updated margins on its next pass. Nothing is sent to the MM, so there is no burst of external calls at the funding timestamp.</li>
 <li><b>Cap / interest</b> — in pass-through mode the cap always equals the actual Binance value; our self-set caps become unnecessary (current table values already mirror Binance, no change needed).</li>
 </ul>
 
 <h2>Liquidation &amp; the Insurance Fund</h2>
 <ol class="pts">
-<li><b>Liquidation price is the output</b> — MMR tiers and the isolated formula are retained; the scanner no longer decides when to close, it computes and publishes the liquidation price (3.8) and keeps a shadow watch (page 4).</li>
-<li><b>Execution on Binance</b> — the MM's stop closes the position at Binance's real fill price; the reported fills settle as ExecType=liquidation (Scheme A journal_id grouping reused). That fill price is the liquidation price the user sees in their history.</li>
+<li><b>Scanner unchanged</b> — trigger evaluation, MMR tiers, and warning bands are retained; on A-Book markets it evaluates against Binance mark.</li>
+<li><b>Execution on Binance</b> — the close is a <code>source=liquidation</code> market order through the MM; the reported fills settle as ExecType=liquidation at Binance's real fill price (Scheme A journal_id grouping reused). That fill price is the liquidation price the user sees in their history.</li>
 <li><b>Settlement order</b> — realized PnL → liquidation fee → remaining isolated margin returned to the user's available balance → cancel the user's other orders on that market (page 4).</li>
 <li><b>Bankruptcy handling</b> — the part of a user's loss exceeding their isolated margin: insurance fund → house account transfer (the existing <code>CLEARING_MIRROR</code> SettleLiquidatedPosition semantics retained, simplified from "settlement pool takes over the position" to "pay the difference directly"). Isolation caps the user's loss at that one position's margin.</li>
-<li><b>Retired</b> — takeover (insurance fund inheriting positions) and ADL (auto-deleveraging counterparties) go offline: A-Book has no internal counterparties to protect. The insurance fund's sole remaining duty is covering bankruptcy shortfalls.</li>
+<li><b>Not used on A-Book</b> — takeover (insurance fund inheriting positions) and ADL (auto-deleveraging counterparties) stay for B-Book markets but are never used on A-Book markets, which have no internal counterparties to protect. There the insurance fund only covers bankruptcy shortfalls.</li>
 </ol>
 
 <h2>Reconciliation System</h2>
@@ -622,7 +594,7 @@ MMHouseAccountID          = <span class="t">"00000000-0000-0000-0000-00000000000
 <thead><tr><th>Task</th><th>Frequency</th><th>Compares</th><th>On mismatch</th></tr></thead>
 <tbody>
 <tr><td><b>Net position reconciliation</b></td><td class="mono-c">every 1 min</td><td class="dim">per market: sum of users' signed positions (± in-flight orders) vs the master account's net position — read both from MM <code>GET /positions</code> and directly with our read-only Binance key</td><td class="dim">over threshold (e.g. 0.5% or notional floor) → alert + freeze new orders on that market; <b>never auto-trade to fix</b></td></tr>
-<tr><td><b>Protection reconciliation</b></td><td class="mono-c">every 1 min</td><td class="dim">every open position has exactly one applied protection whose version, qty, side and trigger price match our latest target (<code>GET /protections</code>)</td><td class="dim">missing / stale → re-publish the target + alert; <b>orphan protection</b> (no matching position) → ask the MM to cancel immediately (on a netted account it would open a real, unowned position when triggered)</td></tr>
+<tr><td><b>Liquidation timeliness</b></td><td class="mono-c">continuous</td><td class="dim">positions whose mark has been past the liquidation price for T seconds without a completed close</td><td class="dim">alert + re-issue after arbitration; persistent → admin emergency close</td></tr>
 <tr><td><b>Fill reconciliation</b></td><td class="mono-c">every 5 min</td><td class="dim">fill-by-fill comparison over the window (fill_id sets)</td><td class="dim">missing → GET arbitration backfill; extra → idempotency layer intercepts + alert</td></tr>
 <tr><td><b>Funding reconciliation</b></td><td class="mono-c">every interval</td><td class="dim">per-user funding charged vs the master account's Binance funding record</td><td class="dim">the net-vs-gross difference is booked to house; unexplained drift → alert</td></tr>
 <tr><td><b>Wallet reconciliation</b></td><td class="mono-c">daily</td><td class="dim">master account wallet balance vs internal ledger (user balances + house + insurance fund + fees)</td><td class="dim">difference → alert + finance review</td></tr>
@@ -636,7 +608,7 @@ MMHouseAccountID          = <span class="t">"00000000-0000-0000-0000-00000000000
 <header>
 <div class="eyebrow">6 · Market Data</div>
 <h1>Data Plane: Everything the User Sees Comes from Binance</h1>
-<p class="standfirst">Principle: <strong>the quote service taps Binance public streams and republishes in existing event formats onto existing topics</strong> — trading-api's WS subscriptions, ledger's storage, and the external gRPC contracts all stay untouched; only the data source is replaced.</p>
+<p class="standfirst">Applies to A-Book markets; B-Book markets keep today's internal market data. Principle: <strong>the quote service taps Binance public streams and republishes in existing event formats onto existing topics</strong> — trading-api's WS subscriptions, ledger's storage, and the external gRPC contracts all stay untouched; only the data source is replaced.</p>
 </header>
 
 <section>
@@ -648,7 +620,7 @@ MMHouseAccountID          = <span class="t">"00000000-0000-0000-0000-00000000000
 <tr><td class="mono-c">&lt;symbol&gt;@kline_1m</td><td>klines</td><td class="dim">new event → ledger writes Timescale directly (below)</td></tr>
 <tr><td class="mono-c">&lt;symbol&gt;@ticker</td><td>24h stats</td><td class="dim">reuses the <code>events.EventTickerUpdated</code> path</td></tr>
 <tr><td class="mono-c">&lt;symbol&gt;@aggTrade</td><td>public trade tape</td><td class="dim">data source for trading-api's public WS trades channel</td></tr>
-<tr><td class="mono-c">&lt;symbol&gt;@markPrice</td><td>mark / index / funding</td><td class="dim">already subscribed; on A-Book markets it becomes <b>the</b> mark price (see Mark Price below)</td></tr>
+<tr><td class="mono-c">&lt;symbol&gt;@markPrice</td><td>mark / index / funding</td><td class="dim">already subscribed; on A-Book markets it is <b>the</b> mark price (see Mark Price below)</td></tr>
 <tr><td class="mono-c">fapi exchangeInfo (REST, hourly)</td><td>filter sync</td><td class="dim">LOT_SIZE / PRICE_FILTER / MIN_NOTIONAL hot-loaded into trading-api's MarketCache (edge pre-check; MM-side INVALID_FILTER as backstop)</td></tr>
 </tbody>
 </table></div>
@@ -666,9 +638,9 @@ MMHouseAccountID          = <span class="t">"00000000-0000-0000-0000-00000000000
 
 <h2>Mark Price &amp; Risk Data</h2>
 <ul class="plain">
-<li><b>A-Book mark = Binance mark (v1.4)</b> — liquidations now trigger on Binance against its mark price (stops use <code>working_type=MARK_PRICE</code>), so the mark we display and use for estimates must be that same value; otherwise a user sees "price never reached my liquidation price" and is liquidated anyway. On A-Book markets the oracle weights Binance 100%; OKX/Bybit remain only as a staleness / divergence alarm. <b>The min_sources = 1 rule never changes</b> (the rollout runbook's permanent-lock clause stays in force).</li>
+<li><b>Mark source per book</b> — A-Book markets use Binance mark directly (OKX/Bybit remain only as a staleness / divergence alarm), because the position really lives on Binance and liquidation must track the price its hedge is exposed to. B-Book markets keep today's multi-source oracle. <b>The min_sources = 1 rule never changes</b> (the rollout runbook's permanent-lock clause stays in force).</li>
 <li><b>InternalPerpTradeCollector disabled</b> — the "internal trade self-price" source goes offline for A-Book markets (user fills are sparse and priced at Binance anyway — no information content).</li>
-<li><b>Liquidation reference price</b> — the liquidation price we publish, the stop's trigger, and the mark shown in the UI are all the same Binance mark: one number end to end.</li>
+<li><b>Liquidation reference price</b> — on A-Book markets the mark shown in the UI, the one the scanner evaluates, and the one Binance applies to the master account are the same number.</li>
 <li><b>exchangeInfo changes</b> — when Binance tightens filters, quote syncs within the hour; resting orders that become invalid are cleaned up naturally by MM-side INVALID_FILTER reports.</li>
 </ul>
 
@@ -681,11 +653,11 @@ MMHouseAccountID          = <span class="t">"00000000-0000-0000-0000-00000000000
 <tr><td>quote provider framework &amp; engine loops</td><td class="dim">framework shared (Source / Subscribe interfaces)</td><td class="dim">all five new subscriptions hang off binance_perp and are configured only for -PERP markets</td><td><span class="pill ok">zero (binance_spot untouched)</span></td></tr>
 <tr><td>orderbook.{MKT} topic namespace</td><td class="dim">format shared, isolated per market</td><td class="dim">quote produces only for -PERP markets; spot's producer remains the finex spot shard</td><td><span class="pill ok">zero</span></td></tr>
 <tr><td>trading-api kline / ticker / trades WS</td><td class="dim">handlers shared, data routed per market</td><td class="dim">perp markets change data source; spot responses unchanged</td><td><span class="pill ok">zero</span></td></tr>
-<tr><td>mark price oracle</td><td class="dim">a perp-only concept</td><td class="dim">A-Book markets use Binance mark directly (other sources alarm-only); min_sources = 1 rule unchanged</td><td><span class="pill ok">not involved</span></td></tr>
+<tr><td>mark price oracle</td><td class="dim">a perp-only concept</td><td class="dim">per book: A-Book markets use Binance mark directly (other sources alarm-only), B-Book markets keep the multi-source oracle; min_sources = 1 rule unchanged</td><td><span class="pill ok">not involved</span></td></tr>
 <tr><td>finex spot shard</td><td class="dim">separate instance, separate config</td><td class="dim">untouched</td><td><span class="pill ok">zero</span></td></tr>
 </tbody>
 </table></div>
-<div class="call warn"><p class="call-t">Cutover verification must include spot regression</p><p>The page 9 checklist carries a spot-specific item: kline continuity spot checks + order book / public trade tape baselines taken before and after cutover.</p><p>Engineering discipline: any perp-side change that touches a shared pipeline's global behavior (e.g. ledger's aggregation logic itself) must be split into market-type condition branches — the spot path's semantics may never change.</p></div>
+<div class="call warn"><p class="call-t">Verification must include B-Book and spot regression</p><p>The page 9 checklist carries a regression item: kline continuity spot checks + order book / public trade tape baselines taken before and after cutover.</p><p>Engineering discipline: any perp-side change that touches a shared pipeline's global behavior (e.g. ledger's aggregation logic itself) must be split into market-type condition branches — the spot path's semantics may never change.</p></div>
 </section>
 </article>
 
@@ -693,26 +665,26 @@ MMHouseAccountID          = <span class="t">"00000000-0000-0000-0000-00000000000
 <article class="panel" id="p-services" hidden>
 <header>
 <div class="eyebrow">7 · Service-by-Service Changes</div>
-<h1>Keep · Modify · New · Retire</h1>
-<p class="standfirst">Sorted by change volume, descending. <strong>Headline: no service is rewritten from scratch</strong> — the heaviest change is the new mm-connector, followed by PM Perp's house account, isolated/one-way enforcement, and liquidation-price publishing.</p>
+<h1>Keep · Modify · New</h1>
+<p class="standfirst">Sorted by change volume, descending. <strong>Headline: no service is rewritten from scratch</strong> — the heaviest change is the new mm-connector, followed by per-market book routing and PM Perp's house account and liquidation outlet.</p>
 </header>
 
 <section>
 <div class="tw"><table>
 <thead><tr><th>Service</th><th>Action</th><th>Changes</th><th>Size</th></tr></thead>
 <tbody>
-<tr><td class="mono-c"><b>mm-connector</b></td><td><span class="pill no">new</span></td><td class="dim">Kafka command consumer + MM REST/WS client + state machine and arbitration + Finex-format event synthesis (house counterparty leg) + <b>protection target relay</b> (latest-version coalescing, periodic resync, trigger/applied/rejected reports) + reconciliation worker (incl. read-only Binance key) + heartbeat circuit breaker + admin observability endpoints</td><td class="dim">large (new service; mirrors finex's command ingress and event egress contracts)</td></tr>
-<tr><td class="mono-c"><b>portfolio_manager_perp</b></td><td><span class="pill gap">modify</span></td><td class="dim">house system account (spec + EnsureSystemAccounts); <b>isolated + one-way enforcement</b> on A-Book markets; liquidation price recomputed on fill / margin / leverage / funding / fee and emitted as a versioned protection target; liquidation settlement from stop fills (lock on trigger, margin return, cancel other orders); scanner switched to shadow mode on A-Book markets; takeover/ADL code paths offline (enums and history reads retained); funding counterparty becomes the house (net-vs-gross difference booked)</td><td class="dim">medium–large</td></tr>
+<tr><td class="mono-c"><b>mm-connector</b></td><td><span class="pill no">new</span></td><td class="dim">Kafka command consumer + MM REST/WS client + state machine and arbitration + Finex-format event synthesis (house counterparty leg) + reconciliation worker (incl. read-only Binance key) + heartbeat circuit breaker + admin observability endpoints</td><td class="dim">large (new service; mirrors finex's command ingress and event egress contracts)</td></tr>
+<tr><td class="mono-c"><b>portfolio_manager_perp</b></td><td><span class="pill gap">modify</span></td><td class="dim">house system account (spec + EnsureSystemAccounts); per-market book flag; <b>isolated enforcement</b> on A-Book markets; liquidation executor outlet per book (A-Book → connector with source=liquidation, B-Book unchanged); liquidation settlement at real fill price with margin return and cancel of other orders; takeover/ADL skipped on A-Book markets; funding counterparty is the house on A-Book markets (net-vs-gross difference booked)</td><td class="dim">medium</td></tr>
 <tr><td class="mono-c"><b>quote</b></td><td><span class="pill gap">modify</span></td><td class="dim">binance_perp gains five subscriptions (depth/kline/ticker/aggTrade/exchangeInfo); new kline event publication; depth → orderbook topic replication; InternalPerpTradeCollector disabled per A-Book market</td><td class="dim">medium</td></tr>
 <tr><td class="mono-c"><b>ledger</b></td><td><span class="pill gap">modify</span></td><td class="dim">external-kline source table + UPSERT/watermark semantics + REST disconnect backfill; perp-market aggregation chain re-pointed to the new source, spot chain retained (dual chains routed per market, see page 6); 24h ticker switches to Binance source</td><td class="dim">medium (storage &amp; aggregation design, not a plain new consumer)</td></tr>
-<tr><td class="mono-c"><b>trading-api</b></td><td><span class="pill gap">modify</span></td><td class="dim">MarketCache wires into exchangeInfo hot sync (upfront filter validation); rejects cross-margin / hedge-mode requests on A-Book markets; frontend hides the Cross/Hedge toggles and shows the published liquidation price; frontend contract gains the "mirrored book + my orders" overlay semantics; everything else (auth / rate limits / locking flow / private streams) unchanged</td><td class="dim">small</td></tr>
-<tr><td class="mono-c"><b>admin</b></td><td><span class="pill gap">modify</span></td><td class="dim">MM connectivity / reconciliation diffs / house balance / <b>master account margin</b> monitoring pages; protection coverage view; emergency close tool; A-Book route switch operations; reconciliation arbitration tooling</td><td class="dim">small</td></tr>
+<tr><td class="mono-c"><b>trading-api</b></td><td><span class="pill gap">modify</span></td><td class="dim">MarketCache wires into exchangeInfo hot sync (upfront filter validation) and carries each market's book; rejects cross-margin requests on A-Book markets; frontend hides the Cross toggle on A-Book markets; frontend contract gains the "mirrored book + my orders" overlay semantics; everything else (auth / rate limits / locking flow / private streams) unchanged</td><td class="dim">small</td></tr>
+<tr><td class="mono-c"><b>admin</b></td><td><span class="pill gap">modify</span></td><td class="dim">MM connectivity / reconciliation diffs / house balance / <b>master account margin</b> monitoring pages; per-market book switch (guarded by the zero-position check); emergency close tool; reconciliation arbitration tooling</td><td class="dim">small</td></tr>
 <tr><td class="mono-c"><b>perp_trigger</b></td><td><span class="pill ok">near-zero</span></td><td class="dim">the existing trigger→lock→command flow simply drains into the connector; add: cancel a user's waiting TP/SL on a market when that position is liquidated</td><td class="dim">small</td></tr>
 <tr><td class="mono-c"><b>fee_engine / analytics / competitions</b></td><td><span class="pill ok">zero changes</span></td><td class="dim">fee projections and statistics keep consuming events (format unchanged); analytics' insurance-fund equity view stays valid</td><td class="dim">none</td></tr>
-<tr><td class="mono-c"><b>finex (perp part)</b></td><td><span class="pill no">retired</span></td><td class="dim">perp shards routed off (spot shards untouched); code + config kept one release cycle as the rollback switch, cleaned up afterwards (WAL/snapshots archived with the instances)</td><td class="dim">decommission op</td></tr>
+<tr><td class="mono-c"><b>finex (perp part)</b></td><td><span class="pill ok">kept</span></td><td class="dim">keeps serving B-Book markets; an A-Book market is simply removed from its market list (and added back when the market returns to B-Book)</td><td class="dim">config only</td></tr>
 </tbody>
 </table></div>
-<div class="call"><p class="call-t">Kafka topic surface changes</p><p><b>Unchanged</b>: <code>commands.{MKT}.OrderCommands</code> (consumer swaps finex → connector), <code>events.{MKT}.EventOrderUpdated</code> / <code>EventTradeExecuted</code> (producer swaps to the connector), <code>orderbook.{MKT}</code> (producer swaps to quote), <code>perp_trigger.Persistence</code>. <b>New</b>: <code>events.{MKT}.EventKlineObserved</code>, a PM Perp → connector protection-target topic (keyed by position_key so versions stay ordered per position), plus MM observability/reconciliation internal topics. <b>Stops growing</b>: finex-perp WAL/snapshots. <code>kafka_topic_init</code>'s -perp-markets list is unchanged (topics already exist — only the producer/consumer roles change).</p></div>
+<div class="call"><p class="call-t">Kafka topic surface changes</p><p><b>Unchanged</b>: <code>commands.{MKT}.OrderCommands</code> (consumer swaps finex → connector), <code>events.{MKT}.EventOrderUpdated</code> / <code>EventTradeExecuted</code> (producer swaps to the connector), <code>orderbook.{MKT}</code> (producer swaps to quote), <code>perp_trigger.Persistence</code>. <b>New</b>: <code>events.{MKT}.EventKlineObserved</code>, plus MM observability/reconciliation internal topics. The consumer of each market's command topic is chosen by its book flag, so exactly one of Finex / connector is subscribed at any time. <code>kafka_topic_init</code>'s -perp-markets list is unchanged (topics already exist — only the producer/consumer roles change).</p></div>
 </section>
 </article>
 
@@ -729,12 +701,11 @@ MMHouseAccountID          = <span class="t">"00000000-0000-0000-0000-00000000000
 <div class="tw"><table>
 <thead><tr><th>Risk</th><th>Scenario</th><th>Mitigation</th><th>Level</th></tr></thead>
 <tbody>
-<tr><td><b>MM single point</b></td><td class="dim">in-house MM service failure / Binance restricting the master account → all perp execution stops</td><td class="dim">heartbeat circuit breaker (15s) → reject new orders + cancel-all in-flight; internal SLA; MM redundancy (active/standby) owned by the MM team</td><td><span class="pill no">high</span></td></tr>
+<tr><td><b>MM single point</b></td><td class="dim">in-house MM service failure / Binance restricting the master account → execution stops on every A-Book market (B-Book markets unaffected)</td><td class="dim">heartbeat circuit breaker (15s) → reject new orders + cancel-all in-flight; internal SLA; MM redundancy (active/standby) owned by the MM team</td><td><span class="pill no">high</span></td></tr>
 <tr><td><b>Master account liquidation</b></td><td class="dim">Binance sees one account: all users' net position shares the master margin. A large one-sided net position plus a fast move can liquidate the whole account — every user at once</td><td class="dim">margin-ratio monitoring on <code>GET /account</code> + read-only key; tiered breaker (warn → reduce-only → halt); treasury top-up runbook; per-market net-notional cap sized to the master account's Binance leverage bracket</td><td><span class="pill no">high</span></td></tr>
-<tr><td><b>Liquidation during disconnect</b></td><td class="dim">A crash triggering cascading liquidations at the same moment the NeoDAX ↔ MM link goes dark</td><td class="dim">stops live <b>on Binance</b>, so already-applied protections still fire; the liquidation fills are backfilled into our books on reconnect (fill_id idempotency). What stalls is protection <i>updates</i> — acceptable because new orders are rejected during the break, so positions do not change</td><td><span class="pill gap">medium</span></td></tr>
-<tr><td><b>Protection gap</b></td><td class="dim">cancel-then-place leaves tens of milliseconds unprotected; a target not yet applied (lag, rejection, per-symbol cap) leaves a position on an old price or unprotected</td><td class="dim">applied-version lag SLO + alert; <code>PROTECTION_REJECTED</code> is an incident; shadow scanner alert + emergency close tool; protection reconciliation every minute</td><td><span class="pill gap">medium</span></td></tr>
-<tr><td><b>Double close / orphan stop</b></td><td class="dim">two live stops for one position, or a stop left behind after the position closed — on a netted account either opens a real, unowned position when triggered</td><td class="dim">cancel-then-place (3.8); qty=0 targets on position close; orphan detection in protection reconciliation → immediate cancel; the local scanner never closes on A-Book</td><td><span class="pill gap">medium</span></td></tr>
-<tr><td><b>Recompute storm</b></td><td class="dim">a funding settlement moves every position's liquidation price at the same instant → thousands of replaces → Binance rate limits</td><td class="dim">change threshold (only re-publish when the price moves N ticks), paced batches, MM-side priority for positions closest to their trigger</td><td><span class="pill gap">medium</span></td></tr>
+<tr><td><b>Liquidation during disconnect</b></td><td class="dim">A crash triggering cascading liquidations on A-Book markets at the same moment the NeoDAX ↔ MM link goes dark — the most dangerous combination</td><td class="dim">user positions and margin sit with us, unaffected (settlement pauses, nothing is lost); positions stay locked and closes are re-issued immediately on reconnect; sustained deterioration absorbed by the insurance fund + manual escalation. B-Book markets are unaffected</td><td><span class="pill no">high</span></td></tr>
+<tr><td><b>Book switch with open interest</b></td><td class="dim">a market flipped between A-Book and B-Book while positions or orders exist would leave positions with no Binance hedge (or a hedge with no position)</td><td class="dim">the admin switch refuses unless the market has zero positions and zero resting orders; a switch is a scheduled, announced operation</td><td><span class="pill gap">medium</span></td></tr>
+<tr><td><b>Fee inversion</b></td><td class="dim">every fill (both legs of hedged users included) pays Binance fees on the master account; if our user rates are below Binance's, each fill loses money</td><td class="dim">fee schedule check at market configuration: A-Book markets must have maker/taker rates above the master account's Binance tier</td><td><span class="pill gap">medium</span></td></tr>
 <tr><td><b>Latency</b></td><td class="dim">lock (Raft ~10ms) + Kafka + connector + MM + Binance RTT + reports → end-to-end p99 target &lt; 1s; price drift during market orders</td><td class="dim">segmented SLA monitoring (page 3); market-order slippage cap parameter (open)</td><td><span class="pill gap">medium</span></td></tr>
 <tr><td><b>Slippage eating through margin</b></td><td class="dim">IMR validated at placement; a worse Binance fill → MMR breached immediately post-fill → instant liquidation trigger</td><td class="dim">configurable slippage buffer added at lock time; a breach simply rides the normal liquidation path (experience issue, not a loss-of-funds issue); IMR buffer value is an open item</td><td><span class="pill gap">medium</span></td></tr>
 <tr><td><b>UNKNOWN fund occupation</b></td><td class="dim">margin stays locked during arbitration — network partitions / MM unavailability can drag it to minutes</td><td class="dim">shown to the user as "in progress"; after a circuit break, UNKNOWN resolution takes priority over new orders; the lock buffer budgets for it</td><td><span class="pill gap">medium</span></td></tr>
@@ -748,64 +719,80 @@ MMHouseAccountID          = <span class="t">"00000000-0000-0000-0000-00000000000
 <div class="tw"><table>
 <thead><tr><th>Trigger</th><th>New orders</th><th>In-flight orders</th><th>Liquidation</th><th>Recovery</th></tr></thead>
 <tbody>
-<tr><td class="mono-c">heartbeat lost 15s</td><td><span class="pill no">all rejected</span></td><td><span class="pill no">cancel-all</span></td><td><span class="pill gap">Binance stops still fire; reports delayed</span></td><td class="dim">reconnect → full GET arbitration → backfill liquidation fills → protection resync → release</td></tr>
+<tr><td class="mono-c">heartbeat lost 15s</td><td><span class="pill no">rejected on A-Book markets</span></td><td><span class="pill no">cancel-all (A-Book)</span></td><td><span class="pill gap">suspended (A-Book only)</span></td><td class="dim">reconnect → full GET arbitration → re-issue liquidation closes → release</td></tr>
 <tr><td class="mono-c">sustained 429 / SYSTEM_BUSY</td><td><span class="pill gap">backoff</span></td><td><span class="pill ok">kept</span></td><td><span class="pill ok">retried</span></td><td class="dim">released when rates recover; 5 minutes sustained → escalates to heartbeat-level break</td></tr>
 <tr><td class="mono-c">position reconciliation over threshold</td><td><span class="pill no">market frozen</span></td><td><span class="pill ok">kept</span></td><td><span class="pill gap">manual confirm</span></td><td class="dim">admin arbitration tooling locates the differing orders → manual fix → unfreeze</td></tr>
 <tr><td class="mono-c">master account margin ratio over threshold</td><td><span class="pill no">risk-increasing rejected</span></td><td><span class="pill ok">kept</span></td><td><span class="pill ok">normal</span></td><td class="dim">treasury top-up / net exposure reduced below threshold → release; higher tier → full halt</td></tr>
-<tr><td class="mono-c">protection reconciliation mismatch</td><td><span class="pill no">market frozen</span></td><td><span class="pill ok">kept</span></td><td><span class="pill gap">shadow alert + manual</span></td><td class="dim">orphans cancelled, missing targets re-applied → unfreeze</td></tr>
-<tr><td class="mono-c">manual kill-switch</td><td><span class="pill no">all rejected</span></td><td><span class="pill no">cancel-all</span></td><td><span class="pill gap">suspended</span></td><td class="dim">may flip back to B-Book (within one release cycle, see page 9)</td></tr>
+<tr><td class="mono-c">liquidation overdue</td><td><span class="pill no">market frozen</span></td><td><span class="pill ok">kept</span></td><td><span class="pill gap">re-issue + manual</span></td><td class="dim">closes complete or admin emergency close → unfreeze</td></tr>
+<tr><td class="mono-c">manual kill-switch</td><td><span class="pill no">all rejected</span></td><td><span class="pill no">cancel-all</span></td><td><span class="pill gap">suspended</span></td><td class="dim">per market or all A-Book markets; a market may be returned to B-Book once flat (page 9)</td></tr>
 </tbody>
 </table></div>
-<div class="call warn"><p class="call-t">The boundary of a broken link</p><p>Because protections live on Binance, a NeoDAX ↔ MM outage no longer suspends liquidation: applied stops keep firing and are settled when reports resume. The real exposure is the <b>MM ↔ Binance</b> side — a position whose latest target was never applied, or a stop Binance could not accept.</p><p>Those gaps are what the shadow scanner, protection reconciliation, and emergency close tool exist for; their residual cost belongs in insurance-fund capacity modeling (open items).</p></div>
+<div class="call warn"><p class="call-t">The boundary of suspended liquidation</p><p>While an A-Book market is disconnected, user margin ratios keep deteriorating (mark never stops); recovery closes at worse prices — the insurance-fund share grows, but <b>no orphaned positions can appear</b> (our books stay self-consistent).</p><p>That is the cost of the "degrade, never lose funds" principle; it must be included in insurance-fund capacity modeling (open items). B-Book markets never depend on the MM.</p></div>
 </section>
 </article>
 
 <!-- ═══ 9 Cutover Plan ═══ -->
 <article class="panel" id="p-cutover" hidden>
 <header>
-<div class="eyebrow">9 · Cutover Plan</div>
-<h1>Six Phases: from Cleanup to Reopening</h1>
-<p class="standfirst">Phases 0–1 are <strong>business and contract</strong> (no code); phases 2–3 are <strong>engineering and integration</strong>; phases 4–5 are <strong>production cutover</strong>. The order is inviolable; every phase has an explicit exit condition.</p>
+<div class="eyebrow">9 · Rollout &amp; Estimate</div>
+<h1>Six Phases, Then Market by Market</h1>
+<p class="standfirst">Phases 0–1 are <strong>business and contract</strong> (no code); phases 2–3 are <strong>engineering and integration</strong>; phases 4–5 enable the <strong>first 2–3 A-Book markets</strong> in production. Every other market stays on B-Book until it is switched individually. The order is inviolable; every phase has an explicit exit condition.</p>
 </header>
 
 <section>
 <h2>Phase Overview</h2>
 <ol class="steps">
-<li><b>Phase 0 · Legacy cleanup (in progress)</b><span>Internal-account cleanup: attacker executed (09-22), MM accounts 0x535c / 0x7152 runbooks ready to execute; <b>no user positions need disposal</b> (halted state treated as a fresh start, confirmed 2026-09-24). Exit: perp positions platform-wide = 0, order books clean.</span></li>
-<li><b>Phase 1 · Contract review (page 3 of this document)</b><span>Walk the MM through SLA / error codes / dangling-order arbitration semantics / cancel-all latency / GTX reject distinguishability one by one (the 3.7 checklist), <b>plus the 3.8 protection contract</b> (one stop per position, cancel-then-place, full-qty completion, how the per-symbol conditional-order cap is covered); the MM confirms implementation schedule and sandbox. Exit: agreed contract v1 + MM sandbox available.</span></li>
-<li><b>Phase 2 · Development</b><span>Milestones: ① mm-connector MVP (submit / reports / event synthesis / idempotency / protection relay) + the <b>mock-MM simulator</b> (integration base, see phase 3) → ② PM Perp house account + isolated/one-way enforcement + liquidation-price publishing + stop-fill liquidation settlement → ③ quote's five subscriptions + Binance mark on A-Book + ledger kline path → ④ circuit breaking / reconciliation (incl. protections, master margin) / admin tooling → ⑤ end-to-end use cases. Each milestone lands with integration tests in <code>test/v2</code> scenarios.</span></li>
-<li><b>Phase 3 · Staging integration (three test tiers — approach decided)</b><span><b>① mock-MM (primary, built by us)</b>: <code>tools/mockmm</code> implements the contract v1 REST+WS simulator with scenario injection (multi-fill / rejects / ack timeouts / reconnects / out-of-order / duplicate reports / 429) — repeatable in CI, no external dependency. <b>② MM sandbox</b>: the MM provides a sandbox on the same contract; if he wires it to the <b>Binance futures testnet</b> (testnet.binancefuture.com, free API keys) he can verify his real execution path on major symbols like BTCUSDT / ETHUSDT — note the testnet lacks TradFi contracts, is thin, and resets roughly monthly: it validates the pipe, not coverage. <b>③ Production small-notional smoke</b>: built into the cutover checklist (controlled accounts, minimum notional). Use cases: placement / partial fills / cancels / timeout arbitration / reconnect / liquidation drill / reconciliation drift injection / rate-limit backoff. Exit: all green + joint integration report.</span></li>
-<li><b>Phase 4 · Production cutover (order is law)</b><span>① Announce new-order halt (trading-api trading switch) → ② drain in-flight orders / cancel-all → ③ enable mm-connector routing (consumes OrderCommands) → ④ switch quote market data (depth/kline/ticker live) → ⑤ stop finex-perp shards → ⑥ run the checklist (below) → ⑦ announce reopening. <b>finex-perp stops only after the connector passes verification</b> — in the wrong order you get two consumers.</span></li>
-<li><b>Phase 5 · Reopening &amp; observation window</b><span>72 hours of watching after reopening: latency percentiles, reconciliation drift rate, fee-correctness spot checks, one liquidation drill (controlled account). Observation ends → review on removing the B-book rollback switch.</span></li>
+<li><b>Phase 0 · Legacy cleanup (in progress)</b><span>Attacker positions executed (09-22), 0x535c / 0x7152 runbooks ready. The internal market-making accounts are cleaned, not closed: they keep providing liquidity for B-Book markets. <b>No user positions need disposal</b> (halted state treated as a fresh start, confirmed 2026-09-24). Exit: the first A-Book markets have zero positions and clean books.</span></li>
+<li><b>Phase 1 · Contract review (page 3 of this document)</b><span>Walk the MM team through SLA / error codes / dangling-order arbitration / cancel latency / GTX reject distinguishability (the 3.7 checklist) and the 3.8 netted-account rules; the MM team confirms schedule and sandbox. Exit: agreed contract v1 + MM sandbox available.</span></li>
+<li><b>Phase 2 · Development</b><span>Four parallel workstreams (see Delivery Estimate below): ① mm-connector + <b>mock-MM simulator</b>; ② PM Perp house account + per-market book flag + isolated enforcement + A-Book liquidation outlet; ③ quote Binance mirror + Binance mark on A-Book + ledger kline path; ④ trading-api book awareness, reconciliation, breakers, admin tooling. Each lands with integration tests in <code>test/v2</code> scenarios.</span></li>
+<li><b>Phase 3 · Staging integration (three test tiers)</b><span><b>① mock-MM (primary, built by us)</b>: <code>tools/mockmm</code> implements the contract v1 REST+WS simulator with scenario injection (multi-fill / rejects / ack timeouts / reconnects / out-of-order / duplicate reports / 429) — repeatable in CI. <b>② MM sandbox</b>: the MM team's sandbox on the same contract, ideally wired to the <b>Binance futures testnet</b> for BTCUSDT / ETHUSDT — it validates the pipe, not coverage. <b>③ Production small-notional smoke</b>: controlled accounts, minimum notional. A-Book and B-Book markets run side by side in staging throughout. Exit: all green + joint integration report.</span></li>
+<li><b>Phase 4 · Enable the first A-Book markets (order is law)</b><span>Per market: ① halt new orders on that market → ② confirm zero positions and zero resting orders → ③ flip the book flag (Finex drops the market, connector subscribes) → ④ switch its market data to the Binance mirror and its mark to Binance → ⑤ run the checklist → ⑥ reopen. <b>Finex releases the market only after the connector passes verification</b> — never two consumers on one command topic.</span></li>
+<li><b>Phase 5 · Observation, then expand</b><span>72 hours of watching: latency percentiles, reconciliation drift, fee correctness, one liquidation drill. Afterwards, further markets are switched one at a time with the same procedure.</span></li>
 </ol>
 
-<h2>Cutover Verification Checklist</h2>
+<h2>Verification Checklist (per A-Book market)</h2>
 <ul class="plain">
 <li><b>Order book mirror</b> — frontend depth matches Binance for the same symbol; increment/snapshot mixed stream without jumps; latency &lt; 300ms.</li>
-<li><b>Full order path</b> — resting limit + fill, market with multiple fills, post_only rejection, FOK full rejection, IOC remainder expiry — at least one of each of the five.</li>
+<li><b>Full order path</b> — resting limit + fill, market with multiple fills, post_only rejection, FOK full rejection, IOC remainder expiry — at least one of each of the five, in both hedge and one-way mode.</li>
+<li><b>Netting</b> — a hedge-mode account long and short on the same market leaves the master account at the net; no reduceOnly / closePosition ever reaches Binance.</li>
 <li><b>Cancels and arbitration</b> — normal cancel, cancel race (already filled), an intentionally induced POST timeout walking the GET arbitration path.</li>
-<li><b>Settlement correctness</b> — spot-check fills for position / PnL / fees (maker/taker rates by role); house balance matches a manual walkthrough.</li>
-<li><b>Kline continuity</b> — 1m klines stitch across the switch date without gaps; higher timeframes produce values normally.</li>
-<li><b>Isolated / one-way enforcement</b> — cross-margin and hedge-mode requests rejected on every A-Book market; toggles hidden in the UI.</li>
-<li><b>Protection lifecycle</b> — open → stop applied at the published price; partial fills coalesce into one replace; add margin / change leverage moves the stop; close to zero removes it; protection reconciliation green.</li>
-<li><b>Liquidation drill</b> — a controlled account's position driven to its liquidation price: the Binance stop fires, fills arrive as ExecType=liquidation at the real fill price, remaining margin returned, other orders on that market cancelled, bankruptcy shortfall (if any) lands in house, Scheme A journal complete.</li>
-<li><b>Funding recompute</b> — after a funding settlement, affected positions get new protection versions within the paced batch; no rate-limit errors.</li>
-<li><b>Circuit-breaker drill</b> — cut the MM sandbox: 15s break takes effect, new orders rejected, cancel-all issued, reconnect arbitration recovers.</li>
-<li><b>Reconciliation clean</b> — first rounds of all jobs (net position / protections / fills / wallet) green; master account margin ratio within band.</li>
-<li><b>spot regression (dedicated)</b> — spot kline continuity spot checks; spot order book and public trade tape baselines compared before and after cutover (verifies market-type gating on shared pipelines).</li>
+<li><b>Settlement correctness</b> — spot-check fills for position / PnL / fees (maker/taker rates by role); house balance matches a manual walkthrough; user rates above the master account's Binance rates.</li>
+<li><b>Isolated enforcement</b> — cross-margin requests rejected; Cross toggle hidden.</li>
+<li><b>Liquidation drill</b> — a controlled position driven to its liquidation price: the scanner locks it, the market close executes via the MM, fills settle as ExecType=liquidation at the real fill price, remaining margin returned, other orders on that market cancelled, shortfall (if any) lands in house, Scheme A journal complete.</li>
+<li><b>Circuit-breaker drill</b> — cut the MM sandbox: 15s break takes effect on A-Book markets only, B-Book markets keep trading, reconnect arbitration recovers and liquidation closes are re-issued.</li>
+<li><b>Reconciliation clean</b> — net position / fills / funding / wallet jobs green; master account margin ratio within band.</li>
+<li><b>B-Book and spot regression</b> — B-Book perp markets and spot markets unchanged: order books, klines, trade tapes, liquidations compared before and after.</li>
 </ul>
 
-<h2>Rollback (valid for one release cycle)</h2>
-<pre><span class="c"># Trigger: an A-Book systemic problem that cannot be fixed quickly (persistent reconciliation drift / MM long-term unavailable)</span>
-① trading-api halts new orders + cancel-all
-② drain in-flight orders (if positions exist: record and decide hedging manually — rollback wants positions at zero)
-③ route flag flips back to finex-perp: connector stops consuming OrderCommands, finex-perp shards restart and load markets
-④ quote market data flips back (order book producer returns to finex; klines resume internal aggregation —
-   the Binance klines already written during the window are kept)
+<h2>Returning a Market to B-Book</h2>
+<pre><span class="c"># Same procedure in reverse; the market must reach zero positions first</span>
+① halt new orders on the market + cancel resting orders
+② wait for (or arrange) zero open positions — positions opened on A-Book have a real Binance hedge
+③ flip the book flag: connector unsubscribes, Finex loads the market
+④ market data and mark source flip back to internal / multi-source oracle
 ⑤ verify → reopen
 
-<span class="c"># After rollback, A-Book history already written is untouched (trade history / house balance / audit)</span></pre>
-<div class="call warn"><p class="call-t">The hard constraint of rollback</p><p>If positions opened during the A-Book window exist at rollback time, Finex's internal matching after switching back has no counterparty liquidity — <b>within the rollback window, treat open positions as exceptions requiring manual handling</b>. That is why the window is one release cycle: the longer it drags on, the less realistic rollback becomes — which is what the observation window is for, surfacing problems early.</p></div>
+<span class="c"># A-Book history already written is untouched (trade history / house balance / audit)</span></pre>
+<div class="call warn"><p class="call-t">Why zero positions is mandatory</p><p>A position opened on A-Book is backed by a Binance position; on B-Book it would need an internal counterparty that does not exist. Migrating live positions (closing on Binance and re-opening against the internal book at an agreed price) is possible in principle but out of scope for the first version.</p></div>
+
+<h2>Delivery Estimate</h2>
+<p class="section-note">Team: 2 full-time + 2 part-time engineers, all code written with AI agents. The MM service is built by a separate team. What AI does not shorten: Binance testnet integration, coordination with the MM team, the production switch, and funds operations — the calendar is driven by integration and launch, not by coding.</p>
+<div class="tw"><table>
+<thead><tr><th>Workstream</th><th>Owner</th><th>Duration</th></tr></thead>
+<tbody>
+<tr><td>mm-connector + mock-MM</td><td class="dim">full-time 1</td><td class="mono-c">3 weeks</td></tr>
+<tr><td>PM Perp: house account, per-market book flag, isolated enforcement, A-Book liquidation outlet (B-Book untouched)</td><td class="dim">full-time 2</td><td class="mono-c">3 weeks</td></tr>
+<tr><td>quote / ledger Binance mirror, per-market mark source</td><td class="dim">part-time 1</td><td class="mono-c">3 weeks</td></tr>
+<tr><td>trading-api book awareness, admin, reconciliation, breakers</td><td class="dim">part-time 2</td><td class="mono-c">3 weeks</td></tr>
+<tr><td>Integration (mock-MM → MM sandbox → production small notional)</td><td class="dim">all</td><td class="mono-c">2 weeks</td></tr>
+<tr><td>First markets live + observation</td><td class="dim">all</td><td class="mono-c">1 week</td></tr>
+</tbody>
+</table></div>
+<ul class="plain">
+<li><b>Perps A/B coexistence: about 6–7 weeks</b> to the first A-Book markets, assuming the MM forwarding interface is ready on time.</li>
+<li><b>Compressed: about 5 weeks</b> — first batch of 2–3 markets only, reconciliation alert-and-manual at first, minimal admin tooling. Cutting integration time further is where funds incidents come from; not recommended.</li>
+<li><b>Spot A-Book (phase 2): an additional 4–6 weeks</b>, dominated by asset mapping and treasury rebalancing processes that need finance / operations (page 10).</li>
+</ul>
 </section>
 </article>
 
@@ -813,8 +800,8 @@ MMHouseAccountID          = <span class="t">"00000000-0000-0000-0000-00000000000
 <article class="panel" id="p-open" hidden>
 <header>
 <div class="eyebrow">10 · Decided &amp; Open</div>
-<h1>Seven Decided, Five Open</h1>
-<p class="standfirst">Above: decisions landed on 2026-09-24 and 2026-09-28. Below: open items; the first blocks the phase-1 contract, the rest can proceed in parallel with development and must land before cutover.</p>
+<h1>Ten Decided, Six Open</h1>
+<p class="standfirst">Above: decisions landed on 2026-09-24 and 2026-09-28 (v1.5 revisions marked). Below: open items; the first blocks the phase-1 contract, the rest can proceed in parallel with development and must land before the first A-Book market goes live.</p>
 </header>
 
 <section>
@@ -822,41 +809,50 @@ MMHouseAccountID          = <span class="t">"00000000-0000-0000-0000-00000000000
 <div class="tw"><table>
 <thead><tr><th>Item</th><th>Outcome</th><th>Lands as</th></tr></thead>
 <tbody>
-<tr><td>Legacy user positions <span class="mono">09-24</span></td><td><span class="pill ok">fresh start, none</span></td><td class="dim">halted state treated as a clean slate; phase 0 cleans internal accounts only</td></tr>
+<tr><td>Legacy user positions <span class="mono">09-24</span></td><td><span class="pill ok">fresh start, none</span></td><td class="dim">halted state treated as a clean slate; phase 0 cleans internal accounts</td></tr>
 <tr><td>Test environments <span class="mono">09-24</span></td><td><span class="pill ok">three tiers</span></td><td class="dim">mock-MM (self-built, primary) / MM sandbox (optional Binance testnet) / production small-notional smoke; see phase 3</td></tr>
-<tr><td>Market data &amp; mapping <span class="mono">09-24</span></td><td><span class="pill ok">Binance-first</span></td><td class="dim">A-Book execution / market data / klines all keyed to Binance; only our ↔ Binance symbol mapping maintained — no further OKX / Bybit mapping work; existing markets re-verified against fapi exchangeInfo one by one before cutover</td></tr>
-<tr><td>Binance account <span class="mono">09-28</span></td><td><span class="pill ok">our own master account</span></td><td class="dim">all user flow on one platform-owned account; MM is an in-house agent, not a principal — commercial settlement, MM collateral and MM credit exposure are dropped (pages 1, 5, 8)</td></tr>
-<tr><td>Margin mode <span class="mono">09-28</span></td><td><span class="pill ok">forced isolated</span></td><td class="dim">cross margin disabled on A-Book markets; enforced server-side, toggle hidden</td></tr>
-<tr><td>Position mode <span class="mono">09-28</span></td><td><span class="pill ok">one-way only</span></td><td class="dim">hedge mode disabled on A-Book markets for now; one user × one market = one position = one stop</td></tr>
-<tr><td>Liquidation execution <span class="mono">09-28</span></td><td><span class="pill ok">local price, MM-held stop</span></td><td class="dim">NeoDAX computes and publishes the isolated liquidation price; the MM places and maintains the Binance stop; its fill is the liquidation (3.8)</td></tr>
+<tr><td>Market data &amp; mapping <span class="mono">09-24</span></td><td><span class="pill ok">Binance-first on A-Book</span></td><td class="dim">A-Book execution / market data / klines / mark keyed to Binance; only our ↔ Binance symbol mapping maintained; markets re-verified against fapi exchangeInfo before switching</td></tr>
+<tr><td>Book selection <span class="mono">09-28 · v1.5</span></td><td><span class="pill ok">A-Book + B-Book per market</span></td><td class="dim">both books permanent; a market switches only at zero positions; Finex, takeover/ADL and internal MM accounts stay for B-Book</td></tr>
+<tr><td>Binance account <span class="mono">09-28</span></td><td><span class="pill ok">our own master account</span></td><td class="dim">one-way; MM is an in-house agent, not a principal — no commercial settlement, MM collateral or MM credit exposure</td></tr>
+<tr><td>Position mode <span class="mono">09-28 · v1.5</span></td><td><span class="pill ok">hedge + one-way</span></td><td class="dim">both kept for users; the master account nets all legs (reverses v1.4's one-way-only)</td></tr>
+<tr><td>Margin mode <span class="mono">09-28</span></td><td><span class="pill ok">forced isolated on A-Book</span></td><td class="dim">cross disabled on A-Book markets; B-Book keeps both</td></tr>
+<tr><td>Liquidation execution <span class="mono">09-28 · v1.5</span></td><td><span class="pill ok">local trigger, market close via MM</span></td><td class="dim">PM Perp scanner on Binance mark; no Binance stop orders (per-symbol conditional-order cap) — reverses v1.4's MM-held stops</td></tr>
+<tr><td>Spot A-Book <span class="mono">09-28</span></td><td><span class="pill ok">phase 2</span></td><td class="dim">perps first; spot scoped separately (open items below)</td></tr>
+<tr><td>MM development <span class="mono">09-28</span></td><td><span class="pill ok">separate MM team</span></td><td class="dim">our four engineers build mm-connector and the platform side only</td></tr>
 </tbody>
 </table></div>
 
 <h2>Still Open</h2>
 
-<h4>Protection contract details with the MM <span class="pill gap">blocks phase-1 contract</span></h4>
-<p class="section-note">Replaces the v1.3 commercial-terms block (no longer applicable with our own account).</p>
+<h4>MM contract details <span class="pill gap">blocks phase-1 contract</span></h4>
 <div class="tw"><table>
 <thead><tr><th>Item</th><th>To decide</th></tr></thead>
 <tbody>
-<tr><td>Per-symbol conditional-order cap</td><td class="dim">how the MM covers every open position given Binance's per-symbol cap on conditional orders (sub-accounts, local triggering, …) and what capacity that gives per market</td></tr>
-<tr><td>Applied-version lag SLO</td><td class="dim">max time from a published target to <code>PROTECTION_APPLIED</code>; the alert threshold for protection gaps</td></tr>
-<tr><td>Order-forwarding path</td><td class="dim">confirm user orders keep flowing connector → MM (page 3 contract) rather than a direct NeoDAX → Binance client</td></tr>
+<tr><td>Forwarding path</td><td class="dim">confirm user orders flow connector → MM (page 3 contract) rather than a direct NeoDAX → Binance client</td></tr>
+<tr><td>Liquidation close handling</td><td class="dim">priority in the MM's rate budget and full-quantity completion (3.8); the report sent when a close cannot complete</td></tr>
 <tr><td>Master account setup</td><td class="dim">Binance leverage bracket and margin setup of the master account; the margin-ratio breaker tiers and the per-market net-notional cap derived from them</td></tr>
-<tr><td>Liquidation fee &amp; warnings</td><td class="dim">liquidation fee rate on A-Book; whether per-position margin warnings (today's 80/90/95 bands are cross-only) are needed for isolated positions</td></tr>
 </tbody>
 </table></div>
 
-<h4>Market-order slippage protection <span class="pill gap">before cutover</span></h4>
+<h4>A-Book fee schedule <span class="pill gap">before first market</span></h4>
+<p class="section-note">User maker/taker rates on A-Book markets must stay above the master account's Binance rates, including both legs of hedged users (3.8). Also decide the liquidation fee rate and whether isolated positions need per-position margin warnings (today's 80/90/95 bands are cross-only).</p>
+
+<h4>First A-Book markets <span class="pill gap">before phase 4</span></h4>
+<p class="section-note">Pick the first 2–3 markets. Criteria depend on why A-Book is wanted: risk transfer (largest one-sided exposure), liquidity (thinnest internal book with real volume), or both — to confirm with the business.</p>
+
+<h4>Spot A-Book <span class="pill gap">phase 2</span></h4>
+<p class="section-note">Three blockers to resolve before designing it: ① <b>asset mismatch</b> — we custody on-chain WBTC / WSOL while Binance spot trades BTC / SOL, so a user buying WBTC with us is hedged in a different asset; ② <b>treasury rebalancing</b> — net user buying accumulates BTC and drains USDT on Binance while withdrawals come from the Cage vault, which needs a finance-run rebalancing process between Binance and the vault; ③ <b>unlisted assets</b> — YELLOWUSDT has no Binance market and stays B-Book; spot PM also has no house / system-account machinery yet.</p>
+
+<h4>Market-order slippage protection <span class="pill gap">before first market</span></h4>
 <p class="section-note">Binance has no native slippage parameter. Phase 1 ships the lock-side buffer factor; a later phase may add an API-level max_slippage (needs MM cooperation via a dedicated error code, or our post-hoc arbitration).</p>
 
-<h4>Insurance-fund capacity for protection gaps <span class="pill gap">before cutover</span></h4>
-<p class="section-note">Applied stops keep firing through a NeoDAX ↔ MM outage, so the residual risk is positions whose latest target was not applied (MM ↔ Binance trouble, rejected stops) plus slippage past bankruptcy on fast moves. Stress-test basis: 30 minutes of MM ↔ Binance outage + ±20% move, and the master-account liquidation scenario (page 8).</p>
+<h4>Emergency liquidation capacity during MM disconnect <span class="pill gap">before first market</span></h4>
+<p class="section-note">Bankruptcy expansion while A-Book liquidation is suspended is absorbed by the insurance fund. Stress-test basis: 30 minutes of disconnect + ±20% market move, plus the master-account liquidation scenario (page 8).</p>
 
-<h4>Compliance &amp; account attribution <span class="pill gap">blocks production cutover</span></h4>
+<h4>Compliance &amp; account attribution <span class="pill gap">blocks first production market</span></h4>
 <p class="section-note">The platform's own Binance account entity, regional compliance, and the regulatory characterization of "user orders executed on the platform's own exchange account" — needs the compliance team's opinion; does not block engineering.</p>
 
-<div class="call"><p class="call-t">Document maintenance</p><p>v1.4 (2026-09-28, new requirements): Binance account is our own master account and the MM is an in-house agent (principal model, commercial settlement and MM credit exposure dropped); A-Book markets forced to isolated margin + one-way mode; liquidation redesigned — PM Perp publishes a versioned per-position liquidation price, the MM holds the Binance stop (new 3.8 protection contract: cancel-then-place, full-qty completion, netted-account rules, per-symbol conditional-order cap), the stop's fill is the liquidation, other orders on that market are cancelled, the local scanner goes shadow-only; A-Book mark switched to Binance mark; reconciliation extended to net position (with a read-only Binance key), protections, and wallet; new risks: master account liquidation, protection gap, double close / orphan stop, funding recompute storm.</p><p>v1.3 (2026-09-25, review feedback absorbed): 3.5 rewritten — UNKNOWN state + three-condition death verdict + MM-side tombstone / UNKNOWN obligations + CANCEL_REJECTED backfill; house economic-loop payment direction corrected, credit exposure defined (balance + MTM + funding accruals), engineering checklist added (hot-row benchmarking, two-way legs, risk exemptions, no-double-booking invariant); ledger external klines upgraded to a full storage/aggregation design (source-table UPSERT, disconnect backfill, dual-chain routing); depth diffing gains deletion-level and reconnect-reset semantics. v1.2: Binance-first decided; open items restructured. v1.1: 3.0 data ownership, spot boundary matrix.</p><p>v2 final follows the contract review and the remaining open items landing; the Chinese twin is <code>docs/a-book-perps-design.html</code>. Related documents: <code>docs/new-perps-rollout-plan.html</code> (market parameters and quote config baseline), <code>docs/2026-09-22-attacker-position-force-close-runbook.md</code> plus the two 09-23 MM cleanup runbooks (phase 0).</p></div>
+<div class="call"><p class="call-t">Document maintenance</p><p>v1.5 (2026-09-28, second round of requirements): A-Book and B-Book coexist per market (Finex, takeover/ADL and internal MM accounts kept for B-Book; a market switches only at zero positions); hedge and one-way both supported with a netted one-way master account; isolated margin still forced on A-Book; liquidation back to a local trigger with a market close via the MM — v1.4's MM-held Binance stops withdrawn because of the per-symbol conditional-order cap (3.8 replaced by netted-account rules); mark source per book; new sections on what A-Book changes, system-level isolation vs business-level dependency, and the delivery estimate; spot A-Book scoped as phase 2.</p><p>v1.4 (2026-09-28, new requirements): Binance account is our own master account and the MM is an in-house agent (principal model, commercial settlement and MM credit exposure dropped); A-Book markets forced to isolated margin + one-way mode; liquidation redesigned — PM Perp publishes a versioned per-position liquidation price, the MM holds the Binance stop (new 3.8 protection contract: cancel-then-place, full-qty completion, netted-account rules, per-symbol conditional-order cap), the stop's fill is the liquidation, other orders on that market are cancelled, the local scanner goes shadow-only; A-Book mark switched to Binance mark; reconciliation extended to net position (with a read-only Binance key), protections, and wallet; new risks: master account liquidation, protection gap, double close / orphan stop, funding recompute storm.</p><p>v1.3 (2026-09-25, review feedback absorbed): 3.5 rewritten — UNKNOWN state + three-condition death verdict + MM-side tombstone / UNKNOWN obligations + CANCEL_REJECTED backfill; house economic-loop payment direction corrected, credit exposure defined (balance + MTM + funding accruals), engineering checklist added (hot-row benchmarking, two-way legs, risk exemptions, no-double-booking invariant); ledger external klines upgraded to a full storage/aggregation design (source-table UPSERT, disconnect backfill, dual-chain routing); depth diffing gains deletion-level and reconnect-reset semantics. v1.2: Binance-first decided; open items restructured. v1.1: 3.0 data ownership, spot boundary matrix.</p><p>v2 final follows the contract review and the remaining open items landing; the Chinese twin is <code>docs/a-book-perps-design.html</code>. Related documents: <code>docs/new-perps-rollout-plan.html</code> (market parameters and quote config baseline), <code>docs/2026-09-22-attacker-position-force-close-runbook.md</code> plus the two 09-23 MM cleanup runbooks (phase 0).</p></div>
 </section>
 </article>
 

@@ -104,10 +104,10 @@ ol.pts b{color:var(--ink);font-weight:600}
 <a href="#services" data-tab="services"><span class="n">7</span>服务改动明细</a>
 <div class="grp">执行</div>
 <a href="#risk" data-tab="risk"><span class="n">8</span>风险与熔断</a>
-<a href="#cutover" data-tab="cutover"><span class="n">9</span>切换计划</a>
+<a href="#cutover" data-tab="cutover"><span class="n">9</span>上线与排期</a>
 <a href="#open" data-tab="open"><span class="n">10</span>已决与待决</a>
 </nav>
-<div class="side-foot">2026-09-28 · v1.4 · 设计稿<br>强制逐仓 + 单向持仓<br>自有币安主账户<br>自有 MM 持有强平止损单<br>已决: 币安价+显式费<br>全量切换 · 无存量 · 币安为主</div>
+<div class="side-foot">2026-09-28 · v1.5 · 设计稿<br>A-Book + B-Book 按市场并存<br>自有币安主账户<br>双向 + 单向 · A-Book 逐仓<br>本地触发强平<br>现货 A-Book = 第二期</div>
 </aside>
 
 <div class="main">
@@ -116,59 +116,67 @@ ol.pts b{color:var(--ink);font-weight:600}
 <article class="panel" id="p-overview">
 <header>
 <div class="eyebrow">1 · 总览与决策</div>
-<h1>永续全面转向 A-Book</h1>
-<p class="standfirst">平台<strong>退出永续对手方角色</strong>：订单簿、K线、24h 统计直接采用币安数据；用户订单全部经我方自有做市商（MM）在<strong>平台自己的币安主账户</strong>上真实执行；平台保留账户、保证金、强平价计算与手续费体系，赚取<strong>显式手续费</strong>，不再承担内部撮合与对手方市场风险。v1.4 起 <strong>A-Book 仓位一律逐仓 + 单向持仓</strong>：每个仓位的强平价由我方计算，MM 在币安挂一张对应的止损单，止损单的真实成交就是用户的强平。</p>
+<h1>按市场在 B-Book 之外增加 A-Book</h1>
+<p class="standfirst">平台新增第二种执行模式，并<strong>按市场</strong>选择。<strong>B-Book</strong> 就是现在的系统：Finex 撮合用户之间、以及用户与内部做市账户之间的订单，平台是对手方。<strong>A-Book</strong> 把每笔用户订单经我方自有做市商（MM）转发到<strong>平台自己的币安主账户</strong>：订单簿、K线、mark 价来自币安，平台在这个市场上不再是对手方。两种模式下，账户、保证金、强平、手续费都留在我方系统。</p>
 <div class="tw"><table>
 <thead><tr><th>决策点</th><th>结论</th><th>含义</th></tr></thead>
 <tbody>
-<tr><td><b>币安账户</b></td><td><span class="pill ok">我方自有主账户</span></td><td class="dim">所有用户订单落在同一个平台自有币安账户；币安只看得到这个账户的净头寸和余额，看不到单个用户（2026-09-28 决定）</td></tr>
-<tr><td><b>MM 角色</b></td><td><span class="pill ok">自有执行代理</span></td><td class="dim">我方自己的 MM 系统操作主账户：转发用户订单、持有强平止损单。它不是对手方——没有商务结算，也没有 MM 信用敞口</td></tr>
-<tr><td><b>保证金与持仓模式</b></td><td><span class="pill ok">强制逐仓 + 单向</span></td><td class="dim">A-Book 市场关闭全仓与双向持仓；一个用户 × 一个币对最多一个仓位 = 一个强平价（2026-09-28 决定）</td></tr>
-<tr><td><b>强平执行</b></td><td><span class="pill ok">本地算价 → 币安止损单</span></td><td class="dim">PM Perp 计算每个仓位的逐仓强平价并发布；MM 在币安挂单并维护；止损单的实际成交价就是用户的强平价</td></tr>
-<tr><td><b>成交价格</b></td><td><span class="pill ok">币安真实成交价 + 显式手续费</span></td><td class="dim">费率走 fee_engine 现有体系；点差不进价格</td></tr>
-<tr><td><b>切换范围</b></td><td><span class="pill ok">全量切换</span></td><td class="dim">所有永续市场一次切 A-Book；无存量持仓（从新开始）</td></tr>
-<tr><td><b>行情与映射</b></td><td><span class="pill ok">以币安为准</span></td><td class="dim">执行 / 行情 / K线 / mark 价全以币安为准；仅维护我方 ↔ 币安 symbol 映射</td></tr>
-<tr><td><b>接口现状</b></td><td><span class="pill gap">NeoDAX ↔ MM 未建</span></td><td class="dim">MM 已对接币安；我方与 MM 之间的契约（订单 + 强平保护）= 本文档第 3 页（过会材料）</td></tr>
+<tr><td><b>A/B 选择</b></td><td><span class="pill ok">按市场，A 与 B 并存</span></td><td class="dim">每个永续市场配置为 A-Book 或 B-Book（如 BTC / ETH 走 A，其余走 B）；只有在该市场持仓为零时才能切换（2026-09-28 决定）</td></tr>
+<tr><td><b>币安账户</b></td><td><span class="pill ok">我方自有主账户</span></td><td class="dim">所有 A-Book 用户订单落在同一个平台自有币安账户；币安只看得到这个账户的净头寸和余额，看不到单个用户</td></tr>
+<tr><td><b>MM 角色</b></td><td><span class="pill ok">自有执行代理</span></td><td class="dim">我方自己的 MM 系统（由另一个团队开发）负责转发订单、回报成交。它不是对手方——没有商务结算，也没有 MM 信用敞口</td></tr>
+<tr><td><b>持仓模式</b></td><td><span class="pill ok">双向 + 单向</span></td><td class="dim">两种都继续提供给用户。主账户在币安用单向模式，只持有所有用户腿的净额（一个用户多 0.5、空 1 → 主账户空 0.5）</td></tr>
+<tr><td><b>保证金模式</b></td><td><span class="pill ok">A-Book 强制逐仓</span></td><td class="dim">A-Book 市场关闭全仓；B-Book 市场两种都保留</td></tr>
+<tr><td><b>强平</b></td><td><span class="pill ok">本地触发，经 MM 市价平仓</span></td><td class="dim">PM Perp 扫描器盯币安 mark，到强平价后经 MM 发市价平仓单，按实际成交价结算。不使用币安止损单（单 symbol 数量上限，见 3.8）</td></tr>
+<tr><td><b>成交价格</b></td><td><span class="pill ok">币安真实成交价 + 显式手续费</span></td><td class="dim">费率走 fee_engine 现有体系；我方费率必须高于币安向主账户收的费率</td></tr>
+<tr><td><b>上线方式</b></td><td><span class="pill ok">逐个市场开启</span></td><td class="dim">首批 2–3 个市场；现货 A-Book 为第二期</td></tr>
+<tr><td><b>接口现状</b></td><td><span class="pill gap">NeoDAX ↔ MM 未建</span></td><td class="dim">MM 已对接币安；我方与 MM 之间的契约 = 本文档第 3 页（过会材料）</td></tr>
 </tbody>
 </table></div>
+<div class="call"><p class="call-t">A-Book 改变了什么，没改变什么</p><p><b>改变的</b>：成交发生在哪里（币安而不是我方 Finex 订单簿），以及市场风险由谁承担。主账户持有与用户净头寸相反的仓位，用户赚的钱来自币安市场，而不是平台。用户吃的是币安深度，内部薄盘不再会被操纵（09-18 TAO 攻击）或冻结（07-15 ETH mark 事故）。</p><p><b>没改变的</b>：所有业务逻辑——余额、保证金、持仓、强平、手续费、风控——都留在我方系统，因为币安只认识我们的主账户。对 A-Book 市场来说，MM 就是一个执行通道，接替的是 Finex 的位置。</p><p><b>代价</b>：A-Book 市场只剩手续费收入，而且每笔成交都要付币安手续费。所以按市场选择：风险转移或流动性最重要的市场走 A-Book；平台愿意自己赚价差、或者币安没有的币种（如 YELLOW）走 B-Book。</p></div>
+<div class="call warn"><p class="call-t">系统层面隔离，业务层面依赖</p><p>MM 出问题不会阻塞我方服务：trading-api 不同步等 MM（锁保证金后发 Kafka，connector 异步调用 MM），查询、充提、划转、B-Book 市场照常。</p><p>但在 A-Book 市场上成交<em>发生</em>在币安，我方不能自己假定结果：下单超时进入 UNKNOWN，保证金继续锁定，直到 MM 确认（3.5）；撤单超时不能告诉用户"已撤销"；强平单发不出去就是真实的资金敞口。MM 长时间不可用，A-Book 市场就停止交易，影响等同于 Finex 挂掉对 B-Book 市场的影响。熔断、UNKNOWN 仲裁、对账、强平补发是上线前提，不是可选项。</p></div>
 </header>
 
 <section>
 <h2>目标链路一图流</h2>
-<p class="section-note">命令面（绿框为新增）与数据面分离。命令面：<strong>资金与保证金仍 100% 由我方持有</strong>，MM 只是执行通道；数据面：用户可见行情全部来自币安镜像。</p>
+<p class="section-note">命令面与数据面分离（绿框为新增）。命令面：<strong>资金与保证金仍 100% 由我方持有</strong>，MM 只是执行通道；数据面：A-Book 市场上用户可见行情全部来自币安镜像。B-Book 市场保持现在的 Finex 链路不变。</p>
 <div class="layers">
 <div class="layer">
 <div class="layer-n">用户<small>REST / WebSocket</small></div>
-<p class="layer-d">下单 / 撤单 / 查询。体验不变：还是对接 trading-api 的现有 API。</p>
+<p class="layer-d">下单 / 撤单 / 查询。体验不变：还是对接 trading-api 的现有 API，A-Book 与 B-Book 市场一样。</p>
 </div>
-<div class="arrow">↓ ① gRPC LockPerpAsset（保证金校验+锁定，不变） · ② Kafka CommandOrderCreate（不变）</div>
+<div class="arrow">↓ ① gRPC LockPerpAsset（保证金校验+锁定，不变） · ② Kafka CommandOrderCreate 到 <code>commands.{MKT}.OrderCommands</code>（不变）</div>
+<div class="layer hi">
+<div class="layer-n">按市场路由<small>book 开关</small></div>
+<p class="layer-d">每个市场的命令 topic 只有一个消费者：B-Book 市场是 <b>Finex</b>，A-Book 市场是 <b>mm-connector</b>，由该市场的 book 开关决定。</p>
+</div>
+<div class="arrow">↓ A-Book 市场</div>
 <div class="layer hi">
 <div class="layer-n">mm-connector<small>新增服务 · 协议翻译</small></div>
-<p class="layer-d">消费与 Finex 相同的 <code>commands.{MKT}.OrderCommands</code> → 翻译成 MM REST 接口 → 接收 WS 回报 → <b>合成 Finex 格式事件</b>发回 Kafka。对下游而言它就是"撮合引擎"。</p>
+<p class="layer-d">消费 A-Book 市场的 <code>commands.{MKT}.OrderCommands</code> → 翻译成 MM REST 接口 → 接收 WS 回报 → <b>合成 Finex 格式事件</b>发回 Kafka。对下游而言它就是"撮合引擎"。</p>
 </div>
-<div class="arrow">↓ REST 提交 / WS 回报 / 保护目标（本文档第 3 页契约）</div>
+<div class="arrow">↓ REST 提交 / WS 回报（本文档第 3 页契约）</div>
 <div class="layer hi">
 <div class="layer-n">MM<small>自有 · 我方币安主账户</small></div>
-<p class="layer-d">把我方订单转发到币安 USDⓈ-M（限价/市价/只挂单），回报<b>真实成交价与成交角色</b>。同时在币安为<b>每个仓位持有一张强平止损单</b>，与我方发布的强平价保持同步；止损单触发后作为强平成交回报。</p>
+<p class="layer-d">在单向模式的主账户上把我方订单转发到币安 USDⓈ-M（限价/市价/只挂单），回报<b>真实成交价与成交角色</b>。强平平仓单就是普通的 <code>source=liquidation</code> 市价单。</p>
 </div>
 <div class="arrow">↓ EventOrderUpdated / EventTradeExecuted（格式与 Finex 完全一致，下游零改动）</div>
 <div class="layer">
-<div class="layer-n">PM Perp<small>结算 · + 逐仓强平价</small></div>
-<p class="layer-d">双参与者结算：用户 + <b>house 系统账户</b>（新增，镜像主账户）。保证金、逐仓仓位、PnL、funding、Scheme A 审计全部保留；清算扫描器改为<b>强平价计算器 + 影子监控</b>——平仓本身在币安完成。</p>
+<div class="layer-n">PM Perp<small>结算 · 按市场区分强平出口</small></div>
+<p class="layer-d">A-Book 市场双参与者结算：用户 + <b>house 系统账户</b>（新增，镜像主账户）；B-Book 市场不变。保证金、仓位、PnL、funding、清算扫描器、Scheme A 审计全部保留；只有强平平仓单发往哪里取决于市场所属的 book。</p>
 </div>
 </div>
 <div class="layers" style="margin-top:14px">
 <div class="layer hi">
 <div class="layer-n">quote<small>扩展 · 币安镜像</small></div>
-<p class="layer-d">新增订阅：depth20 订单簿、kline_1m、24h ticker、aggTrade、exchangeInfo 过滤器 → 以现有事件格式发布，<b>trading-api 与 ledger 的消费端零改动</b>。A-Book 市场的 mark price 直接用币安 mark（与止损单触发参照一致，第 6 页）。</p>
+<p class="layer-d">为 A-Book 市场新增订阅：depth20 订单簿、kline_1m、24h ticker、aggTrade、exchangeInfo 过滤器 → 以现有事件格式发布，<b>trading-api 与 ledger 的消费端零改动</b>。A-Book 市场直接用币安 mark；B-Book 市场保留多源 oracle（第 6 页）。</p>
 </div>
 </div>
 
-<h2>三个必须先说清楚的前提</h2>
-<div class="call warn"><p class="call-t">前提一：切换时点全平台持仓必须为零（已确认从新开始）</p><p>切换瞬间<b>全平台无未平仓位</b>——历史持仓没有币安对冲，账实分离。</p><p>内部账户清仓进行中：attacker 已执行（09-22），0x535c / 0x7152 runbook 就绪。<b>普通用户无存量持仓需处置</b>（停服状态视为全新开始，2026-09-24 确认）。</p></div>
-<div class="call"><p class="call-t">前提二：用户条件单留在本地；强平改为币安上的止损单</p><p>用户止盈止损的触发判定、WAL、LockPerpAsset 仍在本地（<code>perp_trigger</code> 的 Trigger→Lock→CommandOrderExecute 流程不变）。</p><p>强平形态改变（v1.4）：PM Perp 继续计算每个仓位的逐仓强平价（MMR 档位），但<strong>不再自己发平仓单</strong>——它把强平价作为保护目标发布，由 MM 在币安的止损单完成平仓。扫描器保留为影子监控（只报警），同一个仓位不会被平两次。</p></div>
-<div class="call warn"><p class="call-t">前提四：逐仓 + 单向是强制的，不是默认值</p><p>A-Book 市场在服务端拒绝全仓和双向持仓设置（PM Perp + trading-api 校验），前端隐藏 Cross/Hedge 切换。一个用户 × 一个币对最多一个仓位，对应恰好一个强平价、一张止损单。</p></div>
-<div class="call"><p class="call-t">前提三：保留一个版本周期的 B-book 回滚开关</p><p>finex-perp 引擎<b>下线路由但不删代码</b>。</p><p>cutover 后保留一个版本周期的"路由 flag 热切回 Finex"能力（第 9 页），观察期结束、A-Book 稳定后再清理。</p></div>
+<h2>四个必须先说清楚的前提</h2>
+<div class="call warn"><p class="call-t">前提一：市场只能在持仓为零时切换 book</p><p>A-Book 仓位背后有真实的币安头寸，B-Book 仓位没有。持仓未平时把市场在两种 book 之间切换会造成账实分离，所以第一版只允许在该市场<b>没有持仓、也没有挂单</b>时切换。</p><p>首次上线天然满足：交易已停，视为全新开始（2026-09-24 确认）。</p></div>
+<div class="call"><p class="call-t">前提二：触发与强平都留在本地</p><p>用户止盈止损的触发判定、WAL、LockPerpAsset 仍在本地（<code>perp_trigger</code> 的 Trigger→Lock→CommandOrderExecute 流程不变）。</p><p>PM Perp 清算扫描器继续决定何时强平（A-Book 市场按币安 mark，MMR 档位）。在 A-Book 市场上，平仓单发给 mm-connector 而不是 Finex。强平不使用币安止损单：币安限制每个账户每个 symbol 的条件单数量（撰写时为 10 张），在共用的主账户上远不够每个用户一张。</p></div>
+<div class="call"><p class="call-t">前提三：两种 book 长期并存</p><p>Finex perp、takeover/ADL、内部做市账户都<b>保留</b>——它们服务 B-Book 市场。book 开关是长期的按市场配置，不是一次性的回滚开关。</p></div>
+<div class="call warn"><p class="call-t">前提四：A-Book 市场强制逐仓</p><p>A-Book 市场在服务端拒绝全仓设置（PM Perp + trading-api 校验），前端隐藏 Cross 切换。双向和单向持仓都保留：主账户只持有所有用户腿的净额。</p></div>
 </section>
 </article>
 
@@ -176,8 +184,8 @@ ol.pts b{color:var(--ink);font-weight:600}
 <article class="panel" id="p-arch" hidden>
 <header>
 <div class="eyebrow">2 · 架构</div>
-<h1>现状 → 目标：替换"撮合引擎"，保留一切契约</h1>
-<p class="standfirst">改造的核心洞察：<strong>Finex 对外只暴露两个 Kafka 契约</strong>——入口 <code>commands.{MKT}.OrderCommands</code>、出口 <code>events.{MKT}.EventOrderUpdated</code> + <code>events.{MKT}.EventTradeExecuted</code>。把消费入口、生产出口的角色换成 mm-connector，<strong>下游全部服务零改动</strong>。</p>
+<h1>现状 → 目标：新增第二个撮合席位，按市场选择</h1>
+<p class="standfirst">改造的核心洞察：<strong>Finex 对外只暴露两个 Kafka 契约</strong>——入口 <code>commands.{MKT}.OrderCommands</code>、出口 <code>events.{MKT}.EventOrderUpdated</code> + <code>events.{MKT}.EventTradeExecuted</code>。topic 本来就按市场划分，所以 A-Book 市场只需把这个席位交给 mm-connector，B-Book 市场继续用 Finex——两种情况下<strong>下游全部服务零改动</strong>。</p>
 </header>
 
 <section>
@@ -204,13 +212,14 @@ ol.pts b{color:var(--ink);font-weight:600}
 </div>
 </div>
 
-<h2>目标（A-Book 经 MM 执行）</h2>
+<h2>目标（按市场：B-Book 走 Finex，A-Book 走 MM）</h2>
+<p class="section-note">B-Book 市场完全按上面的"现状"链路运行，下面各层只适用于 A-Book 市场。</p>
 <div class="layers">
 <div class="layer">
 <div class="layer-n">trading-api<small>不变</small></div>
-<p class="layer-d">下单/锁仓/回滚路径完全不变。仅订单簿、K线、ticker、公共成交流的数据源换成 quote 的币安镜像（同 topic 同格式）。</p>
+<p class="layer-d">下单/锁仓/回滚路径完全不变。A-Book 市场上仅订单簿、K线、ticker、公共成交流的数据源换成 quote 的币安镜像（同 topic 同格式）。</p>
 </div>
-<div class="arrow">↓ Kafka commands.{MKT}.OrderCommands（同一 topic，消费者换人）</div>
+<div class="arrow">↓ Kafka commands.{MKT}.OrderCommands（同一 topic，消费者由市场的 book 开关决定）</div>
 <div class="layer hi">
 <div class="layer-n">mm-connector<small>新增 · 替代 Finex 的位置</small></div>
 <p class="layer-d">消费订单命令 → MM REST 提交（幂等 + expires_at）→ WS 回报驱动状态机 → 把 ack/成交/撤单/拒绝翻译成 <code>EventOrderUpdated</code>、<code>EventTradeExecuted</code>（house 合成单做对手腿）→ 发布到 <code>events.{MKT}.*</code>。内置：UNKNOWN 悬挂仲裁（判死三条件，见 3.5）、心跳熔断、三方对账 worker。</p>
@@ -218,7 +227,7 @@ ol.pts b{color:var(--ink);font-weight:600}
 <div class="arrow">↓ REST / WS（第 3 页契约） · MM → 币安执行</div>
 <div class="layer hi">
 <div class="layer-n">PM Perp<small>结算语义不变 + house 账户</small></div>
-<p class="layer-d">仍消费 <code>EventTradeExecuted</code> 做双参与者结算——只是对手腿从"另一个用户/系统账户"固定为 <b>house 系统账户</b>（UUID 尾号 09，owner=0x0），它镜像我方币安主账户。每次仓位变化后重算逐仓强平价，向 connector 发出保护目标；强平成交以 <code>ExecType=liquidation</code> 回来。takeover/ADL 退役，保险金只兜穿仓差额。</p>
+<p class="layer-d">仍消费 <code>EventTradeExecuted</code> 做双参与者结算——只是对手腿从"另一个用户/系统账户"固定为 <b>house 系统账户</b>（UUID 尾号 09，owner=0x0），它镜像我方币安主账户。扫描器对 A-Book 仓位的强平平仓单以 <code>source=liquidation</code> 市价单发给 connector，按 <code>ExecType=liquidation</code> 结算；穿仓差额由保险金付给 house。A-Book 市场不使用 takeover/ADL（B-Book 市场仍然使用）。</p>
 </div>
 <div class="arrow">↓ 币安公共流（quote 镜像，第 6 页）</div>
 <div class="layer hi">
@@ -236,21 +245,22 @@ ol.pts b{color:var(--ink);font-weight:600}
 <li><b>治理</b> — connector 是我们的一等公民服务：限速、熔断、对账、审计日志都在我们侧，可观测可运维。</li>
 </ol>
 
-<h2>不变与退役清单</h2>
+<h2>两种 book 各用什么</h2>
 <div class="tw"><table>
-<thead><tr><th>组件</th><th>判定</th><th>说明</th></tr></thead>
+<thead><tr><th>组件</th><th>B-Book 市场</th><th>A-Book 市场</th></tr></thead>
 <tbody>
-<tr><td class="mono-c">LockPerpAsset / UnlockPerpAsset</td><td><span class="pill ok">不变</span></td><td class="dim">资金仍在我方。校验（margin/杠杆/risk-tier/价格偏离）保留</td></tr>
-<tr><td class="mono-c">perp_trigger 服务</td><td><span class="pill ok">近零改动</span></td><td class="dim">触发→锁仓→CommandOrderExecute，命令自然流入 connector；新增一点：某仓位被强平时，撤掉该用户在这个币对上等待中的止盈止损</td></tr>
-<tr><td class="mono-c">PM Perp 结算/Scheme A 审计</td><td><span class="pill ok">不变</span></td><td class="dim">双参与者模型照旧，对手腿换成 house 账户</td></tr>
-<tr><td class="mono-c">fee_engine</td><td><span class="pill ok">不变</span></td><td class="dim">用户费率照收；house 侧零费率</td></tr>
-<tr><td class="mono-c">MMR 档位 + 逐仓强平价公式</td><td><span class="pill ok">保留 · 变成输出</span></td><td class="dim">档位与逐仓公式保留；结果作为保护目标发布，不再驱动本地平仓</td></tr>
-<tr><td class="mono-c">清算扫描器（平仓执行）</td><td><span class="pill gap">影子模式</span></td><td class="dim">A-Book 市场不再发平仓单（由币安止损单平仓）；继续扫描，mark 已穿过强平价却没收到强平成交时报警</td></tr>
-<tr><td class="mono-c">全仓 / 双向持仓</td><td><span class="pill no">A-Book 禁用</span></td><td class="dim">代码与枚举保留；A-Book 市场只接受逐仓 + 单向（校验 + UI）</td></tr>
-<tr><td class="mono-c">Finex perp 撮合引擎</td><td><span class="pill no">退役</span></td><td class="dim">下线路由，代码保留一个版本周期作回滚开关；<b>Finex spot 不受影响</b></td></tr>
-<tr><td class="mono-c">takeover / ADL</td><td><span class="pill no">退役</span></td><td class="dim">B-Book 独有机制（保护内部对手方）；A-Book 下穿仓由保险金直付 house 账户</td></tr>
-<tr><td class="mono-c">清算 IOC 内部撮合</td><td><span class="pill no">退役</span></td><td class="dim">改为 MM 在币安为每个仓位持有的止损单（成交以 source=liquidation 回报）</td></tr>
-<tr><td class="mono-c">内部 MM 报价账户</td><td><span class="pill no">退役</span></td><td class="dim">0x535c / 0x7152 等内部做市账户完成清仓后关闭（runbook 已就绪）</td></tr>
+<tr><td class="mono-c">LockPerpAsset / UnlockPerpAsset</td><td><span class="pill ok">不变</span></td><td class="dim">不变——资金仍在我方；校验（margin/杠杆/risk-tier/价格偏离）保留，市价单增加滑点缓冲</td></tr>
+<tr><td class="mono-c">perp_trigger 服务</td><td><span class="pill ok">不变</span></td><td class="dim">不变——触发→锁仓→CommandOrderExecute，命令自然流入 connector；强平时撤掉该用户在这个币对上等待中的止盈止损（两种 book 都做）</td></tr>
+<tr><td class="mono-c">PM Perp 结算/Scheme A 审计</td><td><span class="pill ok">不变</span></td><td class="dim">双参与者模型照旧，对手腿是 house 账户</td></tr>
+<tr><td class="mono-c">fee_engine</td><td><span class="pill ok">不变</span></td><td class="dim">用户费率照收；house 侧零费率；费率必须高于币安向主账户收的费率</td></tr>
+<tr><td class="mono-c">清算扫描器 + MMR 档位</td><td><span class="pill ok">不变</span></td><td class="dim">触发逻辑相同，按币安 mark；平仓单发给 connector 而不是 Finex</td></tr>
+<tr><td class="mono-c">双向 / 单向持仓</td><td><span class="pill ok">都支持</span></td><td class="dim">都支持；主账户单向，持有所有用户腿的净额</td></tr>
+<tr><td class="mono-c">全仓 / 逐仓</td><td><span class="pill ok">都支持</span></td><td class="dim">只有逐仓（校验 + UI）</td></tr>
+<tr><td class="mono-c">Finex perp 撮合引擎</td><td><span class="pill ok">使用</span></td><td class="dim">不使用（该市场下线路由）；<b>Finex spot 不受影响</b></td></tr>
+<tr><td class="mono-c">takeover / ADL</td><td><span class="pill ok">使用</span></td><td class="dim">不使用——没有需要保护的内部对手方；穿仓走保险金 → house</td></tr>
+<tr><td class="mono-c">清算 IOC 内部撮合</td><td><span class="pill ok">使用</span></td><td class="dim">改为经 MM 在币安执行的 source=liquidation 市价平仓单</td></tr>
+<tr><td class="mono-c">内部做市账户</td><td><span class="pill ok">使用（提供流动性）</span></td><td class="dim">不使用——流动性来自币安深度</td></tr>
+<tr><td class="mono-c">mark 价来源</td><td><span class="pill ok">多源 oracle</span></td><td class="dim">币安 mark</td></tr>
 </tbody>
 </table></div>
 </section>
@@ -262,7 +272,7 @@ ol.pts b{color:var(--ink);font-weight:600}
 <div class="eyebrow">3 · MM 接口契约 v1</div>
 <h1>NeoDAX ↔ MM 通信契约（过会材料）</h1>
 <p class="standfirst">这是整个项目<strong>第一个要落地的东西</strong>。设计原则：<strong>语义镜像币安 USDⓈ-M API</strong>（下单/撤单/执行回报流），MM 按他熟悉的模型实现；我方 mm-connector 作为唯一调用方，MM 不接触我方 Kafka。</p>
-<div class="assume"><b>契约要点速览</b><br>REST 提交/查询 + WebSocket 回报 · HMAC 认证<br><code>client_order_id</code> 幂等（= 我方订单 UUID）· <code>expires_at</code> 防悬挂<br>ack ≤ 500ms · 市单回报 ≤ 3s · 数值一律字符串小数（禁止 float）<br><b>v1.4</b>：+ 强平保护目标（3.8）——我方发布价格，MM 负责币安止损单 · MM 操作的是<b>我方自有</b>币安主账户</div>
+<div class="assume"><b>契约要点速览</b><br>REST 提交/查询 + WebSocket 回报 · HMAC 认证<br><code>client_order_id</code> 幂等（= 我方订单 UUID）· <code>expires_at</code> 防悬挂<br>ack ≤ 500ms · 市单回报 ≤ 3s · 数值一律字符串小数（禁止 float）<br><b>v1.5</b>：MM 操作的是<b>我方自有</b>、单向模式的币安主账户 · 净额账户规则（3.8）· 强平平仓单就是普通的 <code>source=liquidation</code> 市价单</div>
 </header>
 
 <section>
@@ -274,8 +284,7 @@ ol.pts b{color:var(--ink);font-weight:600}
 <tr><td>用户订单 / 仓位 / 余额 / 成交历史</td><td><span class="pill ok">我方 PM Perp</span></td><td class="dim"><code>perps_orders</code> / <code>perps_positions</code> / <code>perps_balances</code> / <code>perps_transactions</code> + Raft FSM——现网结构不变</td></tr>
 <tr><td>用户读接口（REST / WS 私有流）</td><td><span class="pill ok">我方本地</span></td><td class="dim">trading-api → PM Perp gRPC，与现网一致；<b>永不查 MM</b>——MM 挂了只影响下单，不影响查询</td></tr>
 <tr><td>MM 侧订单 / 仓位状态</td><td><span class="pill gap">MM（执行反馈）</span></td><td class="dim">只是我方状态机的<b>输入</b>，不是账本；GET 仅用于仲裁与对账（见下）</td></tr>
-<tr><td>每个仓位的强平价</td><td><span class="pill ok">我方 PM Perp</span></td><td class="dim">本地计算（逐仓公式 + MMR 档位）；展示给用户的和发给 MM 的是同一个值</td></tr>
-<tr><td>币安止损单（强平保护）</td><td><span class="pill gap">MM（挂单与维护）</span></td><td class="dim">止损单在币安上怎么挂由 MM 负责（Algo 接口、替换顺序、限频）；我方负责目标值，并通过对账核验（3.8）</td></tr>
+<tr><td>每个仓位的强平决策</td><td><span class="pill ok">我方 PM Perp</span></td><td class="dim">本地计算并触发（逐仓公式 + MMR 档位，币安 mark）；MM 只执行由此产生的平仓单</td></tr>
 <tr><td>币安主账户（持仓 / 钱包）</td><td><span class="pill ok">平台自有</span></td><td class="dim">是我方自己的账户：除了 MM 回报，我方还用<b>只读 API key</b> 直接对账（第 5 页）</td></tr>
 </tbody>
 </table></div>
@@ -311,8 +320,6 @@ ol.pts b{color:var(--ink);font-weight:600}
 <tr><td class="mono-c"><b>GET /api/v1/orders/{client_order_id}</b></td><td>权威状态查询</td><td class="dim"><b>悬挂仲裁唯一依据</b>：返回订单终态 + 全部 fills（详见 3.5）</td></tr>
 <tr><td class="mono-c">GET /api/v1/positions</td><td>主账户净头寸报告</td><td class="dim">对账 worker 周期拉取，与所有用户带方向持仓之和比对（再用我方只读 key 交叉核验）</td></tr>
 <tr><td class="mono-c">GET /api/v1/account</td><td>主账户保证金报告</td><td class="dim">钱包余额 / 保证金余额 / 维持保证金 / 保证金率；驱动主账户熔断（第 8 页）</td></tr>
-<tr><td class="mono-c"><b>PUT /api/v1/protections/{position_key}</b></td><td>更新强平保护目标</td><td class="dim">目标状态语义，带单调递增版本号；qty=0 表示撤销（见 3.8）</td></tr>
-<tr><td class="mono-c">GET /api/v1/protections</td><td>保护状态列表</td><td class="dim">每个仓位已生效的版本 / 币安止损单 id / 触发价 / 数量；保护对账的依据</td></tr>
 <tr><td class="mono-c">GET /api/v1/health</td><td>健康检查</td><td class="dim">心跳探测；含币安连接状态字段</td></tr>
 <tr><td class="mono-c">GET /api/v1/time</td><td>服务端时钟</td><td class="dim">时钟校准</td></tr>
 </tbody>
@@ -324,7 +331,7 @@ ol.pts b{color:var(--ink);font-weight:600}
   <span class="k">"client_order_id"</span>: <span class="t">"3f9c2a48-9d21-4b6e-8f2a-2c1d5e7b9a03"</span>,  <span class="c">// 我方订单 UUID，幂等键</span>
   <span class="k">"market"</span>:           <span class="t">"TAOUSDT-PERP"</span>,                       <span class="c">// 我方 symbol（双保险，两列都给）</span>
   <span class="k">"binance_symbol"</span>:   <span class="t">"TAOUSDT"</span>,
-  <span class="k">"side"</span>:             <span class="t">"buy"</span>,                                  <span class="c">// buy|sell（只有单向持仓，见 3.6）</span>
+  <span class="k">"side"</span>:             <span class="t">"buy"</span>,                                  <span class="c">// buy|sell（我方已按双向持仓方向翻译，见 3.6）</span>
   <span class="k">"type"</span>:             <span class="t">"LIMIT"</span>,                                <span class="c">// LIMIT|MARKET|POST_ONLY</span>
   <span class="k">"qty"</span>:              <span class="t">"19.75"</span>,                                <span class="c">// 基础资产数量，字符串小数</span>
   <span class="k">"price"</span>:            <span class="t">"199.50"</span>,                               <span class="c">// LIMIT/POST_ONLY 必填</span>
@@ -393,9 +400,9 @@ ol.pts b{color:var(--ink);font-weight:600}
 <div class="tw"><table>
 <thead><tr><th>我方字段</th><th>翻译规则</th></tr></thead>
 <tbody>
-<tr><td class="mono-c">direction</td><td class="dim">A-Book 只有单向持仓（v1.4）：订单就是针对用户唯一净仓位的普通 buy/sell。MM 只见 buy/sell</td></tr>
+<tr><td class="mono-c">direction（双向 long/short）</td><td class="dim">开多→buy；平多→sell；开空→sell；平空→buy。MM 只见单向主账户上的 buy/sell，主账户把每条腿都做净额（见 3.8）</td></tr>
 <tr><td class="mono-c">margin_mode / leverage</td><td class="dim">A-Book 固定逐仓；保证金与杠杆是我方对用户的授信概念。主账户自己在币安上的杠杆与保证金设置属于运营决策（第 8 页），不从任何用户推导</td></tr>
-<tr><td class="mono-c">position_mode</td><td class="dim">A-Book 固定 ONE_WAY，纯内部，不下发</td></tr>
+<tr><td class="mono-c">position_mode (ONE_WAY/HEDGE)</td><td class="dim">用户设置，纯内部；主账户始终是单向</td></tr>
 <tr><td class="mono-c">reduce_only</td><td class="dim">在我方执行（数量不超过用户持仓），<b>不转发</b>：主账户是净额账户，币安的 reduceOnly 针对的是账户净头寸而不是这个用户，会被错误拒单</td></tr>
 <tr><td class="mono-c">post_only</td><td class="dim">映射 type=POST_ONLY；MM 在币安用 GTX 语义（只挂不吃，否则拒）</td></tr>
 </tbody>
@@ -425,45 +432,18 @@ ol.pts b{color:var(--ink);font-weight:600}
 <tr><td class="mono-c">SYSTEM_BUSY</td><td>MM 内部过载</td><td class="dim">退避；连续出现 → 熔断</td></tr>
 </tbody>
 </table></div>
-<div class="call warn"><p class="call-t">过会时需要 MM 逐条确认的点</p><p>① GTX（post_only）拒绝时回报里能否区分"会吃单"与其他拒绝原因；② IOC 部分成交的余量是否会推 ORDER_UPDATE(FILLED) + 明确的终态语义（我方余量记 StateExpired，与现网一致）；③ GET /orders 的 fills 列表是否含 role 字段（仲裁补账需要）；④ cancel-all 的生效时延保证；⑤ 币安维护窗口的预告机制；⑥ <b>tombstone 持久化</b>——首次 GET 应答"无记录"后，迟到的同 ID POST 是否保证拒绝（3.5 第 3 条，判死前提）；⑦ <b>MM 侧 UNKNOWN 语义</b>——对币安提交结果不确定时是否承诺不报终态（3.5 第 4 条）；⑧ <b>强平保护义务</b>——3.8 义务清单逐条确认，尤其是"每个仓位最多一张生效止损单"和部分触发后补足全部数量；⑨ <b>币安上的 client id</b>——我方订单 UUID 正好 36 个字符，是币安 <code>newClientOrderId</code> 的上限；MM 不能再加前缀，并且要保存 id ↔ 订单的映射用于归属。</p></div>
+<div class="call warn"><p class="call-t">过会时需要 MM 逐条确认的点</p><p>① GTX（post_only）拒绝时回报里能否区分"会吃单"与其他拒绝原因；② IOC 部分成交的余量是否会推 ORDER_UPDATE(FILLED) + 明确的终态语义（我方余量记 StateExpired，与现网一致）；③ GET /orders 的 fills 列表是否含 role 字段（仲裁补账需要）；④ cancel-all 的生效时延保证；⑤ 币安维护窗口的预告机制；⑥ <b>tombstone 持久化</b>——首次 GET 应答"无记录"后，迟到的同 ID POST 是否保证拒绝（3.5 第 3 条，判死前提）；⑦ <b>MM 侧 UNKNOWN 语义</b>——对币安提交结果不确定时是否承诺不报终态（3.5 第 4 条）；⑧ <b>净额账户规则</b>——3.8 逐条确认，尤其是绝不使用 reduceOnly / closePosition / 按 symbol 全撤，以及强平平仓单补足全部数量；⑨ <b>币安上的 client id</b>——我方订单 UUID 正好 36 个字符，是币安 <code>newClientOrderId</code> 的上限；MM 不能再加前缀，并且要保存 id ↔ 订单的映射用于归属。</p></div>
 
-<h3>3.8 强平保护契约（v1.4）</h3>
-<p class="section-note">2026-09-28 确定的分工：<b>我方计算强平价，MM 在币安按这个价格维持一张止损单</b>。我方按仓位发布期望状态，MM 把币安收敛到这个状态。我方自己从不在币安挂、改、撤止损单。</p>
-<pre><span class="c">// PUT /api/v1/protections/{position_key} —— position_key = {app_session_id}:{market}</span>
-{
-  <span class="k">"position_key"</span>:  <span class="t">"8c1e…:TAOUSDT-PERP"</span>,
-  <span class="k">"version"</span>:       1042,                      <span class="c">// 每个仓位单调递增；旧版本必须丢弃</span>
-  <span class="k">"binance_symbol"</span>: <span class="t">"TAOUSDT"</span>,
-  <span class="k">"side"</span>:          <span class="t">"sell"</span>,                    <span class="c">// 平仓方向：多仓 → sell，空仓 → buy</span>
-  <span class="k">"qty"</span>:           <span class="t">"19.75"</span>,                   <span class="c">// 仓位全量；"0" = 撤销保护</span>
-  <span class="k">"trigger_price"</span>: <span class="t">"181.35"</span>,                  <span class="c">// 我方计算的逐仓强平价</span>
-  <span class="k">"working_type"</span>:  <span class="t">"MARK_PRICE"</span>,              <span class="c">// 与展示给用户的 mark 同一参照</span>
-  <span class="k">"reason"</span>:        <span class="t">"fill"</span>                     <span class="c">// fill|margin_change|leverage|funding|resync</span>
-}
-
-<span class="c">// 3.4 执行流新增的 WS 回报</span>
-PROTECTION_APPLIED   {position_key, version, binance_stop_id, trigger_price, qty}
-PROTECTION_TRIGGERED {position_key, version, binance_stop_id, transact_time}   <span class="c">// 先于成交回报发出</span>
-TRADE_FILL           {…, source:"liquidation", position_key, version}          <span class="c">// 平仓成交，3.4 格式</span>
-PROTECTION_REJECTED  {position_key, version, error_code}                       <span class="c">// 如达到上限 —— 告警</span></pre>
-<h4>我方义务</h4>
+<h3>3.8 净额主账户规则（v1.5）</h3>
+<p class="section-note">所有用户的每一笔 A-Book 订单都落在同一个单向模式的币安账户上，它只持有两种持仓模式下所有用户腿的<b>净额</b>。例如：只有一个双向持仓用户，多 0.5、空 1，主账户就是空 0.5。这是正确的，不需要特殊处理，但它让以下规则成为 MM 的硬性要求。</p>
 <ul class="plain">
-<li><b>每次变化都发布</b> — 每笔成交（含部分成交）、追加/减少保证金、改杠杆、资金费结算、会影响强平价的扣费之后。仓位归零 → 发布 qty=0。</li>
-<li><b>我方也做合并</b> — 每个仓位同时最多一个未完成的版本；新目标在发出前覆盖旧目标。MM 仍然只执行它见过的最高版本。</li>
-<li><b>定期全量重发</b> — 每 N 分钟以及每次 WS 重连后，把所有持仓的最新版本重发一遍（MM 侧幂等）。</li>
-<li><b>触发即冻结</b> — 收到 <code>PROTECTION_TRIGGERED</code> 后，仓位进入强平中状态（沿用现有逐仓强平锁）：在强平结算完成前，拒绝该用户在这个币对上的新订单。</li>
+<li><b>只用普通 buy/sell</b> — 绝不发 <code>reduceOnly</code> 或 <code>closePosition</code>，也绝不按 symbol 撤单。三者作用的都是账户净头寸，也就是其他用户的仓位。只减仓的限制在我方执行（数量不超过该用户这条腿）。</li>
+<li><b>逐张撤单</b> — 只按 client_order_id 撤；按 symbol 全撤会撤掉这个市场上所有用户的订单。</li>
+<li><b>强平平仓单必须补足全部数量</b> — <code>source=liquidation</code> 市价平仓单只部分成交时，继续执行直到请求数量全部完成，每笔成交照常回报；如果无法完成，明确回报剩余数量，由我方重发。</li>
+<li><b>优先级</b> — 在 MM 的限频额度里，强平平仓单优先于用户订单。</li>
+<li><b>不为我方用户使用币安条件单</b> — 用户止盈止损和强平触发都在本地判定（perp_trigger / PM Perp 扫描器）。币安限制每个账户每个 symbol 的条件单数量（撰写时为 10 张），并把条件单迁到了 Algo Service（<code>/fapi/v1/algoOrder</code>），两者都不适合一个账户服务许多用户。</li>
 </ul>
-<h4>MM 义务（过会逐条确认）</h4>
-<ul class="plain">
-<li><b>每个仓位恰好一张生效止损单</b> — 替换顺序是<b>先撤后挂</b>，绝不先挂后撤：同时存在两张止损单时可能都触发，等于把仓位平两次。先撤后挂的短暂无保护空窗可以接受。</li>
-<li><b>撤单返回"未知订单" = 可能已触发</b> — 旧单的结果确定之前不挂新单（如果已触发，改为回报强平）。</li>
-<li><b>价格已经穿过</b> — 如果币安因为触发价会立即触发而拒绝止损单，立刻按市价平仓，并作为强平回报。</li>
-<li><b>补足全部数量</b> — 止损单触发后只部分成交时，继续按市价平掉剩余数量，直到被保护的数量全部平完；最后一笔成交标记为 final。</li>
-<li><b>净额账户规则</b> — 主账户是所有用户的净额：不得使用 <code>closePosition</code> 和按 symbol 全撤，也不要依赖 <code>reduceOnly</code>（三者作用的都是账户净头寸，也就是会波及其他用户）。</li>
-<li><b>币安限制由 MM 解决，但要对我方可见</b> — 条件单现在走 Algo Service（<code>/fapi/v1/algoOrder</code>，<code>clientAlgoId</code>），且币安限制每个账户每个 symbol 的条件单数量（撰写时为 10 张），远少于"每个用户一张"。MM 怎么覆盖所有仓位（子账户、本地触发……）是它的设计选择，但保护不了的仓位必须通过 <code>PROTECTION_REJECTED</code> 报出来，绝不能静默丢弃。</li>
-<li><b>归属</b> — 每张止损单和每笔强平成交都带 position_key + version，成交能直接结算到正确的用户，不需要解析币安 id。</li>
-</ul>
-<div class="call"><p class="call-t">强平价定义（逐仓、单向）</p><p>复用 PM Perp 现有的逐仓强平价计算（就是现在展示给用户的那个值），MMR 取市场的风险档位。参考公式：多仓 ≈ (开仓价 × 数量 − 逐仓保证金) / (数量 × (1 − MMR))；空仓 ≈ (开仓价 × 数量 + 逐仓保证金) / (数量 × (1 + MMR))。其中逐仓保证金已计入追加或减少的保证金、收付的资金费和扣除的手续费。触发点设在<b>维持保证金</b>水平而不是破产价，为触发到成交之间的滑点留出缓冲。</p></div>
+<div class="call warn"><p class="call-t">净额流量下的手续费</p><p>双向持仓用户的两条腿都会在币安真实成交，主账户每条腿都要付币安手续费，而净头寸几乎不变。A-Book 市场上我方的用户费率必须高于主账户的币安费率（maker 和 taker），否则每笔成交都亏钱。这是上线前需要业务确认的定价决策。</p></div>
 </section>
 </article>
 
@@ -532,31 +512,23 @@ POST 超时(500ms) → 进入 UNKNOWN（<b>保证金保持锁定</b>）
 
 WS 断线 15s → 熔断：新单全拒 + cancel-all 在途单 + 重连后全量 GET 仲裁（含 UNKNOWN）</pre>
 
-<h4>成交 → 强平价 → 保护更新（v1.4）</h4>
-<pre>TRADE_FILL（用户订单）→ connector → EventTradeExecuted → PM Perp 结算
-   → 更新仓位数量 / 开仓均价（逐仓、单向）
-   → 重算逐仓强平价（按新名义价值所在的 MMR 档位）
-   → 保护目标 {version+1, qty, trigger_price} → connector → PUT /protections
-   → MM：撤旧止损单 → 挂新止损单 → PROTECTION_APPLIED{version}
-   <span class="c">// 同一订单的多次部分成交会合并：任何时刻只有最新版本在途</span>
-   <span class="c">// 仓位归零 → qty=0 → MM 只撤不挂</span>
-
-同样触发重算：追加/减少保证金 · 改杠杆 · 资金费结算 · 扣手续费</pre>
-
-<h4>强平（币安止损单触发）</h4>
-<pre>币安 mark 到达 trigger_price → MM 的止损单在币安触发
-   → PROTECTION_TRIGGERED{position_key, version}
-        → PM Perp 锁定仓位（逐仓强平锁）；拒绝该用户在这个币对上的新订单
-   → TRADE_FILL{source:"liquidation"} × n（MM 补足全部数量）
+<h4>强平平仓（A-Book 市场，source=liquidation）</h4>
+<pre>PM Perp 清算扫描器（币安 mark，MMR 档位——触发逻辑与 B-Book 相同）
+   → 仓位到达强平价 → 取得逐仓强平锁
+        <span class="c">// 拒绝该用户在这个币对上的新订单；锁同时保证每个仓位只平一次</span>
+   → source=liquidation 市价平仓 → connector → MM → 币安
+   → TRADE_FILL × n（MM 补足全部数量，3.8）
         → EventTradeExecuted(ExecType=liquidation) → PM Perp 按<b>实际成交价</b>结算
         → 已实现盈亏入账；扣强平手续费；剩余逐仓保证金退回可用余额
         → 亏损超过逐仓保证金的部分 → 保险金 → house   <span class="c">// CLEARING_MIRROR 语义保留</span>
    → 撤掉该用户在这个币对上的其他订单，按 client_order_id 逐张撤
         （挂着的限价单走 connector DELETE；等待中的止盈止损走 perp_trigger）
         <span class="c">// 否则之后成交会悄悄重新开出仓位；绝不使用按 symbol 全撤</span>
-   → 解锁</pre>
-<div class="call warn"><p class="call-t">本地扫描器从不平 A-Book 仓位</p><p>如果币安止损单和本地扫描器都能平仓，同一个仓位可能被平两次——在净额账户上，第二次平仓会真实开出一个无主头寸。在 A-Book 市场上扫描器只观察：mark 已穿过强平价，但 T 秒内没有收到 <code>PROTECTION_TRIGGERED</code>，就报警，由 admin 的<b>紧急平仓</b>工具（人工操作，source=liquidation）接手。</p></div>
-<div class="call"><p class="call-t">改单</p><p>不支持。与现网一致：撤单 + 重下。紧急平仓/批量平仓（batch close）走同一命令路径，connector 逐单提交。</p></div>
+   → 解锁
+
+B-Book 市场上同一个扫描器照旧把平仓单发给 Finex（IOC、takeover/ADL）。</pre>
+<div class="call warn"><p class="call-t">平仓单没有回来</p><p>如果平仓单被拒、超时进入 UNKNOWN、或者没有平完，仓位保持锁定，扫描器在仲裁（3.5）后重发剩余数量——绝不并行发第二张平仓单。mark 已越过强平价 T 秒仍未完成平仓时，触发强平超时告警。</p></div>
+<div class="call"><p class="call-t">改单</p><p>不支持。与现网一致：撤单 + 重下。清算/批量平仓（batch close）走同一命令路径，connector 逐单提交。</p></div>
 </section>
 </article>
 
@@ -565,7 +537,7 @@ WS 断线 15s → 熔断：新单全拒 + cancel-all 在途单 + 重连后全量
 <header>
 <div class="eyebrow">5 · 结算与账务</div>
 <h1>house 账户：复式记账的最后一块拼图</h1>
-<p class="standfirst">每笔用户成交都是<strong>我方自有币安主账户</strong>上的真实交易，但<strong>我们的账本必须记下对用户的每笔支付义务从哪来</strong>。解法：一个新系统账户——<strong>house 账户</strong>——作为每笔成交的对手腿。它是主账户在账本里的镜像，天然保留 Scheme A 复式记账与审计链。</p>
+<p class="standfirst">在 A-Book 市场上，每笔用户成交都是<strong>我方自有币安主账户</strong>上的真实交易，但<strong>我们的账本必须记下对用户的每笔支付义务从哪来</strong>。解法：一个新系统账户——<strong>house 账户</strong>——作为每笔 A-Book 成交的对手腿。它是主账户在账本里的镜像，天然保留 Scheme A 复式记账与审计链。B-Book 市场的结算与现在完全一样。</p>
 </header>
 
 <section>
@@ -598,23 +570,23 @@ MMHouseAccountID          = <span class="t">"00000000-0000-0000-0000-00000000000
 <tr><td class="mono-c">Header.IdempotencyKey</td><td class="dim"><code>{client_order_id}:{fill_id}</code> → PM Perp 幂等缓存直接防重</td></tr>
 </tbody>
 </table></div>
-<div class="call"><p class="call-t">经济闭环（一笔用户开多的完整旅程——v1.4，自有主账户）</p><p>用户开多 10 TAO @199（逐仓）→ 我方锁定逐仓保证金 → MM 在我方主账户买入 10 TAO → house 对用户记空头腿 → PM Perp 发布保护目标（止损价 = 强平价）。</p><p>用户平多 @205 → <b>用户 +60</b>（已实现盈亏入账），<b>house −60</b>；币安上主账户卖出这 10 TAO 赚了 +60。兑现用户盈利的钱已经在我方自己的账户里，不需要向任何人收取。</p><p>用户亏损时方向相反：house 盈利，主账户在这部分流量上的币安亏损与之相等。<b>任意时刻 house 与主账户的用户流量持仓和盈亏互为镜像</b>。</p><p>两个用户互为对手时（A 买 B 卖）两笔订单仍原样转发到币安，只是在主账户的持仓里互相抵消。我方从不做内部撮合。</p></div>
+<div class="call"><p class="call-t">经济闭环（一笔用户开多的完整旅程——v1.4，自有主账户）</p><p>用户开多 10 TAO @199（逐仓）→ 我方锁定逐仓保证金 → MM 在我方主账户买入 10 TAO → house 对用户记空头腿 → 扫描器开始盯这个仓位的强平价。</p><p>用户平多 @205 → <b>用户 +60</b>（已实现盈亏入账），<b>house −60</b>；币安上主账户卖出这 10 TAO 赚了 +60。兑现用户盈利的钱已经在我方自己的账户里，不需要向任何人收取。</p><p>用户亏损时方向相反：house 盈利，主账户在这部分流量上的币安亏损与之相等。<b>任意时刻 house 与主账户的用户流量持仓和盈亏互为镜像</b>。</p><p>两个用户互为对手时（A 买 B 卖）两笔订单仍原样转发到币安，只是在主账户的持仓里互相抵消。A-Book 市场上我方从不做内部撮合。一个双向持仓用户同时持有两条腿也是一样：两条腿都在币安成交，账户做净额，两条腿都付手续费（3.8）。</p></div>
 
 <h2>funding 透传</h2>
 <ul class="plain">
 <li><b>rate 与周期</b> — 直接采用币安值：mark oracle 的 funding 字段已有币安源；<code>perps_markets.funding_interval_seconds</code> 已支持可变周期（rollout 已按币安 fundingInfo 种入 4h/8h）。PM Perp 的 funding worker、<code>funding_payments</code> 结算逻辑不变。</li>
 <li><b>账务路径</b> — 用户付/收资金费计入 house 账户。币安按主账户的<b>净</b>头寸收付，我方按每个用户各自的仓位收付；用户多空都有时两者不同（多空在币安上相互抵消，在我方各自收付）。差额是 house 盈亏，每次资金费结算显式入账，并与主账户在币安的资金费记录对账。</li>
-<li><b>强平价随资金费变化</b> — 每次资金费结算都会改变逐仓保证金，所有持仓重算一遍并批量发布新的保护版本。只有强平价变动超过阈值（N 个 tick）的仓位才重发，并且分批限速，避免在资金费时点撞上币安限频。</li>
+<li><b>强平价随资金费变化</b> — 每次资金费结算都会改变逐仓保证金；扫描器下一轮直接按更新后的保证金判定。不向 MM 发送任何东西，所以资金费时点不会产生外部调用高峰。</li>
 <li><b>cap / 利率</b> — 透传模式下 cap 恒等于币安实际值，我方不再需要自设 cap（现表值即币安值，无需改动）。</li>
 </ul>
 
 <h2>清算与保险金</h2>
 <ol class="pts">
-<li><b>强平价是输出</b> — MMR 档位与逐仓公式保留；扫描器不再决定何时平仓，而是计算并发布强平价（3.8），同时做影子监控（第 4 页）。</li>
-<li><b>在币安执行</b> — MM 的止损单按币安真实成交价平仓；回报的成交按 ExecType=liquidation 结算（Scheme A 的 journal_id 归组逻辑复用）。这个成交价就是用户在历史记录里看到的强平价。</li>
+<li><b>扫描器不变</b> — 触发判定、MMR 档位、预警带全部保留；A-Book 市场按币安 mark 判定。</li>
+<li><b>在币安执行</b> — 平仓单是经 MM 发出的 <code>source=liquidation</code> 市价单；回报的成交按 ExecType=liquidation、以币安真实成交价结算（Scheme A 的 journal_id 归组逻辑复用）。这个成交价就是用户在历史记录里看到的强平价。</li>
 <li><b>结算顺序</b> — 已实现盈亏 → 强平手续费 → 剩余逐仓保证金退回用户可用余额 → 撤掉该用户在这个币对上的其他订单（第 4 页）。</li>
 <li><b>穿仓处置</b> — 用户损失超出其逐仓保证金的部分：保险金账户 → house 账户划转（现 <code>CLEARING_MIRROR</code> 的 SettleLiquidatedPosition 路径语义保留，对手从"清算池承接仓位"简化为"差额直付"）。逐仓把用户的损失限制在这一个仓位的保证金内。</li>
-<li><b>退役</b> — takeover（保险金承接仓位）与 ADL（对手方自动减仓）代码路径下线：A-Book 没有需要保护的内部对手方。保险金唯一职责变为兜穿仓差额。</li>
+<li><b>A-Book 不使用</b> — takeover（保险金承接仓位）与 ADL（对手方自动减仓）为 B-Book 市场保留，但 A-Book 市场从不使用：那里没有需要保护的内部对手方。A-Book 市场上保险金只兜穿仓差额。</li>
 </ol>
 
 <h2>对账体系</h2>
@@ -622,7 +594,7 @@ MMHouseAccountID          = <span class="t">"00000000-0000-0000-0000-00000000000
 <thead><tr><th>任务</th><th>频率</th><th>比对内容</th><th>差异处置</th></tr></thead>
 <tbody>
 <tr><td><b>净头寸对账</b></td><td class="mono-c">每 1 分钟</td><td class="dim">每个市场：所有用户带方向持仓之和（± 在途订单）vs 主账户净头寸——同时从 MM <code>GET /positions</code> 和我方只读币安 key 读取</td><td class="dim">超阈值(如 0.5% 或名义额) → 告警 + 冻结该市场新单；<b>不自动下单修复</b></td></tr>
-<tr><td><b>保护对账</b></td><td class="mono-c">每 1 分钟</td><td class="dim">每个持仓恰好有一张已生效的保护，版本、数量、方向、触发价与我方最新目标一致（<code>GET /protections</code>）</td><td class="dim">缺失 / 过期 → 重发目标 + 告警；<b>孤儿保护</b>（没有对应仓位）→ 立即要求 MM 撤掉（在净额账户上，它触发时会真实开出一个无主头寸）</td></tr>
+<tr><td><b>强平及时性</b></td><td class="mono-c">持续</td><td class="dim">mark 已越过强平价 T 秒仍未完成平仓的仓位</td><td class="dim">告警 + 仲裁后重发；持续 → admin 紧急平仓</td></tr>
 <tr><td><b>成交对账</b></td><td class="mono-c">每 5 分钟</td><td class="dim">窗口内 fills 逐笔比对（fill_id 集合）</td><td class="dim">缺笔 → GET 仲裁补收；多笔 → 幂等层天然拦截 + 告警</td></tr>
 <tr><td><b>资金费对账</b></td><td class="mono-c">每周期</td><td class="dim">按用户收付的资金费 vs 主账户在币安的资金费记录</td><td class="dim">净额与总额的差额入 house；无法解释的偏差 → 告警</td></tr>
 <tr><td><b>钱包对账</b></td><td class="mono-c">每日</td><td class="dim">主账户钱包余额 vs 内部账本（用户余额 + house + 保险金 + 手续费）</td><td class="dim">有差额 → 告警 + 财务复核</td></tr>
@@ -636,7 +608,7 @@ MMHouseAccountID          = <span class="t">"00000000-0000-0000-0000-00000000000
 <header>
 <div class="eyebrow">6 · 行情与数据</div>
 <h1>数据面：一切用户可见行情来自币安</h1>
-<p class="standfirst">原则：<strong>quote 侧接入币安公共流，以现有事件格式与现有 topic 发布</strong>——trading-api 的 WS 订阅、ledger 的存储、对外的 gRPC 契约全部不动，只有数据源头换血。</p>
+<p class="standfirst">适用于 A-Book 市场；B-Book 市场保留现在的内部行情。原则：<strong>quote 侧接入币安公共流，以现有事件格式与现有 topic 发布</strong>——trading-api 的 WS 订阅、ledger 的存储、对外的 gRPC 契约全部不动，只有数据源头换血。</p>
 </header>
 
 <section>
@@ -666,9 +638,9 @@ MMHouseAccountID          = <span class="t">"00000000-0000-0000-0000-00000000000
 
 <h2>mark price 与风控数据</h2>
 <ul class="plain">
-<li><b>A-Book mark = 币安 mark（v1.4）</b> — 强平现在在币安上按它的 mark 触发（止损单用 <code>working_type=MARK_PRICE</code>），所以我方展示和估算用的 mark 必须是同一个值；否则用户会看到"价格没到我的强平价"却被强平。A-Book 市场上 oracle 给币安 100% 权重，OKX/Bybit 只用于陈旧 / 偏离报警。<b>min_sources = 1 铁律不变</b>（rollout 手册的永久锁定条款继续有效）。</li>
+<li><b>按 book 选择 mark 来源</b> — A-Book 市场直接用币安 mark（OKX/Bybit 只用于陈旧 / 偏离报警），因为仓位真实地在币安上，强平必须跟随其对冲所面对的价格。B-Book 市场保留现在的多源 oracle。<b>min_sources = 1 铁律不变</b>（rollout 手册的永久锁定条款继续有效）。</li>
 <li><b>InternalPerpTradeCollector 停用</b> — A-book 市场"内部成交自价"源下线（用户成交稀疏且价格即币安价，无信息量）。</li>
-<li><b>清算基准价</b> — 我方发布的强平价、止损单的触发价、界面上显示的 mark，都是同一个币安 mark：从头到尾一个数。</li>
+<li><b>清算基准价</b> — A-Book 市场上，界面显示的 mark、扫描器判定用的 mark、币安对主账户使用的 mark 是同一个数。</li>
 <li><b>exchangeInfo 变更</b> — 币安调过滤器时 quote 1h 内自动同步；若收紧导致在途挂单违规，由 MM 侧 INVALID_FILTER 回报自然清理。</li>
 </ul>
 
@@ -681,11 +653,11 @@ MMHouseAccountID          = <span class="t">"00000000-0000-0000-0000-00000000000
 <tr><td>quote provider 框架与引擎循环</td><td class="dim">框架共享（Source / Subscribe 接口）</td><td class="dim">五路新订阅全部挂在 binance_perp、只配 -PERP 市场</td><td><span class="pill ok">零（binance_spot 不动）</span></td></tr>
 <tr><td>orderbook.{MKT} topic 命名空间</td><td class="dim">格式共享、按市场隔离</td><td class="dim">quote 只对 -PERP 市场生产；spot 生产者仍是 finex spot shard</td><td><span class="pill ok">零</span></td></tr>
 <tr><td>trading-api K线 / ticker / trades WS</td><td class="dim">handler 共享，数据按市场路由</td><td class="dim">perp 市场换数据源，spot 响应不变</td><td><span class="pill ok">零</span></td></tr>
-<tr><td>mark price oracle</td><td class="dim">perp 专属概念</td><td class="dim">A-Book 市场直接用币安 mark（其他源只报警）；min_sources = 1 铁律不变</td><td><span class="pill ok">不涉及</span></td></tr>
+<tr><td>mark price oracle</td><td class="dim">perp 专属概念</td><td class="dim">按 book：A-Book 市场直接用币安 mark（其他源只报警），B-Book 市场保留多源 oracle；min_sources = 1 铁律不变</td><td><span class="pill ok">不涉及</span></td></tr>
 <tr><td>finex spot shard</td><td class="dim">独立实例独立配置</td><td class="dim">不改动</td><td><span class="pill ok">零</span></td></tr>
 </tbody>
 </table></div>
-<div class="call warn"><p class="call-t">切换验证必须包含 spot 回归</p><p>第 9 页验证清单含 spot 专项：K线连续性抽查 + 订单簿/公共成交流 cutover 前后基线对照。</p><p>工程纪律：任何 perp 侧改动若触及共享管线的全局行为（如 ledger 聚合逻辑本身），必须拆成市场类型条件分支，不许改 spot 路径的语义。</p></div>
+<div class="call warn"><p class="call-t">验证必须包含 B-Book 与 spot 回归</p><p>第 9 页验证清单含回归专项：K线连续性抽查 + 订单簿/公共成交流 cutover 前后基线对照。</p><p>工程纪律：任何 perp 侧改动若触及共享管线的全局行为（如 ledger 聚合逻辑本身），必须拆成市场类型条件分支，不许改 spot 路径的语义。</p></div>
 </section>
 </article>
 
@@ -693,26 +665,26 @@ MMHouseAccountID          = <span class="t">"00000000-0000-0000-0000-00000000000
 <article class="panel" id="p-services" hidden>
 <header>
 <div class="eyebrow">7 · 服务改动明细</div>
-<h1>逐服务盘点：保留 · 修改 · 新增 · 退役</h1>
-<p class="standfirst">按改动量从大到小排列。<strong>核心结论：没有任何一个服务被推倒重写</strong>——改动最重的是新服务 mm-connector，其次是 PM Perp 的 house 账户、逐仓/单向强制与强平价发布。</p>
+<h1>逐服务盘点：保留 · 修改 · 新增</h1>
+<p class="standfirst">按改动量从大到小排列。<strong>核心结论：没有任何一个服务被推倒重写</strong>——改动最重的是新服务 mm-connector，其次是按市场的 book 路由，以及 PM Perp 的 house 账户与强平出口。</p>
 </header>
 
 <section>
 <div class="tw"><table>
 <thead><tr><th>服务</th><th>动作</th><th>改动内容</th><th>量级</th></tr></thead>
 <tbody>
-<tr><td class="mono-c"><b>mm-connector</b></td><td><span class="pill no">新增</span></td><td class="dim">Kafka 命令消费 + MM REST/WS 客户端 + 状态机与仲裁 + Finex 格式事件合成（house 对手腿）+ <b>保护目标转发</b>（最新版本合并、定期重发、触发/生效/拒绝回报）+ 对账 worker（含只读币安 key）+ 心跳熔断 + admin 观测接口</td><td class="dim">大（新服务，参照 finex 的命令入口与事件出口契约）</td></tr>
-<tr><td class="mono-c"><b>portfolio_manager_perp</b></td><td><span class="pill gap">修改</span></td><td class="dim">house 系统账户（spec + EnsureSystemAccounts）；A-Book 市场<b>强制逐仓 + 单向</b>；成交 / 保证金 / 杠杆 / 资金费 / 扣费后重算强平价，作为带版本号的保护目标发出；按止损成交做强平结算（触发即锁、退回保证金、撤其他订单）；A-Book 市场扫描器切影子模式；takeover/ADL 代码路径下线（保留枚举与历史数据读取）；funding 账务对手方换 house（净额与总额差额入账）</td><td class="dim">中–大</td></tr>
+<tr><td class="mono-c"><b>mm-connector</b></td><td><span class="pill no">新增</span></td><td class="dim">Kafka 命令消费 + MM REST/WS 客户端 + 状态机与仲裁 + Finex 格式事件合成（house 对手腿）+ 对账 worker（含只读币安 key）+ 心跳熔断 + admin 观测接口</td><td class="dim">大（新服务，参照 finex 的命令入口与事件出口契约）</td></tr>
+<tr><td class="mono-c"><b>portfolio_manager_perp</b></td><td><span class="pill gap">修改</span></td><td class="dim">house 系统账户（spec + EnsureSystemAccounts）；按市场的 book 开关；A-Book 市场<b>强制逐仓</b>；强平 executor 出口按 book 区分（A-Book → connector，带 source=liquidation；B-Book 不变）；按实际成交价做强平结算，退回保证金并撤掉其他订单；A-Book 市场跳过 takeover/ADL；A-Book 市场 funding 账务对手方为 house（净额与总额差额入账）</td><td class="dim">中</td></tr>
 <tr><td class="mono-c"><b>quote</b></td><td><span class="pill gap">修改</span></td><td class="dim">binance_perp 扩展五路订阅（depth/kline/ticker/aggTrade/exchangeInfo）；新 kline 事件发布；depth → orderbook topic 复刻；InternalPerpTradeCollector 按 A-book 市场停用</td><td class="dim">中</td></tr>
 <tr><td class="mono-c"><b>ledger</b></td><td><span class="pill gap">修改</span></td><td class="dim">外部 K线源表 + UPSERT/水位语义 + REST 断线补数；perp 市场聚合链改指向新源表，spot 链保留（双链 per-market 路由，见第 6 页）；24h ticker 改币安源</td><td class="dim">中（存储与聚合设计，非单纯新增消费者）</td></tr>
-<tr><td class="mono-c"><b>trading-api</b></td><td><span class="pill gap">修改</span></td><td class="dim">MarketCache 对接 exchangeInfo 热同步（前置过滤器校验）；A-Book 市场拒绝全仓 / 双向持仓请求；前端隐藏 Cross/Hedge 切换并展示发布的强平价；前端契约新增"镜像簿 + 我的挂单"叠加语义说明；其余（认证/限流/锁仓流程/私有流）不变</td><td class="dim">小</td></tr>
-<tr><td class="mono-c"><b>admin</b></td><td><span class="pill gap">修改</span></td><td class="dim">MM 连接状态/对账差异/house 余额/<b>主账户保证金</b>监控页；保护覆盖视图；紧急平仓工具；A-book 路由开关操作；对账仲裁工具</td><td class="dim">小</td></tr>
+<tr><td class="mono-c"><b>trading-api</b></td><td><span class="pill gap">修改</span></td><td class="dim">MarketCache 对接 exchangeInfo 热同步（前置过滤器校验）并带上每个市场的 book；A-Book 市场拒绝全仓请求；A-Book 市场前端隐藏 Cross 切换；前端契约新增"镜像簿 + 我的挂单"叠加语义说明；其余（认证/限流/锁仓流程/私有流）不变</td><td class="dim">小</td></tr>
+<tr><td class="mono-c"><b>admin</b></td><td><span class="pill gap">修改</span></td><td class="dim">MM 连接状态/对账差异/house 余额/<b>主账户保证金</b>监控页；按市场切换 book（带零持仓检查）；紧急平仓工具；对账仲裁工具</td><td class="dim">小</td></tr>
 <tr><td class="mono-c"><b>perp_trigger</b></td><td><span class="pill ok">近零改动</span></td><td class="dim">触发→锁仓→命令的既有流程自动流向 connector；新增：某仓位被强平时撤掉该用户在这个币对上等待中的止盈止损</td><td class="dim">小</td></tr>
 <tr><td class="mono-c"><b>fee_engine / analytics / competitions</b></td><td><span class="pill ok">零改动</span></td><td class="dim">费用投影与统计照常消费事件（格式未变）；analytics 的 insurance fund equity 视图继续有效</td><td class="dim">无</td></tr>
-<tr><td class="mono-c"><b>finex（perp 部分）</b></td><td><span class="pill no">退役</span></td><td class="dim">perp shard 下线路由（spot shard 不动）；代码 + 配置保留一个版本周期作回滚开关，之后清理（WAL/快照随实例归档）</td><td class="dim">下线操作</td></tr>
+<tr><td class="mono-c"><b>finex（perp 部分）</b></td><td><span class="pill ok">保留</span></td><td class="dim">继续服务 B-Book 市场；A-Book 市场只是从它的市场清单里移除（回到 B-Book 时再加回）</td><td class="dim">仅配置</td></tr>
 </tbody>
 </table></div>
-<div class="call"><p class="call-t">Kafka topic 面变化</p><p><b>不变</b>：<code>commands.{MKT}.OrderCommands</code>（消费者从 finex 换成 connector）、<code>events.{MKT}.EventOrderUpdated</code> / <code>EventTradeExecuted</code>（生产者换成 connector）、<code>orderbook.{MKT}</code>（生产者换成 quote）、<code>perp_trigger.Persistence</code>。<b>新增</b>：<code>events.{MKT}.EventKlineObserved</code>、PM Perp → connector 的保护目标 topic（按 position_key 分区，保证同一仓位的版本有序）、MM 观测/对账内部 topic。<b>停用</b>：finex perp 的 WAL/快照不再增长。<code>kafka_topic_init</code> 的 -perp-markets 清单不变（topic 均已存在，只是换了生产/消费角色）。</p></div>
+<div class="call"><p class="call-t">Kafka topic 面变化</p><p><b>不变</b>：<code>commands.{MKT}.OrderCommands</code>（消费者从 finex 换成 connector）、<code>events.{MKT}.EventOrderUpdated</code> / <code>EventTradeExecuted</code>（生产者换成 connector）、<code>orderbook.{MKT}</code>（生产者换成 quote）、<code>perp_trigger.Persistence</code>。<b>新增</b>：<code>events.{MKT}.EventKlineObserved</code>、MM 观测/对账内部 topic。每个市场命令 topic 的消费者由其 book 开关决定，任何时刻 Finex / connector 只有一个在订阅。<code>kafka_topic_init</code> 的 -perp-markets 清单不变（topic 均已存在，只是换了生产/消费角色）。</p></div>
 </section>
 </article>
 
@@ -729,12 +701,11 @@ MMHouseAccountID          = <span class="t">"00000000-0000-0000-0000-00000000000
 <div class="tw"><table>
 <thead><tr><th>风险</th><th>场景</th><th>缓解</th><th>等级</th></tr></thead>
 <tbody>
-<tr><td><b>MM 单点</b></td><td class="dim">自有 MM 服务故障 / 币安限制主账户 → 全站永续无法执行</td><td class="dim">心跳熔断（15s）→ 新单全拒、在途单 cancel-all；内部 SLA；MM 冗余（主备）由 MM 团队负责</td><td><span class="pill no">高</span></td></tr>
+<tr><td><b>MM 单点</b></td><td class="dim">自有 MM 服务故障 / 币安限制主账户 → 所有 A-Book 市场无法执行（B-Book 市场不受影响）</td><td class="dim">心跳熔断（15s）→ 新单全拒、在途单 cancel-all；内部 SLA；MM 冗余（主备）由 MM 团队负责</td><td><span class="pill no">高</span></td></tr>
 <tr><td><b>主账户被强平</b></td><td class="dim">币安只看一个账户：所有用户的净头寸共用主账户保证金。单边净头寸很大时遇到快速行情，整个账户可能被强平——所有用户同时受影响</td><td class="dim">通过 <code>GET /account</code> + 只读 key 监控保证金率；分级熔断（预警 → 只减仓 → 停止交易）；资金补充 runbook；按主账户币安杠杆档位设定每个市场的净名义上限</td><td><span class="pill no">高</span></td></tr>
-<tr><td><b>清算遇断连</b></td><td class="dim">行情暴跌触发连环清算的同一时刻 NeoDAX ↔ MM 链路断开</td><td class="dim">止损单挂在<b>币安上</b>，已生效的保护照常触发；强平成交在重连后补入我方账本（fill_id 幂等）。停滞的只是保护<i>更新</i>——可以接受，因为熔断期间新单全拒，仓位不会变化</td><td><span class="pill gap">中</span></td></tr>
-<tr><td><b>保护空窗</b></td><td class="dim">先撤后挂有几十毫秒无保护；目标尚未生效（延迟、被拒、单 symbol 上限）会让仓位停留在旧价格或完全无保护</td><td class="dim">生效版本延迟 SLO + 告警；<code>PROTECTION_REJECTED</code> 按事故处理；影子扫描器告警 + 紧急平仓工具；每分钟保护对账</td><td><span class="pill gap">中</span></td></tr>
-<tr><td><b>重复平仓 / 孤儿止损单</b></td><td class="dim">一个仓位同时有两张生效止损单，或仓位平掉后止损单残留——在净额账户上任何一种触发都会真实开出一个无主头寸</td><td class="dim">先撤后挂（3.8）；平仓时发布 qty=0；保护对账发现孤儿立即撤单；本地扫描器在 A-Book 上从不平仓</td><td><span class="pill gap">中</span></td></tr>
-<tr><td><b>重算风暴</b></td><td class="dim">资金费结算同一时刻改变所有仓位的强平价 → 成千上万次替换 → 触发币安限频</td><td class="dim">变动阈值（强平价变动超过 N 个 tick 才重发）、分批限速、MM 侧优先处理离触发价最近的仓位</td><td><span class="pill gap">中</span></td></tr>
+<tr><td><b>清算遇断连</b></td><td class="dim">行情暴跌触发 A-Book 市场连环清算的同一时刻 NeoDAX ↔ MM 链路断开——最危险的组合</td><td class="dim">用户仓位与保证金在我方不受影响（结算暂停而非丢失）；仓位保持锁定，重连后立即补发平仓单；持续恶化由保险金兜底 + 人工升级。B-Book 市场不受影响</td><td><span class="pill no">高</span></td></tr>
+<tr><td><b>有持仓时切换 book</b></td><td class="dim">持仓或挂单存在时把市场在 A-Book 与 B-Book 之间切换，会留下没有币安对冲的仓位（或没有仓位的对冲）</td><td class="dim">admin 切换在市场持仓和挂单都为零之前一律拒绝；切换是提前公告、按计划执行的操作</td><td><span class="pill gap">中</span></td></tr>
+<tr><td><b>手续费倒挂</b></td><td class="dim">每笔成交（包括双向持仓用户的两条腿）都在主账户上付币安手续费；我方用户费率低于币安费率时，每笔成交都亏钱</td><td class="dim">市场配置时校验费率表：A-Book 市场的 maker/taker 费率必须高于主账户的币安档位</td><td><span class="pill gap">中</span></td></tr>
 <tr><td><b>延迟</b></td><td class="dim">锁仓(Raft ~10ms) + Kafka + connector + MM + 币安 RTT + 回报 → 全链 p99 目标 &lt; 1s；市价单期间价格漂移</td><td class="dim">SLA 分段监控（第 3 页）；市单滑点上限参数（待决）</td><td><span class="pill gap">中</span></td></tr>
 <tr><td><b>滑点吃穿保证金</b></td><td class="dim">锁仓按下单时校验 IMR，币安成交价劣化 → 成交后 MMR 立即越界 → 秒触发清算</td><td class="dim">锁仓端增加滑点缓冲系数（可配）；越界即走正常清算路径（非资损，是体验问题）；IMR 缓冲值入待决</td><td><span class="pill gap">中</span></td></tr>
 <tr><td><b>UNKNOWN 资金占用</b></td><td class="dim">仲裁期间保证金保持锁定——网络分区 / MM 不可用时可拖到分钟级</td><td class="dim">对用户呈现"挂单中"；熔断恢复后 UNKNOWN 清算优先于新单；锁仓缓冲含该占用</td><td><span class="pill gap">中</span></td></tr>
@@ -748,63 +719,80 @@ MMHouseAccountID          = <span class="t">"00000000-0000-0000-0000-00000000000
 <div class="tw"><table>
 <thead><tr><th>触发</th><th>新单</th><th>在途单</th><th>清算</th><th>恢复动作</th></tr></thead>
 <tbody>
-<tr><td class="mono-c">心跳丢失 15s</td><td><span class="pill no">全拒</span></td><td><span class="pill no">cancel-all</span></td><td><span class="pill gap">币安止损照常触发；回报延迟</span></td><td class="dim">重连 → 全量 GET 仲裁 → 补入强平成交 → 保护重发 → 解除</td></tr>
+<tr><td class="mono-c">心跳丢失 15s</td><td><span class="pill no">A-Book 市场全拒</span></td><td><span class="pill no">cancel-all（A-Book）</span></td><td><span class="pill gap">挂起（仅 A-Book）</span></td><td class="dim">重连 → 全量 GET 仲裁 → 补发强平平仓单 → 解除</td></tr>
 <tr><td class="mono-c">连续 429 / SYSTEM_BUSY</td><td><span class="pill gap">退避</span></td><td><span class="pill ok">保留</span></td><td><span class="pill ok">重试</span></td><td class="dim">速率恢复即解除；持续 5 分钟升级为心跳级熔断</td></tr>
 <tr><td class="mono-c">持仓对账超阈值</td><td><span class="pill no">该市场冻结</span></td><td><span class="pill ok">保留</span></td><td><span class="pill gap">人工确认</span></td><td class="dim">admin 仲裁工具定位差异单 → 手工修复 → 解冻</td></tr>
 <tr><td class="mono-c">主账户保证金率超阈值</td><td><span class="pill no">拒绝增加风险的订单</span></td><td><span class="pill ok">保留</span></td><td><span class="pill ok">正常</span></td><td class="dim">补充资金 / 净敞口降到阈值以下 → 解除；更高一级 → 全面停止交易</td></tr>
-<tr><td class="mono-c">保护对账不一致</td><td><span class="pill no">该市场冻结</span></td><td><span class="pill ok">保留</span></td><td><span class="pill gap">影子告警 + 人工</span></td><td class="dim">撤掉孤儿、重新生效缺失的目标 → 解冻</td></tr>
-<tr><td class="mono-c">人工 kill-switch</td><td><span class="pill no">全拒</span></td><td><span class="pill no">cancel-all</span></td><td><span class="pill gap">挂起</span></td><td class="dim">可切回 B-book（一个版本周期内，见第 9 页）</td></tr>
+<tr><td class="mono-c">强平超时</td><td><span class="pill no">该市场冻结</span></td><td><span class="pill ok">保留</span></td><td><span class="pill gap">重发 + 人工</span></td><td class="dim">平仓完成或 admin 紧急平仓 → 解冻</td></tr>
+<tr><td class="mono-c">人工 kill-switch</td><td><span class="pill no">全拒</span></td><td><span class="pill no">cancel-all</span></td><td><span class="pill gap">挂起</span></td><td class="dim">可按市场或全部 A-Book 市场执行；市场平仓归零后可切回 B-Book（第 9 页）</td></tr>
 </tbody>
 </table></div>
-<div class="call warn"><p class="call-t">链路中断的边界说明</p><p>保护挂在币安上，所以 NeoDAX ↔ MM 中断不再让清算挂起：已生效的止损单照常触发，回报恢复后再结算。真正的敞口在 <b>MM ↔ 币安</b>一侧——最新目标从未生效的仓位，或币安不接受的止损单。</p><p>影子扫描器、保护对账和紧急平仓工具就是为这些空窗准备的；剩余成本需纳入保险金容量测算（待决事项）。</p></div>
+<div class="call warn"><p class="call-t">清算挂起的边界说明</p><p>A-Book 市场断连期间用户保证金率继续恶化（mark 不停），恢复后按更差价格平仓——保险金吸收的部分会变大，但<b>不会出现无主仓位</b>（我方账本始终自洽）。</p><p>这是"服务降级不资损"原则的代价，需纳入保险金容量测算（待决事项）。B-Book 市场从不依赖 MM。</p></div>
 </section>
 </article>
 
 <!-- ═══ 9 切换计划 ═══ -->
 <article class="panel" id="p-cutover" hidden>
 <header>
-<div class="eyebrow">9 · 切换计划</div>
-<h1>六阶段：从清仓到开放</h1>
-<p class="standfirst">阶段 0–1 是<strong>业务与契约</strong>（不含代码），阶段 2–3 是<strong>工程与联调</strong>，阶段 4–5 是<strong>生产切换</strong>。顺序不可乱，每阶段有明确出口条件。</p>
+<div class="eyebrow">9 · 上线与排期</div>
+<h1>六阶段，然后逐个市场推进</h1>
+<p class="standfirst">阶段 0–1 是<strong>业务与契约</strong>（不含代码），阶段 2–3 是<strong>工程与联调</strong>，阶段 4–5 在生产上开启<strong>首批 2–3 个 A-Book 市场</strong>。其他市场在单独切换前一直留在 B-Book。顺序不可乱，每阶段有明确出口条件。</p>
 </header>
 
 <section>
 <h2>阶段总览</h2>
 <ol class="steps">
-<li><b>阶段 0 · 存量清仓（进行中）</b><span>内部账户清仓：attacker 已执行（09-22），MM 账户 0x535c / 0x7152 runbook 就绪待执行；普通用户<b>无存量持仓需处置</b>（停服状态视为全新开始，2026-09-24 确认）。出口：全平台 perps 持仓 = 0、订单簿干净。</span></li>
-<li><b>阶段 1 · 契约过会（本文档第 3 页）</b><span>与 MM 逐条过 SLA / 错误码 / 悬挂仲裁语义 / cancel-all 时延 / GTX 拒绝可区分性（3.7 过会清单），<b>以及 3.8 强平保护契约</b>（每仓一张止损单、先撤后挂、补足全部数量、如何覆盖单 symbol 条件单上限）；MM 确认实现排期与沙箱环境。出口：双方确认的契约 v1 + MM 沙箱可用。</span></li>
-<li><b>阶段 2 · 开发</b><span>里程碑：① mm-connector MVP（提交/回报/合成事件/幂等/保护转发）+ <b>mock-MM 模拟器</b>（联调基座，见阶段 3）→ ② PM Perp house 账户 + 逐仓/单向强制 + 强平价发布 + 止损成交强平结算 → ③ quote 五路订阅 + A-Book 用币安 mark + ledger K线路径 → ④ 熔断/对账（含保护、主账户保证金）/admin 工具 → ⑤ 端到端用例打通。每里程碑配集成测试进 <code>test/v2</code> 场景。</span></li>
-<li><b>阶段 3 · staging 联调（三层测试环境，方案已定）</b><span><b>① mock-MM（主力，我方自建）</b>：<code>tools/mockmm</code> 实现契约 v1 的 REST+WS 模拟器，场景注入（多笔成交 / 拒绝 / ack 超时 / 断线重连 / 乱序 / 重复回报 / 429）——CI 可重复，不依赖任何外部环境。<b>② MM 沙箱</b>：MM 按同一契约提供 sandbox；他若接<b>币安 futures testnet</b>（testnet.binancefuture.com，免费 API key）可用 BTCUSDT / ETHUSDT 等主要符号验证真实执行链路——注意 testnet 无 TradFi 合约、深度薄、约月度重置，只验链路不验覆盖。<b>③ 生产小额冒烟</b>：cutover 验证清单内置（受控账户、最小名义）。用例：下单 / 部分成交 / 撤单 / 超时仲裁 / 断线重连 / 清算演练 / 对账差异注入 / 限速退避。出口：全绿 + 双方联调报告。</span></li>
-<li><b>阶段 4 · 生产 cutover（顺序铁律）</b><span>① 公告停新单（trading-api 禁交易开关）→ ② 等在途单终结 / cancel-all → ③ 启用 mm-connector 路由（消费 OrderCommands）→ ④ quote 行情切换（depth/kline/ticker 上线）→ ⑤ finex-perp shard 停止 → ⑥ 验证清单（见下）→ ⑦ 公告开放交易。<b>finex-perp 停在 connector 验证通过之后</b>，顺序反了会出现双消费者。</span></li>
-<li><b>阶段 5 · 开放与观察期</b><span>开放后 72 小时盯盘：延迟分位、对账差异率、费率正确性抽查、清算演练一次（受控账户）。观察期结束 → 移除 B-book 回滚开关的决策评审。</span></li>
+<li><b>阶段 0 · 存量清理（进行中）</b><span>attacker 仓位已执行（09-22），0x535c / 0x7152 runbook 就绪。内部做市账户是清理而不是关闭：它们继续为 B-Book 市场提供流动性。普通用户<b>无存量持仓需处置</b>（停服状态视为全新开始，2026-09-24 确认）。出口：首批 A-Book 市场持仓为零、订单簿干净。</span></li>
+<li><b>阶段 1 · 契约过会（本文档第 3 页）</b><span>与 MM 团队逐条过 SLA / 错误码 / 悬挂仲裁 / 撤单时延 / GTX 拒绝可区分性（3.7 过会清单）以及 3.8 净额账户规则；MM 团队确认排期与沙箱。出口：双方确认的契约 v1 + MM 沙箱可用。</span></li>
+<li><b>阶段 2 · 开发</b><span>四条并行工作流（见下方开发周期）：① mm-connector + <b>mock-MM 模拟器</b>；② PM Perp house 账户 + 按市场 book 开关 + 逐仓强制 + A-Book 强平出口；③ quote 币安镜像 + A-Book 用币安 mark + ledger K线路径；④ trading-api 识别 book、对账、熔断、admin 工具。每条都配集成测试进 <code>test/v2</code> 场景。</span></li>
+<li><b>阶段 3 · staging 联调（三层测试环境）</b><span><b>① mock-MM（主力，我方自建）</b>：<code>tools/mockmm</code> 实现契约 v1 的 REST+WS 模拟器，场景注入（多笔成交 / 拒绝 / ack 超时 / 断线重连 / 乱序 / 重复回报 / 429）——CI 可重复。<b>② MM 沙箱</b>：MM 团队按同一契约提供沙箱，最好接<b>币安 futures testnet</b> 验证 BTCUSDT / ETHUSDT——只验链路不验覆盖。<b>③ 生产小额冒烟</b>：受控账户、最小名义。staging 里 A-Book 与 B-Book 市场全程并行运行。出口：全绿 + 双方联调报告。</span></li>
+<li><b>阶段 4 · 开启首批 A-Book 市场（顺序铁律）</b><span>逐个市场：① 该市场停新单 → ② 确认持仓与挂单都为零 → ③ 切换 book 开关（Finex 移除该市场，connector 开始订阅）→ ④ 该市场行情切到币安镜像、mark 切到币安 → ⑤ 跑验证清单 → ⑥ 重新开放。<b>Finex 在 connector 验证通过之后才释放该市场</b>——一个命令 topic 绝不能有两个消费者。</span></li>
+<li><b>阶段 5 · 观察，然后扩展</b><span>72 小时盯盘：延迟分位、对账差异、费率正确性、一次强平演练。之后其他市场按同样流程逐个切换。</span></li>
 </ol>
 
-<h2>cutover 验证清单</h2>
+<h2>验证清单（每个 A-Book 市场）</h2>
 <ul class="plain">
 <li><b>订单簿镜像</b> — 前端 depth 与币安同 symbol 一致；增量/快照混合流无跳变；延迟 &lt; 300ms。</li>
-<li><b>下单全链路</b> — 限价挂单/成交、市价多笔成交、post_only 拒绝、FOK 整单拒、IOC 余量过期，五类各至少一笔。</li>
+<li><b>下单全链路</b> — 限价挂单/成交、市价多笔成交、post_only 拒绝、FOK 整单拒、IOC 余量过期，五类各至少一笔，双向和单向模式都要测。</li>
+<li><b>净额</b> — 双向持仓账户在同一市场同时多空，主账户停在净额；reduceOnly / closePosition 从不到达币安。</li>
 <li><b>撤单与仲裁</b> — 正常撤单、撤单竞态（已成交）、人为制造 POST 超时走 GET 仲裁路径。</li>
-<li><b>结算正确性</b> — 抽查成交的仓位/盈亏/费用（maker/taker 费率按 role）；house 账户余额与手工推演一致。</li>
-<li><b>K线连续性</b> — 切换日前后 1m K线拼接无缺口；高周期聚合正常出值。</li>
-<li><b>逐仓 / 单向强制</b> — 每个 A-Book 市场都拒绝全仓和双向持仓请求；界面隐藏切换开关。</li>
-<li><b>保护生命周期</b> — 开仓 → 止损单按发布价生效；多次部分成交合并成一次替换；追加保证金 / 改杠杆会移动止损单；平到零会撤掉它；保护对账全绿。</li>
-<li><b>清算演练</b> — 受控账户的仓位打到强平价：币安止损单触发，成交以 ExecType=liquidation 按真实成交价回来，剩余保证金退回，这个币对上的其他订单被撤掉，穿仓差额（如有）进 house，Scheme A journal 完整。</li>
-<li><b>资金费重算</b> — 资金费结算后，受影响仓位在限速批次内拿到新的保护版本；没有限频错误。</li>
-<li><b>熔断演练</b> — 断开 MM 沙箱：15s 熔断生效、新单全拒、cancel-all、重连仲裁恢复。</li>
-<li><b>对账零差异</b> — 所有 job（净头寸 / 保护 / 成交 / 钱包）首轮全绿；主账户保证金率在区间内。</li>
-<li><b>spot 回归（专项）</b> — spot K线连续性抽查；spot 订单簿与公共成交流 cutover 前后基线对照（共享管线的市场类型门控验证）。</li>
+<li><b>结算正确性</b> — 抽查成交的仓位/盈亏/费用（maker/taker 费率按 role）；house 余额与手工推演一致；用户费率高于主账户币安费率。</li>
+<li><b>逐仓强制</b> — 拒绝全仓请求；隐藏 Cross 切换。</li>
+<li><b>清算演练</b> — 受控仓位打到强平价：扫描器锁定仓位，市价平仓经 MM 执行，成交按 ExecType=liquidation、以真实成交价结算，剩余保证金退回，该币对上的其他订单被撤，穿仓差额（如有）进 house，Scheme A journal 完整。</li>
+<li><b>熔断演练</b> — 断开 MM 沙箱：15s 熔断只作用于 A-Book 市场，B-Book 市场继续交易，重连仲裁恢复并补发强平平仓单。</li>
+<li><b>对账零差异</b> — 净头寸 / 成交 / 资金费 / 钱包 job 全绿；主账户保证金率在区间内。</li>
+<li><b>B-Book 与 spot 回归</b> — B-Book 永续市场与 spot 市场不变：订单簿、K线、成交流、强平前后对照。</li>
 </ul>
 
-<h2>回滚（一个版本周期内有效）</h2>
-<pre><span class="c"># 触发条件：A-Book 出现无法快速修复的系统性问题（对账持续漂移 / MM 长期不可用）</span>
-① trading-api 停新单 + cancel-all
-② 等在途单终结（若存在持仓：记录并人工对冲决策——回滚要求持仓尽量为零）
-③ 路由 flag 切回 finex-perp：connector 停止消费 OrderCommands，finex-perp shard 重启加载市场
-④ quote 行情切回（orderbook 生产者换回 finex；K线恢复内部聚合——期间币安 K线已写入的历史保留）
+<h2>把市场切回 B-Book</h2>
+<pre><span class="c"># 反向执行同样的流程；市场必须先归零持仓</span>
+① 该市场停新单 + 撤掉挂单
+② 等待（或安排）持仓归零——A-Book 期间开的仓在币安有真实对冲
+③ 切换 book 开关：connector 取消订阅，Finex 加载该市场
+④ 行情与 mark 来源切回内部 / 多源 oracle
 ⑤ 验证 → 开放
 
-<span class="c"># 回滚后 A-Book 已发生的历史数据不动（trade history / house 账户余额 / 审计）</span></pre>
-<div class="call warn"><p class="call-t">回滚的硬约束</p><p>回滚时若存在 A-Book 期间开立的持仓，切回 B-book 后 Finex 内部撮合将没有对手流动性——<b>回滚窗口内应把持仓视为需要人工处置的例外</b>。这就是"保留期一个版本周期"的原因：时间越长，回滚的现实性越低，靠观察期把问题暴露在早期。</p></div>
+<span class="c"># A-Book 期间已发生的历史数据不动（trade history / house 余额 / 审计）</span></pre>
+<div class="call warn"><p class="call-t">为什么必须零持仓</p><p>A-Book 开的仓由币安头寸支撑；到了 B-Book 它需要一个并不存在的内部对手方。迁移未平仓位（在币安平掉，再按约定价格对内部订单簿重开）原理上可行，但不在第一版范围内。</p></div>
+
+<h2>开发周期</h2>
+<p class="section-note">团队：2 名全职 + 2 名兼职工程师，代码全部由 AI agent 编写；MM 服务由另一个团队开发。AI 加速不了的环节：币安 testnet 联调、与 MM 团队协调、生产切换、资金运营——日历主要由联调和上线决定，而不是写代码。</p>
+<div class="tw"><table>
+<thead><tr><th>工作流</th><th>负责人</th><th>周期</th></tr></thead>
+<tbody>
+<tr><td>mm-connector + mock-MM</td><td class="dim">全职 1</td><td class="mono-c">3 周</td></tr>
+<tr><td>PM Perp：house 账户、按市场 book 开关、逐仓强制、A-Book 强平出口（B-Book 不动）</td><td class="dim">全职 2</td><td class="mono-c">3 周</td></tr>
+<tr><td>quote / ledger 币安镜像、按市场的 mark 来源</td><td class="dim">兼职 1</td><td class="mono-c">3 周</td></tr>
+<tr><td>trading-api 识别 book、admin、对账、熔断</td><td class="dim">兼职 2</td><td class="mono-c">3 周</td></tr>
+<tr><td>联调（mock-MM → MM 沙箱 → 生产小额）</td><td class="dim">全员</td><td class="mono-c">2 周</td></tr>
+<tr><td>首批市场上线 + 观察</td><td class="dim">全员</td><td class="mono-c">1 周</td></tr>
+</tbody>
+</table></div>
+<ul class="plain">
+<li><b>永续 A/B 并存：约 6–7 周</b>上线首批 A-Book 市场，前提是 MM 转发接口按时就绪。</li>
+<li><b>压缩后：约 5 周</b>——首批只上 2–3 个市场，对账先告警后人工处理，admin 工具从简。再压联调时间就是资金事故的来源，不建议。</li>
+<li><b>现货 A-Book（第二期）：另加 4–6 周</b>，大头是资产映射与库存调拨流程，需要财务 / 运营参与（第 10 页）。</li>
+</ul>
 </section>
 </article>
 
@@ -812,8 +800,8 @@ MMHouseAccountID          = <span class="t">"00000000-0000-0000-0000-00000000000
 <article class="panel" id="p-open" hidden>
 <header>
 <div class="eyebrow">10 · 已决与待决</div>
-<h1>七项已拍板，五项待定</h1>
-<p class="standfirst">上方是 2026-09-24 与 2026-09-28 已落定的决策；下方是待决项，第一项阻塞阶段 1 契约，其余可与开发并行、cutover 前落定。</p>
+<h1>十项已拍板，六项待定</h1>
+<p class="standfirst">上方是 2026-09-24 与 2026-09-28 已落定的决策（标注了 v1.5 的修订）；下方是待决项，第一项阻塞阶段 1 契约，其余可与开发并行，首个 A-Book 市场上线前落定。</p>
 </header>
 
 <section>
@@ -821,41 +809,50 @@ MMHouseAccountID          = <span class="t">"00000000-0000-0000-0000-00000000000
 <div class="tw"><table>
 <thead><tr><th>事项</th><th>结论</th><th>落点</th></tr></thead>
 <tbody>
-<tr><td>存量用户持仓 <span class="mono">09-24</span></td><td><span class="pill ok">从新开始，无存量</span></td><td class="dim">停服状态视为全新开始；阶段 0 只清内部账户</td></tr>
+<tr><td>存量用户持仓 <span class="mono">09-24</span></td><td><span class="pill ok">从新开始，无存量</span></td><td class="dim">停服状态视为全新开始；阶段 0 清理内部账户</td></tr>
 <tr><td>测试环境 <span class="mono">09-24</span></td><td><span class="pill ok">三层方案</span></td><td class="dim">mock-MM（自建主力）/ MM 沙箱（可选币安 testnet）/ 生产小额冒烟；见阶段 3</td></tr>
-<tr><td>行情与映射 <span class="mono">09-24</span></td><td><span class="pill ok">以币安为准</span></td><td class="dim">A-book 执行 / 行情 / K线全以币安为准，仅维护我方 ↔ 币安 symbol 映射，不再扩展 OKX / Bybit 映射；cutover 前按 fapi exchangeInfo 逐一复核现有市场存在性</td></tr>
-<tr><td>币安账户 <span class="mono">09-28</span></td><td><span class="pill ok">我方自有主账户</span></td><td class="dim">所有用户流量在同一个平台自有账户上；MM 是自有执行代理而不是 Principal——取消商务结算、MM 保证金和 MM 信用敞口（第 1、5、8 页）</td></tr>
-<tr><td>保证金模式 <span class="mono">09-28</span></td><td><span class="pill ok">强制逐仓</span></td><td class="dim">A-Book 市场关闭全仓；服务端强制，前端隐藏开关</td></tr>
-<tr><td>持仓模式 <span class="mono">09-28</span></td><td><span class="pill ok">只有单向</span></td><td class="dim">A-Book 市场暂时关闭双向持仓；一个用户 × 一个币对 = 一个仓位 = 一张止损单</td></tr>
-<tr><td>强平执行 <span class="mono">09-28</span></td><td><span class="pill ok">本地算价，MM 挂止损</span></td><td class="dim">NeoDAX 计算并发布逐仓强平价；MM 在币安挂单并维护；止损单的成交就是强平（3.8）</td></tr>
+<tr><td>行情与映射 <span class="mono">09-24</span></td><td><span class="pill ok">A-Book 以币安为准</span></td><td class="dim">A-Book 执行 / 行情 / K线 / mark 以币安为准，仅维护我方 ↔ 币安 symbol 映射；切换前按 fapi exchangeInfo 复核市场</td></tr>
+<tr><td>A/B 选择 <span class="mono">09-28 · v1.5</span></td><td><span class="pill ok">A-Book + B-Book 按市场</span></td><td class="dim">两种 book 长期并存；市场只在零持仓时切换；Finex、takeover/ADL、内部做市账户为 B-Book 保留</td></tr>
+<tr><td>币安账户 <span class="mono">09-28</span></td><td><span class="pill ok">我方自有主账户</span></td><td class="dim">单向模式；MM 是自有执行代理而不是 Principal——没有商务结算、MM 保证金和 MM 信用敞口</td></tr>
+<tr><td>持仓模式 <span class="mono">09-28 · v1.5</span></td><td><span class="pill ok">双向 + 单向</span></td><td class="dim">两种都为用户保留；主账户对所有腿做净额（推翻 v1.4 的只有单向）</td></tr>
+<tr><td>保证金模式 <span class="mono">09-28</span></td><td><span class="pill ok">A-Book 强制逐仓</span></td><td class="dim">A-Book 市场关闭全仓；B-Book 保留两种</td></tr>
+<tr><td>强平执行 <span class="mono">09-28 · v1.5</span></td><td><span class="pill ok">本地触发，经 MM 市价平仓</span></td><td class="dim">PM Perp 扫描器按币安 mark；不使用币安止损单（单 symbol 条件单上限）——推翻 v1.4 的 MM 持止损单</td></tr>
+<tr><td>现货 A-Book <span class="mono">09-28</span></td><td><span class="pill ok">第二期</span></td><td class="dim">先做永续；现货单独立项（见下方待决）</td></tr>
+<tr><td>MM 开发 <span class="mono">09-28</span></td><td><span class="pill ok">另有 MM 团队</span></td><td class="dim">我方四名工程师只做 mm-connector 与平台侧</td></tr>
 </tbody>
 </table></div>
 
 <h2>仍待决</h2>
 
-<h4>与 MM 的强平保护契约细节 <span class="pill gap">阻塞阶段 1 契约</span></h4>
-<p class="section-note">替代 v1.3 的商务条款一节（自有账户下已不适用）。</p>
+<h4>MM 契约细节 <span class="pill gap">阻塞阶段 1 契约</span></h4>
 <div class="tw"><table>
 <thead><tr><th>事项</th><th>要定什么</th></tr></thead>
 <tbody>
-<tr><td>单 symbol 条件单上限</td><td class="dim">在币安单 symbol 条件单数量上限下，MM 如何覆盖所有持仓（子账户、本地触发……），每个市场能支撑多少仓位</td></tr>
-<tr><td>生效版本延迟 SLO</td><td class="dim">从发布目标到 <code>PROTECTION_APPLIED</code> 的最长时间；保护空窗的告警阈值</td></tr>
-<tr><td>订单转发路径</td><td class="dim">确认用户订单继续走 connector → MM（第 3 页契约），而不是另建 NeoDAX → 币安直连客户端</td></tr>
+<tr><td>转发路径</td><td class="dim">确认用户订单走 connector → MM（第 3 页契约），而不是另建 NeoDAX → 币安直连客户端</td></tr>
+<tr><td>强平平仓单处理</td><td class="dim">在 MM 限频额度中的优先级与补足全部数量（3.8）；平仓无法完成时的回报</td></tr>
 <tr><td>主账户设置</td><td class="dim">主账户在币安的杠杆档位与保证金设置；由此推出的保证金率熔断分级和每个市场的净名义上限</td></tr>
-<tr><td>强平手续费与预警</td><td class="dim">A-Book 的强平手续费率；逐仓仓位是否需要按仓位的保证金预警（现有 80/90/95 预警带只覆盖全仓）</td></tr>
 </tbody>
 </table></div>
 
-<h4>市价单滑点保护 <span class="pill gap">cutover 前</span></h4>
+<h4>A-Book 费率表 <span class="pill gap">首个市场上线前</span></h4>
+<p class="section-note">A-Book 市场的用户 maker/taker 费率必须高于主账户的币安费率，包括双向持仓用户的两条腿（3.8）。同时确定强平手续费率，以及逐仓仓位是否需要按仓位的保证金预警（现有 80/90/95 预警带只覆盖全仓）。</p>
+
+<h4>首批 A-Book 市场 <span class="pill gap">阶段 4 前</span></h4>
+<p class="section-note">选定首批 2–3 个市场。标准取决于上 A-Book 的目的：转移风险（单边敞口最大）、流动性（内部盘口最薄但交易量真实），或两者兼有——需与业务确认。</p>
+
+<h4>现货 A-Book <span class="pill gap">第二期</span></h4>
+<p class="section-note">设计前需先解决三个阻塞：① <b>资产不一致</b>——我方托管的是链上 WBTC / WSOL，币安现货交易的是 BTC / SOL，用户在我方买 WBTC，对冲的却是另一种资产；② <b>库存调拨</b>——用户净买入会让币安上的 BTC 越积越多、USDT 越来越少，而提现从 Cage 金库出，需要一套由财务运营的币安与金库之间的调拨流程；③ <b>未上币安的资产</b>——YELLOWUSDT 在币安没有市场，只能走 B-Book；现货 PM 也还没有 house / 系统账户机制。</p>
+
+<h4>市价单滑点保护 <span class="pill gap">首个市场上线前</span></h4>
 <p class="section-note">币安无原生滑点参数。一期先上锁仓缓冲系数；二期再议 API 层 max_slippage（需 MM 配合回报特殊错误码，或我方事后仲裁）。</p>
 
-<h4>保护空窗的保险金容量 <span class="pill gap">cutover 前</span></h4>
-<p class="section-note">NeoDAX ↔ MM 中断期间已生效的止损单照常触发，所以剩余风险是最新目标未生效的仓位（MM ↔ 币安故障、止损单被拒），以及快速行情下成交价越过破产价的滑点。压测口径：MM ↔ 币安中断 30 分钟 + 行情 ±20%，以及主账户被强平场景（第 8 页）。</p>
+<h4>MM 断连时强平的应急容量 <span class="pill gap">首个市场上线前</span></h4>
+<p class="section-note">A-Book 强平挂起期间扩大的穿仓由保险金吸收。压测口径：断连 30 分钟 + 行情 ±20%，以及主账户被强平场景（第 8 页）。</p>
 
-<h4>合规与账户归属 <span class="pill gap">阻塞生产 cutover</span></h4>
+<h4>合规与账户归属 <span class="pill gap">阻塞首个生产市场</span></h4>
 <p class="section-note">平台自有币安账户的主体、地域合规、"用户订单在平台自有交易所账户上执行"的监管定性——需合规团队意见，不阻塞技术开发。</p>
 
-<div class="call"><p class="call-t">文档维护</p><p>v1.4（2026-09-28，新需求）：币安账户改为我方自有主账户，MM 为自有执行代理（取消 Principal 模式、商务结算与 MM 信用敞口）；A-Book 市场强制逐仓 + 单向持仓；强平重新设计——PM Perp 发布带版本号的逐仓强平价，MM 在币安持有止损单（新增 3.8 强平保护契约：先撤后挂、补足全部数量、净额账户规则、单 symbol 条件单上限），止损成交即强平，同时撤掉该币对上的其他订单，本地扫描器改为只做影子监控；A-Book mark 改用币安 mark；对账扩展为净头寸（含只读币安 key）、保护、钱包；新增风险：主账户被强平、保护空窗、重复平仓 / 孤儿止损单、资金费重算风暴。</p><p>v1.3（2026-09-25，评审意见吸收）：3.5 重写——UNKNOWN 状态 + 判死三条件 + MM 侧 tombstone / UNKNOWN 义务 + CANCEL_REJECTED 补账；house 经济闭环付款方向修正、信用敞口定义（余额 + MTM + funding 应计）、工程要点清单（热点实测、双向腿、风控豁免、不重复计账不变量）；ledger 外部 K线改为完整存储/聚合设计（源表 UPSERT、断线补数、双链路由）；depth 差分补删除档位与重连重置语义。v1.2：行情与映射定为"以币安为准"；待决项分块排版。v1.1：3.0 数据所有权、spot 边界清单。</p><p>契约过会与剩余待决项落定后更新 v2 定稿；英文版 <code>docs/a-book-perps-design.en.html</code> 同步维护。关联文档：<code>docs/new-perps-rollout-plan.html</code>（市场参数与 quote 配置基线）、<code>docs/2026-09-22-attacker-position-force-close-runbook.md</code> 与 09-23 两份 MM 清仓 runbook（阶段 0）。</p></div>
+<div class="call"><p class="call-t">文档维护</p><p>v1.5（2026-09-28，第二轮需求）：A-Book 与 B-Book 按市场并存（Finex、takeover/ADL、内部做市账户为 B-Book 保留；市场只在零持仓时切换）；双向与单向持仓都支持，主账户单向并做净额；A-Book 仍强制逐仓；强平改回本地触发 + 经 MM 市价平仓——因单 symbol 条件单上限撤回 v1.4 的 MM 持币安止损单（3.8 改为净额账户规则）；mark 来源按 book 选择；新增"A-Book 改变了什么"、"系统层面隔离 vs 业务层面依赖"与开发周期章节；现货 A-Book 列为第二期。</p><p>v1.4（2026-09-28，新需求）：币安账户改为我方自有主账户，MM 为自有执行代理（取消 Principal 模式、商务结算与 MM 信用敞口）；A-Book 市场强制逐仓 + 单向持仓；强平重新设计——PM Perp 发布带版本号的逐仓强平价，MM 在币安持有止损单（新增 3.8 强平保护契约：先撤后挂、补足全部数量、净额账户规则、单 symbol 条件单上限），止损成交即强平，同时撤掉该币对上的其他订单，本地扫描器改为只做影子监控；A-Book mark 改用币安 mark；对账扩展为净头寸（含只读币安 key）、保护、钱包；新增风险：主账户被强平、保护空窗、重复平仓 / 孤儿止损单、资金费重算风暴。</p><p>v1.3（2026-09-25，评审意见吸收）：3.5 重写——UNKNOWN 状态 + 判死三条件 + MM 侧 tombstone / UNKNOWN 义务 + CANCEL_REJECTED 补账；house 经济闭环付款方向修正、信用敞口定义（余额 + MTM + funding 应计）、工程要点清单（热点实测、双向腿、风控豁免、不重复计账不变量）；ledger 外部 K线改为完整存储/聚合设计（源表 UPSERT、断线补数、双链路由）；depth 差分补删除档位与重连重置语义。v1.2：行情与映射定为"以币安为准"；待决项分块排版。v1.1：3.0 数据所有权、spot 边界清单。</p><p>契约过会与剩余待决项落定后更新 v2 定稿；英文版 <code>docs/a-book-perps-design.en.html</code> 同步维护。关联文档：<code>docs/new-perps-rollout-plan.html</code>（市场参数与 quote 配置基线）、<code>docs/2026-09-22-attacker-position-force-close-runbook.md</code> 与 09-23 两份 MM 清仓 runbook（阶段 0）。</p></div>
 </section>
 </article>
 

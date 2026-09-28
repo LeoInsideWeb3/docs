@@ -776,16 +776,13 @@ MMHouseAccountID          = <span class="t">"00000000-0000-0000-0000-00000000000
 <div class="call warn"><p class="call-t">Why zero positions is mandatory</p><p>A position opened on A-Book is backed by a Binance position; on B-Book it would need an internal counterparty that does not exist. Migrating live positions (closing on Binance and re-opening against the internal book at an agreed price) is possible in principle but out of scope for the first version.</p></div>
 
 <h2>Delivery Estimate</h2>
-<p class="section-note">Team: 2 full-time + 2 part-time engineers, all code written with AI agents. The MM service is built by a separate team. What AI does not shorten: Binance testnet integration, coordination with the MM team, the production switch, and funds operations — the calendar is driven by integration and launch, not by coding.</p>
+<p class="section-note">All code is written with AI agents; the MM service is built by a separate team. What AI does not shorten: Binance testnet integration, coordination with the MM team, the production switch, and funds operations — the calendar is driven by integration and launch, not by coding.</p>
 <div class="tw"><table>
-<thead><tr><th>Workstream</th><th>Owner</th><th>Duration</th></tr></thead>
+<thead><tr><th>Stage</th><th>Scope</th><th>Duration</th></tr></thead>
 <tbody>
-<tr><td>mm-connector + mock-MM</td><td class="dim">full-time 1</td><td class="mono-c">3 weeks</td></tr>
-<tr><td>PM Perp: house account, per-market book flag, isolated enforcement, A-Book liquidation outlet (B-Book untouched)</td><td class="dim">full-time 2</td><td class="mono-c">3 weeks</td></tr>
-<tr><td>quote / ledger Binance mirror, per-market mark source</td><td class="dim">part-time 1</td><td class="mono-c">3 weeks</td></tr>
-<tr><td>trading-api book awareness, admin, reconciliation, breakers</td><td class="dim">part-time 2</td><td class="mono-c">3 weeks</td></tr>
-<tr><td>Integration (mock-MM → MM sandbox → production small notional)</td><td class="dim">all</td><td class="mono-c">2 weeks</td></tr>
-<tr><td>First markets live + observation</td><td class="dim">all</td><td class="mono-c">1 week</td></tr>
+<tr><td>Development</td><td class="dim">mm-connector + mock-MM; PM Perp (house account, per-market book flag, isolated enforcement, A-Book liquidation outlet, B-Book untouched); quote / ledger Binance mirror and per-market mark source; trading-api book awareness, admin, reconciliation, breakers — four streams in parallel, each with unit and integration tests</td><td class="mono-c">3 weeks</td></tr>
+<tr><td>Integration testing</td><td class="dim">mock-MM scenario injection → MM sandbox (Binance testnet) → production small-notional smoke; includes liquidation, breaker and reconciliation drills plus B-Book / spot regression</td><td class="mono-c">2 weeks</td></tr>
+<tr><td>Launch &amp; observation</td><td class="dim">first A-Book markets enabled + 72 hours of observation</td><td class="mono-c">1 week</td></tr>
 </tbody>
 </table></div>
 <ul class="plain">

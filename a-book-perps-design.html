@@ -776,16 +776,13 @@ MMHouseAccountID          = <span class="t">"00000000-0000-0000-0000-00000000000
 <div class="call warn"><p class="call-t">为什么必须零持仓</p><p>A-Book 开的仓由币安头寸支撑；到了 B-Book 它需要一个并不存在的内部对手方。迁移未平仓位（在币安平掉，再按约定价格对内部订单簿重开）原理上可行，但不在第一版范围内。</p></div>
 
 <h2>开发周期</h2>
-<p class="section-note">团队：2 名全职 + 2 名兼职工程师，代码全部由 AI agent 编写；MM 服务由另一个团队开发。AI 加速不了的环节：币安 testnet 联调、与 MM 团队协调、生产切换、资金运营——日历主要由联调和上线决定，而不是写代码。</p>
+<p class="section-note">代码全部由 AI agent 编写；MM 服务由另一个团队开发。AI 加速不了的环节：币安 testnet 联调、与 MM 团队协调、生产切换、资金运营——日历主要由联调和上线决定，而不是写代码。</p>
 <div class="tw"><table>
-<thead><tr><th>工作流</th><th>负责人</th><th>周期</th></tr></thead>
+<thead><tr><th>阶段</th><th>内容</th><th>周期</th></tr></thead>
 <tbody>
-<tr><td>mm-connector + mock-MM</td><td class="dim">全职 1</td><td class="mono-c">3 周</td></tr>
-<tr><td>PM Perp：house 账户、按市场 book 开关、逐仓强制、A-Book 强平出口（B-Book 不动）</td><td class="dim">全职 2</td><td class="mono-c">3 周</td></tr>
-<tr><td>quote / ledger 币安镜像、按市场的 mark 来源</td><td class="dim">兼职 1</td><td class="mono-c">3 周</td></tr>
-<tr><td>trading-api 识别 book、admin、对账、熔断</td><td class="dim">兼职 2</td><td class="mono-c">3 周</td></tr>
-<tr><td>联调（mock-MM → MM 沙箱 → 生产小额）</td><td class="dim">全员</td><td class="mono-c">2 周</td></tr>
-<tr><td>首批市场上线 + 观察</td><td class="dim">全员</td><td class="mono-c">1 周</td></tr>
+<tr><td>开发</td><td class="dim">mm-connector + mock-MM；PM Perp（house 账户、按市场 book 开关、逐仓强制、A-Book 强平出口，B-Book 不动）；quote / ledger 币安镜像与按市场的 mark 来源；trading-api 识别 book、admin、对账、熔断——四块并行，各自带单元与集成测试</td><td class="mono-c">3 周</td></tr>
+<tr><td>联调测试</td><td class="dim">mock-MM 场景注入 → MM 沙箱（币安 testnet）→ 生产小额冒烟；含强平、熔断、对账演练与 B-Book / spot 回归</td><td class="mono-c">2 周</td></tr>
+<tr><td>上线观察</td><td class="dim">首批 A-Book 市场开启 + 72 小时观察</td><td class="mono-c">1 周</td></tr>
 </tbody>
 </table></div>
 <ul class="plain">

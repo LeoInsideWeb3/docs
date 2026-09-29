@@ -107,7 +107,7 @@ ol.pts b{color:var(--ink);font-weight:600}
 <a href="#cutover" data-tab="cutover"><span class="n">9</span>上线与排期</a>
 <a href="#open" data-tab="open"><span class="n">10</span>已决与待决</a>
 </nav>
-<div class="side-foot">2026-09-28 · v1.5 · 设计稿<br>A-Book + B-Book 按市场并存<br>自有币安主账户<br>双向 + 单向 · A-Book 逐仓<br>本地触发强平<br>现货 A-Book = 第二期</div>
+<div class="side-foot">2026-09-28 · v1.6 · 设计稿<br>A-Book + B-Book 按市场并存<br>book 标志: perps_markets · 60s 轮询<br>diff 流镜像 · 发布 50 档<br>union 双链 K线<br>现货 A-Book = 第二期</div>
 </aside>
 
 <div class="main">
@@ -122,6 +122,7 @@ ol.pts b{color:var(--ink);font-weight:600}
 <thead><tr><th>决策点</th><th>结论</th><th>含义</th></tr></thead>
 <tbody>
 <tr><td><b>A/B 选择</b></td><td><span class="pill ok">按市场，A 与 B 并存</span></td><td class="dim">每个永续市场配置为 A-Book 或 B-Book（如 BTC / ETH 走 A，其余走 B）；只有在该市场持仓为零时才能切换（2026-09-28 决定）</td></tr>
+<tr><td><b>book 标志存储</b> <span class="mono">09-28 · v1.6</span></td><td><span class="pill ok">perps_markets 列 · 60s 轮询</span></td><td class="dim">DB 是唯一真源；各服务经现有的 perp 市场元数据 gRPC 轮询读取——不做每请求实时查，不发变更事件</td></tr>
 <tr><td><b>币安账户</b></td><td><span class="pill ok">我方自有主账户</span></td><td class="dim">所有 A-Book 用户订单落在同一个平台自有币安账户；币安只看得到这个账户的净头寸和余额，看不到单个用户</td></tr>
 <tr><td><b>MM 角色</b></td><td><span class="pill ok">自有执行代理</span></td><td class="dim">我方自己的 MM 系统（由另一个团队开发）负责转发订单、回报成交。它不是对手方——没有商务结算，也没有 MM 信用敞口</td></tr>
 <tr><td><b>持仓模式</b></td><td><span class="pill ok">双向 + 单向</span></td><td class="dim">两种都继续提供给用户。主账户在币安用单向模式，只持有所有用户腿的净额（一个用户多 0.5、空 1 → 主账户空 0.5）</td></tr>
@@ -616,22 +617,22 @@ MMHouseAccountID          = <span class="t">"00000000-0000-0000-0000-00000000000
 <div class="tw"><table>
 <thead><tr><th>币安流</th><th>用途</th><th>我方落点</th></tr></thead>
 <tbody>
-<tr><td class="mono-c">&lt;symbol&gt;@depth20@100ms</td><td>订单簿镜像</td><td class="dim">聚合进现有 <code>orderbook.{MKT}</code> topic 的 snapshot/increment 格式 → trading-api WS 零改动</td></tr>
+<tr><td class="mono-c">&lt;symbol&gt;@depth@100ms（diff）+ REST 引导</td><td>订单簿镜像</td><td class="dim">diff 流覆盖<b>全部</b>价格档位；quote 维护全量本地簿，按现有 snapshot/increment 格式发布、<b>截断到 50 档</b>（Finex 的 snapshot_depth）→ trading-api WS 零改动（v1.6）</td></tr>
 <tr><td class="mono-c">&lt;symbol&gt;@kline_1m</td><td>K线</td><td class="dim">新事件 → ledger 直写 Timescale（见下）</td></tr>
 <tr><td class="mono-c">&lt;symbol&gt;@ticker</td><td>24h 统计</td><td class="dim">复用 <code>events.EventTickerUpdated</code> 路径</td></tr>
 <tr><td class="mono-c">&lt;symbol&gt;@aggTrade</td><td>公共成交带</td><td class="dim">trading-api WS 公共 trades channel 数据源</td></tr>
 <tr><td class="mono-c">&lt;symbol&gt;@markPrice</td><td>mark / index / funding</td><td class="dim">已订阅；在 A-Book 市场上它就是 mark 价本身（见下方 mark price）</td></tr>
-<tr><td class="mono-c">fapi exchangeInfo（REST，每 1h）</td><td>过滤器同步</td><td class="dim">LOT_SIZE / PRICE_FILTER / MIN_NOTIONAL 热加载进 trading-api MarketCache（edge 前置拦截，MM 侧 INVALID_FILTER 兜底）</td></tr>
+<tr><td class="mono-c">fapi exchangeInfo（REST，每 1h）</td><td>过滤器同步</td><td class="dim">以 <code>EventMarketFiltersObserved</code> 发布——市场级全量快照，每小时一次 + 启动时一次；trading-api 热加载进 MarketCache（edge 前置拦截，MM 侧 INVALID_FILTER 兜底）（v1.6）</td></tr>
 </tbody>
 </table></div>
-<div class="call"><p class="call-t">depth 镜像的实现要点（含差分语义，评审意见 2026-09-25）</p><p>币安 depth20 是<b>快照流</b>（无增量对齐问题），每 100ms 全量 20 档 → 直接映射现有 OrderBookSnapshot 语义；增量由 quote 按 snapshot 差分合成，两条硬规则：<b>消失档位必须发 qty→0 的删除增量</b>；<b>重连后先重发全量 snapshot 重建差分基线</b>（不发跨断线窗口的巨型 diff）。保持现网客户端的增量/快照混合消费模型。</p><p><b>注意</b>：订单簿里全是币安的单——我方用户挂单不在簿上。用户自己的挂单状态走私有流（EventOrderUpdated），前端需在镜像簿上叠加"我的挂单"展示（前端改动项，列入切换计划）。</p></div>
+<div class="call"><p class="call-t">depth 镜像的实现要点（含差分语义，评审意见 2026-09-25）</p><p>镜像订阅<b>diff 深度流</b>（<code>@depth@100ms</code>——推送所有档位变化，不限前 20 档），用一次性 REST 快照引导（<code>/fapi/v1/depth?limit=1000</code>）。quote 维护<b>全量本地簿</b>，发布现有的 <code>EventOrderbookIncrement</code> / <code>EventOrderbookSnapshot</code> 对，深度截断到 <b>50 档</b>（Finex 的 snapshot_depth），两条硬规则：<b>消失档位必须发 amount→"0" 的删除增量</b>；<b>重连后先重发全量 snapshot 重建差分基线</b>（不发跨断线窗口的巨型 diff）。sequence 每市场单调递增；快照先 flush 待发增量再携带相同 sequence（Finex 既有约定）。只发 <code>orderbook.{MKT}.OrderBookUpdates</code>——<b>不双写</b> legacy topic（冷启动，无存量消费者）。</p><p><b>注意</b>：订单簿里全是币安的单——我方用户挂单不在簿上。用户自己的挂单状态走私有流（EventOrderUpdated），前端需在镜像簿上叠加"我的挂单"展示（前端改动项，列入切换计划）。</p></div>
 
 <h2>ledger：外部 K线接入设计（不是"加一个消费者直写"）</h2>
 <p class="section-note">评审意见（2026-09-25）：现网 ledger 从 trades 生成连续聚合、高周期再依赖它；外部 1m K线无法仅靠"新增消费者直写"自然接入现有结构——需要新的存储与聚合设计。</p>
 <ol class="pts">
 <li><b>新源表 + UPSERT 语义</b> — 新增外部 K线源表（symbol, bucket, OHLCV, event_time 水位）：币安 kline 事件携带当分钟<b>累计</b>成交量，未闭合 bar 在当分钟内被逐事件覆盖；重复 / 乱序按事件时间水位幂等 upsert（迟到旧值不回写已更新的 bucket）。</li>
 <li><b>断线补数</b> — WS 断线窗口由 REST <code>/fapi/v1/klines</code> 回填，走同一 upsert 路径，天然幂等；补数与实时流竞争时以水位高者胜。</li>
-<li><b>聚合链重建</b> — perp 市场的高周期 CAGG 从 trades 源改指向新源表；spot 与过渡期市场保留 trades 链——<b>两条链并存、per-market 路由</b>，不是全局切换。</li>
+<li><b>两条 1m 链 + 一个静态 union</b> — trades → <code>ohlc_1m</code>（B-Book 市场）与 <code>external_klines_1m</code> → <code>ohlc_1m_ext</code>（A-Book 市场）是两条并行的 1m 链；<code>ohlc_1m_all = ohlc_1m UNION ALL ohlc_1m_ext</code> 是<b>静态视图</b>（SQL 里不出现市场清单），所有高周期 CAGG 从它构建。每个时间桶只存在于恰好一条链——ledger 对 A-Book 市场停订成交（动态订阅清单），quote 只镜像 A-Book 市场——所以 union 免去去重，切 book 时历史自动拼接。</li>
 <li><b>历史衔接</b> — 内部聚合的历史 K线保留，切换日为分界；前端图表跨界拼接（时间轴连续，无重写）。</li>
 <li><b>用户 trade history</b> — 不受影响：用户自己的成交记录一直由 PM Perp 持有（<code>perps_transactions</code> / position history），与公共 K线互不相干。</li>
 </ol>
@@ -675,16 +676,16 @@ MMHouseAccountID          = <span class="t">"00000000-0000-0000-0000-00000000000
 <tbody>
 <tr><td class="mono-c"><b>mm-connector</b></td><td><span class="pill no">新增</span></td><td class="dim">Kafka 命令消费 + MM REST/WS 客户端 + 状态机与仲裁 + Finex 格式事件合成（house 对手腿）+ 对账 worker（含只读币安 key）+ 心跳熔断 + admin 观测接口</td><td class="dim">大（新服务，参照 finex 的命令入口与事件出口契约）</td></tr>
 <tr><td class="mono-c"><b>portfolio_manager_perp</b></td><td><span class="pill gap">修改</span></td><td class="dim">house 系统账户（spec + EnsureSystemAccounts）；按市场的 book 开关；A-Book 市场<b>强制逐仓</b>；强平 executor 出口按 book 区分（A-Book → connector，带 source=liquidation；B-Book 不变）；按实际成交价做强平结算，退回保证金并撤掉其他订单；A-Book 市场跳过 takeover/ADL；A-Book 市场 funding 账务对手方为 house（净额与总额差额入账）</td><td class="dim">中</td></tr>
-<tr><td class="mono-c"><b>quote</b></td><td><span class="pill gap">修改</span></td><td class="dim">binance_perp 扩展五路订阅（depth/kline/ticker/aggTrade/exchangeInfo）；新 kline 事件发布；depth → orderbook topic 复刻；InternalPerpTradeCollector 按 A-book 市场停用</td><td class="dim">中</td></tr>
-<tr><td class="mono-c"><b>ledger</b></td><td><span class="pill gap">修改</span></td><td class="dim">外部 K线源表 + UPSERT/水位语义 + REST 断线补数；perp 市场聚合链改指向新源表，spot 链保留（双链 per-market 路由，见第 6 页）；24h ticker 改币安源</td><td class="dim">中（存储与聚合设计，非单纯新增消费者）</td></tr>
+<tr><td class="mono-c"><b>quote</b></td><td><span class="pill gap">修改</span></td><td class="dim">binance_perp 扩展五路订阅（订单簿 diff / kline / ticker / aggTrade / exchangeInfo）；新 kline + 市场过滤器事件发布；全量本地簿 → snapshot/increment 复刻（发布 50 档）；InternalPerpTradeCollector 按 A-book 市场停用</td><td class="dim">中</td></tr>
+<tr><td class="mono-c"><b>ledger</b></td><td><span class="pill gap">修改</span></td><td class="dim">外部 K线源表 + UPSERT/水位语义 + REST 断线补数；两条 1m 链由静态 <code>ohlc_1m_all</code> union 统一，高周期 CAGG 重建在它之上（见第 6 页）；按市场动态订阅清单，由 perp 市场元数据轮询驱动（与 quote 同机制）；A-Book 市场 24h ticker 走 ext 链</td><td class="dim">中（存储与聚合设计，非单纯新增消费者）</td></tr>
 <tr><td class="mono-c"><b>trading-api</b></td><td><span class="pill gap">修改</span></td><td class="dim">MarketCache 对接 exchangeInfo 热同步（前置过滤器校验）并带上每个市场的 book；A-Book 市场拒绝全仓请求；A-Book 市场前端隐藏 Cross 切换；前端契约新增"镜像簿 + 我的挂单"叠加语义说明；其余（认证/限流/锁仓流程/私有流）不变</td><td class="dim">小</td></tr>
-<tr><td class="mono-c"><b>admin</b></td><td><span class="pill gap">修改</span></td><td class="dim">MM 连接状态/对账差异/house 余额/<b>主账户保证金</b>监控页；按市场切换 book（带零持仓检查）；紧急平仓工具；对账仲裁工具</td><td class="dim">小</td></tr>
+<tr><td class="mono-c"><b>admin</b></td><td><span class="pill gap">修改</span></td><td class="dim">MM 连接状态/对账差异/house 余额/<b>主账户保证金</b>监控页；对账仲裁工具。book 切换<b>不是</b>后管页面（现无后管流程）：是任务 1 开发的 <code>marketctl</code> CLI</td><td class="dim">小</td></tr>
 <tr><td class="mono-c"><b>perp_trigger</b></td><td><span class="pill ok">近零改动</span></td><td class="dim">触发→锁仓→命令的既有流程自动流向 connector；新增：某仓位被强平时撤掉该用户在这个币对上等待中的止盈止损</td><td class="dim">小</td></tr>
 <tr><td class="mono-c"><b>fee_engine / analytics / competitions</b></td><td><span class="pill ok">零改动</span></td><td class="dim">费用投影与统计照常消费事件（格式未变）；analytics 的 insurance fund equity 视图继续有效</td><td class="dim">无</td></tr>
 <tr><td class="mono-c"><b>finex（perp 部分）</b></td><td><span class="pill ok">保留</span></td><td class="dim">继续服务 B-Book 市场；A-Book 市场只是从它的市场清单里移除（回到 B-Book 时再加回）</td><td class="dim">仅配置</td></tr>
 </tbody>
 </table></div>
-<div class="call"><p class="call-t">Kafka topic 面变化</p><p><b>不变</b>：<code>commands.{MKT}.OrderCommands</code>（消费者从 finex 换成 connector）、<code>events.{MKT}.EventOrderUpdated</code> / <code>EventTradeExecuted</code>（生产者换成 connector）、<code>orderbook.{MKT}</code>（生产者换成 quote）、<code>perp_trigger.Persistence</code>。<b>新增</b>：<code>events.{MKT}.EventKlineObserved</code>、MM 观测/对账内部 topic。每个市场命令 topic 的消费者由其 book 开关决定，任何时刻 Finex / connector 只有一个在订阅。<code>kafka_topic_init</code> 的 -perp-markets 清单不变（topic 均已存在，只是换了生产/消费角色）。</p></div>
+<div class="call"><p class="call-t">Kafka topic 面变化</p><p><b>不变</b>：<code>commands.{MKT}.OrderCommands</code>（消费者从 finex 换成 connector）、<code>events.{MKT}.EventOrderUpdated</code> / <code>EventTradeExecuted</code>（生产者换成 connector）、<code>orderbook.{MKT}</code>（生产者换成 quote）、<code>perp_trigger.Persistence</code>。<b>新增</b>：<code>events.{MKT}.EventKlineObserved</code>、<code>events.EventMarketFiltersObserved</code>、MM 观测/对账内部 topic。每个市场命令 topic 的消费者由其 book 开关决定，任何时刻 Finex / connector 只有一个在订阅。<code>kafka_topic_init</code> 的 -perp-markets 清单不变（topic 均已存在，只是换了生产/消费角色）。</p></div>
 </section>
 </article>
 
@@ -746,7 +747,7 @@ MMHouseAccountID          = <span class="t">"00000000-0000-0000-0000-00000000000
 <li><b>阶段 1 · 契约过会（本文档第 3 页）</b><span>与 MM 团队逐条过 SLA / 错误码 / 悬挂仲裁 / 撤单时延 / GTX 拒绝可区分性（3.7 过会清单）以及 3.8 净额账户规则；MM 团队确认排期与沙箱。出口：双方确认的契约 v1 + MM 沙箱可用。</span></li>
 <li><b>阶段 2 · 开发</b><span>四条并行工作流（见下方开发周期）：① mm-connector + <b>mock-MM 模拟器</b>；② PM Perp house 账户 + 按市场 book 开关 + 逐仓强制 + A-Book 强平出口；③ quote 币安镜像 + A-Book 用币安 mark + ledger K线路径；④ trading-api 识别 book、对账、熔断、admin 工具。每条都配集成测试进 <code>test/v2</code> 场景。</span></li>
 <li><b>阶段 3 · staging 联调（三层测试环境）</b><span><b>① mock-MM（主力，我方自建）</b>：<code>tools/mockmm</code> 实现契约 v1 的 REST+WS 模拟器，场景注入（多笔成交 / 拒绝 / ack 超时 / 断线重连 / 乱序 / 重复回报 / 429）——CI 可重复。<b>② MM 沙箱</b>：MM 团队按同一契约提供沙箱，最好接<b>币安 futures testnet</b> 验证 BTCUSDT / ETHUSDT——只验链路不验覆盖。<b>③ 生产小额冒烟</b>：受控账户、最小名义。staging 里 A-Book 与 B-Book 市场全程并行运行。出口：全绿 + 双方联调报告。</span></li>
-<li><b>阶段 4 · 开启首批 A-Book 市场（顺序铁律）</b><span>逐个市场：① 该市场停新单 → ② 确认持仓与挂单都为零 → ③ 切换 book 开关（Finex 移除该市场，connector 开始订阅）→ ④ 该市场行情切到币安镜像、mark 切到币安 → ⑤ 跑验证清单 → ⑥ 重新开放。<b>Finex 在 connector 验证通过之后才释放该市场</b>——一个命令 topic 绝不能有两个消费者。</span></li>
+<li><b>阶段 4 · 开启首批 A-Book 市场（顺序铁律）</b><span>逐个市场，经 <code>marketctl</code> CLI（任务 1）：① 该市场停新单 → ② 工具经 PM Perp gRPC 断言持仓为零<b>且</b>挂单为零（含 perp_trigger 等待中的条件单），不满足即拒绝 → ③ 工具翻转 <code>perps_markets.book</code> 标志并打印前后状态留审计痕 → ④ Finex 移除该市场、connector 开始订阅（60s 元数据轮询内生效）→ ⑤ 该市场行情切到币安镜像、mark 切到币安 → ⑥ 跑验证清单 → ⑦ 重新开放。<b>Finex 在 connector 验证通过之后才释放该市场</b>——一个命令 topic 绝不能有两个消费者。</span></li>
 <li><b>阶段 5 · 观察，然后扩展</b><span>72 小时盯盘：延迟分位、对账差异、费率正确性、一次强平演练。之后其他市场按同样流程逐个切换。</span></li>
 </ol>
 
@@ -815,6 +816,11 @@ MMHouseAccountID          = <span class="t">"00000000-0000-0000-0000-00000000000
 <tr><td>强平执行 <span class="mono">09-28 · v1.5</span></td><td><span class="pill ok">本地触发，经 MM 市价平仓</span></td><td class="dim">PM Perp 扫描器按币安 mark；不使用币安止损单（单 symbol 条件单上限）——推翻 v1.4 的 MM 持止损单</td></tr>
 <tr><td>现货 A-Book <span class="mono">09-28</span></td><td><span class="pill ok">第二期</span></td><td class="dim">先做永续；现货单独立项（见下方待决）</td></tr>
 <tr><td>MM 开发 <span class="mono">09-28</span></td><td><span class="pill ok">另有 MM 团队</span></td><td class="dim">我方四名工程师只做 mm-connector 与平台侧</td></tr>
+<tr><td>book 标志存储与分发 <span class="mono">09-28 · v1.6</span></td><td><span class="pill ok">perps_markets 列 · 60s 轮询</span></td><td class="dim">DB 单一真源；服务经 perp 市场元数据 gRPC 轮询（60s）读取——不做每请求实时查、不发变更事件；切换是低频停市操作，延迟无影响</td></tr>
+<tr><td>订单簿镜像 <span class="mono">09-28 · v1.6</span></td><td><span class="pill ok">diff 流 + 全量簿 · 发布 50 档</span></td><td class="dim">REST 深度引导（limit=1000）+ diff 深度流喂出全量本地簿；按现有 snapshot/increment 格式发布、截断 50 档；不双写 legacy topic（冷启动）</td></tr>
+<tr><td>K线双链 <span class="mono">09-28 · v1.6</span></td><td><span class="pill ok">两条 1m 链 + 静态 union</span></td><td class="dim"><code>external_klines_1m</code> 充当 A-Book 市场的成交输入角色；<code>ohlc_1m_all</code> 合并两条 1m CAGG，高周期全部构建在它之上——切 book 历史自动拼接；ledger 对 A-Book 市场停订成交</td></tr>
+<tr><td>过滤器同步 <span class="mono">09-28 · v1.6</span></td><td><span class="pill ok">EventMarketFiltersObserved</span></td><td class="dim">市场级全量快照，每小时 + 启动时；quote 是唯一的币安客户端</td></tr>
+<tr><td>book 切换工具 <span class="mono">09-28 · v1.6</span></td><td><span class="pill ok">marketctl CLI（任务 1）</span></td><td class="dim">无后管流程：CLI 经 PM Perp gRPC 断言零持仓 + 零挂单（含等待中的条件单），翻转标志、打印前后状态留审计；首个市场切换前必须存在</td></tr>
 </tbody>
 </table></div>
 
@@ -848,7 +854,7 @@ MMHouseAccountID          = <span class="t">"00000000-0000-0000-0000-00000000000
 <h4>合规与账户归属 <span class="pill gap">阻塞首个生产市场</span></h4>
 <p class="section-note">平台自有币安账户的主体、地域合规、"用户订单在平台自有交易所账户上执行"的监管定性——需合规团队意见，不阻塞技术开发。</p>
 
-<div class="call"><p class="call-t">文档维护</p><p>v1.5（2026-09-28，第二轮需求）：A-Book 与 B-Book 按市场并存（Finex、takeover/ADL、内部做市账户为 B-Book 保留；市场只在零持仓时切换）；双向与单向持仓都支持，主账户单向并做净额；A-Book 仍强制逐仓；强平改回本地触发 + 经 MM 市价平仓——因单 symbol 条件单上限撤回 v1.4 的 MM 持币安止损单（3.8 改为净额账户规则）；mark 来源按 book 选择；新增"A-Book 改变了什么"、"系统层面隔离 vs 业务层面依赖"与开发周期章节；现货 A-Book 列为第二期。</p><p>v1.4（2026-09-28，新需求）：币安账户改为我方自有主账户，MM 为自有执行代理（取消 Principal 模式、商务结算与 MM 信用敞口）；A-Book 市场强制逐仓 + 单向持仓；强平重新设计——PM Perp 发布带版本号的逐仓强平价，MM 在币安持有止损单（新增 3.8 强平保护契约：先撤后挂、补足全部数量、净额账户规则、单 symbol 条件单上限），止损成交即强平，同时撤掉该币对上的其他订单，本地扫描器改为只做影子监控；A-Book mark 改用币安 mark；对账扩展为净头寸（含只读币安 key）、保护、钱包；新增风险：主账户被强平、保护空窗、重复平仓 / 孤儿止损单、资金费重算风暴。</p><p>v1.3（2026-09-25，评审意见吸收）：3.5 重写——UNKNOWN 状态 + 判死三条件 + MM 侧 tombstone / UNKNOWN 义务 + CANCEL_REJECTED 补账；house 经济闭环付款方向修正、信用敞口定义（余额 + MTM + funding 应计）、工程要点清单（热点实测、双向腿、风控豁免、不重复计账不变量）；ledger 外部 K线改为完整存储/聚合设计（源表 UPSERT、断线补数、双链路由）；depth 差分补删除档位与重连重置语义。v1.2：行情与映射定为"以币安为准"；待决项分块排版。v1.1：3.0 数据所有权、spot 边界清单。</p><p>契约过会与剩余待决项落定后更新 v2 定稿；英文版 <code>docs/a-book-perps-design.en.html</code> 同步维护。关联文档：<code>docs/new-perps-rollout-plan.html</code>（市场参数与 quote 配置基线）、<code>docs/2026-09-22-attacker-position-force-close-runbook.md</code> 与 09-23 两份 MM 清仓 runbook（阶段 0）。</p></div>
+<div class="call"><p class="call-t">文档维护</p><p>v1.6（2026-09-28，设计拷问吸收）：book 标志存 <code>perps_markets</code>，经 60s perp 市场元数据轮询分发（不做每请求实时查、不发变更事件）；订单簿镜像改用 diff 深度流 + REST 引导 + 全量本地簿，发布 50 档，不双写 legacy topic；K线双链定稿为两条 1m CAGG 链 + 静态 <code>ohlc_1m_all</code> union（高周期全部构建其上）；exchangeInfo 以 <code>EventMarketFiltersObserved</code> 发布；ledger 订阅清单由同一元数据轮询驱动；book 切换为 <code>marketctl</code> CLI（任务 1），带零持仓/零挂单断言——无后管流程。</p><p>v1.5（2026-09-28，第二轮需求）：A-Book 与 B-Book 按市场并存（Finex、takeover/ADL、内部做市账户为 B-Book 保留；市场只在零持仓时切换）；双向与单向持仓都支持，主账户单向并做净额；A-Book 仍强制逐仓；强平改回本地触发 + 经 MM 市价平仓——因单 symbol 条件单上限撤回 v1.4 的 MM 持币安止损单（3.8 改为净额账户规则）；mark 来源按 book 选择；新增"A-Book 改变了什么"、"系统层面隔离 vs 业务层面依赖"与开发周期章节；现货 A-Book 列为第二期。</p><p>v1.4（2026-09-28，新需求）：币安账户改为我方自有主账户，MM 为自有执行代理（取消 Principal 模式、商务结算与 MM 信用敞口）；A-Book 市场强制逐仓 + 单向持仓；强平重新设计——PM Perp 发布带版本号的逐仓强平价，MM 在币安持有止损单（新增 3.8 强平保护契约：先撤后挂、补足全部数量、净额账户规则、单 symbol 条件单上限），止损成交即强平，同时撤掉该币对上的其他订单，本地扫描器改为只做影子监控；A-Book mark 改用币安 mark；对账扩展为净头寸（含只读币安 key）、保护、钱包；新增风险：主账户被强平、保护空窗、重复平仓 / 孤儿止损单、资金费重算风暴。</p><p>v1.3（2026-09-25，评审意见吸收）：3.5 重写——UNKNOWN 状态 + 判死三条件 + MM 侧 tombstone / UNKNOWN 义务 + CANCEL_REJECTED 补账；house 经济闭环付款方向修正、信用敞口定义（余额 + MTM + funding 应计）、工程要点清单（热点实测、双向腿、风控豁免、不重复计账不变量）；ledger 外部 K线改为完整存储/聚合设计（源表 UPSERT、断线补数、双链路由）；depth 差分补删除档位与重连重置语义。v1.2：行情与映射定为"以币安为准"；待决项分块排版。v1.1：3.0 数据所有权、spot 边界清单。</p><p>契约过会与剩余待决项落定后更新 v2 定稿；英文版 <code>docs/a-book-perps-design.en.html</code> 同步维护。关联文档：<code>docs/new-perps-rollout-plan.html</code>（市场参数与 quote 配置基线）、<code>docs/2026-09-22-attacker-position-force-close-runbook.md</code> 与 09-23 两份 MM 清仓 runbook（阶段 0）。</p></div>
 </section>
 </article>
 

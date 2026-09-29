@@ -142,10 +142,12 @@ ol.seq span{display:block; font-size:13.5px; color:var(--ink-2)}
     <a href="#tasks" data-tab="tasks"><span class="no">04</span>任务清单与代码落点</a>
     <a href="#boundary" data-tab="boundary"><span class="no">05</span>与其他任务的接口</a>
     <a href="#plan" data-tab="plan"><span class="no">06</span>动手顺序与铁律</a>
+    <a href="#decisions" data-tab="decisions"><span class="no">07</span>拷问结论速查</a>
   </nav>
   <div class="foot">
-    依据 <a href="a-book-perps-design.html">A-Book 设计文档 v1.5</a> 第 6 页<br>
-    2026-09-28 · 仅中文 · 未提交
+    依据 <a href="a-book-perps-design.html">A-Book 设计文档 v1.6</a> 第 6 页<br>
+    2026-09-28 · 仅中文 · 未提交<br>
+    含拷问结论速查（第 07 页）
   </div>
 </aside>
 
@@ -297,10 +299,10 @@ ohlc_1m_ticker 物化视图 —— 24h ticker 的数据基础（20260528122000 �
   <div class="tw"><table>
     <thead><tr><th>#</th><th>任务</th><th>落点与要点</th></tr></thead>
     <tbody>
-      <tr><td class="mono-c">Q1</td><td><b>binance_perp 扩展五路订阅</b><br><span class="mono">depth20@100ms / kline_1m / ticker / aggTrade / exchangeInfo(1h)</span></td><td class="dim"><code>binance_perp/client.go</code> + <code>websocket.go</code> 现在只处理 markPrice stream，要加订阅类型分发；<code>Config.Markets</code>（binance.go:13）已有 per-provider 覆盖机制，直接复用</td></tr>
-      <tr><td class="mono-c">Q2</td><td><b>depth → orderbook topic 复刻</b></td><td class="dim">币安 depth20 是<b>快照流</b>（100ms 全量 20 档），要合成成增量发到 <code>orderbook.{MKT}</code>（internal/kafka/const.go:9,190），格式与 Finex 现在发的一致，trading-api 零改动</td></tr>
+      <tr><td class="mono-c">Q1</td><td><b>binance_perp 扩展五路订阅</b><br><span class="mono">depth diff(@depth@100ms) / kline_1m / ticker / aggTrade / exchangeInfo(1h)</span></td><td class="dim">引导：REST <code>/fapi/v1/depth?limit=1000</code> 拉一次全量快照，然后订 diff 深度流（推送<b>所有</b>档位变化，不限前 20 档）；quote 维护全量本地簿，<b>发布截断到 50 档</b>（对齐 Finex snapshot_depth）；<code>client.go</code> + <code>websocket.go</code> 现在只处理 markPrice stream，要加订阅类型分发；<code>Config.Markets</code>（binance.go:13）已有 per-provider 覆盖机制</td></tr>
+      <tr><td class="mono-c">Q2</td><td><b>depth → orderbook topic 复刻</b></td><td class="dim">从全量本地簿合成 <code>EventOrderbookIncrement</code>（删除档位 = amount "0"）+ 周期/重连时 <code>EventOrderbookSnapshot</code>（先 flush 待发增量再带相同 sequence），sequence 每市场单调递增；<b>只发</b> <code>orderbook.{MKT}.OrderBookUpdates</code>，不双写 legacy topic（冷启动无存量消费者）</td></tr>
       <tr><td class="mono-c">Q3</td><td><b>新 kline 事件发布</b></td><td class="dim">新协议事件 <code>EventKlineObserved</code>（internal/protocol/events.go）+ <code>quote/event/producer/</code> 加 publish 函数</td></tr>
-      <tr><td class="mono-c">Q4</td><td><b>按市场门控</b></td><td class="dim">只镜像 A-Book 市场；市场切 book 时热切换数据源。开关挂市场元数据（第 05 页），quote 本身支持配置热更新</td></tr>
+      <tr><td class="mono-c">Q4</td><td><b>按市场门控</b></td><td class="dim">只镜像 A-Book 市场；市场切 book 时热切换数据源。book 开关 = <code>perps_markets.book</code> 列（DB 唯一真源），经现有 60s <code>perp_market_meta</code> 轮询生效（不发变更事件）</td></tr>
       <tr><td class="mono-c">Q5</td><td><b>mark 来源按 book</b></td><td class="dim">A-Book 市场：币安 mark 权重 100%，OKX/Bybit 只用于陈旧 / 偏离报警；B-Book 市场保持多源 oracle。nacos 已有 per-market 权重结构（<code>market_source_weights</code>）</td></tr>
       <tr><td class="mono-c">Q6</td><td><b>InternalPerpTradeCollector 停用</b></td><td class="dim">A-Book 市场下线「内部成交自价」源</td></tr>
     </tbody>
@@ -319,7 +321,8 @@ ohlc_1m_ticker 物化视图 —— 24h ticker 的数据基础（20260528122000 �
       <tr><td class="mono-c">L1</td><td><b>新外部 K 线源表</b></td><td class="dim">新 migration（ledger/migrations/postgres/）：symbol, bucket, OHLCV, 事件时间水位</td></tr>
       <tr><td class="mono-c">L2</td><td><b>UPSERT / 水位语义</b></td><td class="dim">币安 kline 事件带当分钟<b>累计</b>成交量——同一分钟的 bar 随事件逐次覆盖；重复 / 乱序按水位幂等，迟到旧值不回写已更新的 bucket</td></tr>
       <tr><td class="mono-c">L3</td><td><b>REST 断线补数</b></td><td class="dim">WS 断线窗口用 REST <code>/fapi/v1/klines</code> 回填，走同一 UPSERT 路径，天然幂等；补数与实时流竞争时水位高者胜</td></tr>
-      <tr><td class="mono-c">L4</td><td><b>双链按市场路由</b></td><td class="dim">perp A-Book 市场的聚合链改指向新源表；spot 与 B-Book 市场保留 trades 链——两条链并存，<b>不是全局切换</b></td></tr>
+      <tr><td class="mono-c">L4</td><td><b>两条 1m 链 + 静态 union</b></td><td class="dim">trades → <code>ohlc_1m</code>（B-Book）与 <code>external_klines_1m</code> → <code>ohlc_1m_ext</code>（A-Book）两条并行链；<code>ohlc_1m_all = ohlc_1m UNION ALL ohlc_1m_ext</code> 静态视图，<b>高周期 CAGG 全部改从它构建</b>——每个时间桶只在恰好一条链，union 免去去重，切 book 历史自动拼接</td></tr>
+      <tr><td class="mono-c">L7</td><td><b>动态订阅清单 + 元数据轮询</b></td><td class="dim">ledger 加 60s PM 元数据轮询（照抄 quote 的 <code>perp_market_meta</code> 模式）：A 市场停订 <code>EventTradeExecuted</code>（trades 表保持干净，否则稀疏 K 线污染 union），book 变化 → 经现有 <code>MarketConfigUpdates</code> 通道热更新订阅清单</td></tr>
       <tr><td class="mono-c">L5</td><td><b>24h ticker 换源</b></td><td class="dim"><code>Get24hTickersBatch</code>（repository.go:527）现在从 trades 算；A-Book 市场改从外部 K 线算。<code>EventTickerUpdated</code> 下游格式不变，前端零感知</td></tr>
       <tr><td class="mono-c">L6</td><td><b>历史衔接</b></td><td class="dim">切换日之前的内部聚合 K 线保留，之后用币安的；前端图表跨界拼接（时间轴连续，无重写）</td></tr>
     </tbody>
@@ -339,13 +342,50 @@ ohlc_1m_ticker 物化视图 —— 24h ticker 的数据基础（20260528122000 �
     <thead><tr><th>交界</th><th>内容</th><th>对齐时机</th></tr></thead>
     <tbody>
       <tr><td><b>← 任务 1</b><br>公共契约 / 市场元数据</td><td class="dim">book 开关（A / B）挂在市场元数据里，quote 按它决定订阅与 mark 权重。落点：<code>quote/perp_market_meta.go</code>（已有 60s 刷新 + stale 降级缓存 <code>perp_market_meta_store.go</code>），元数据结构加一个字段即可</td><td class="dim">任务 1 第一周给出配置形态就能开工；不阻塞</td></tr>
-      <tr><td><b>↔ 任务 5</b><br>trading-api</td><td class="dim">① <b>exchangeInfo → MarketCache 热加载契约</b>：字段格式、更新频率；② <code>EventKlineObserved</code> 事件格式；③ orderbook 复刻格式与 Finex 现有格式逐字段对齐</td><td class="dim">第一天对齐，写成文档或直接钉在 proto / 常量里</td></tr>
+      <tr><td><b>↔ 任务 5</b><br>trading-api</td><td class="dim">① <b><code>EventMarketFiltersObserved</code> 契约</b>：市场级全量过滤器快照（LOT_SIZE / PRICE_FILTER / MIN_NOTIONAL / tickSize / stepSize），小时级 + 启动时；② <code>EventKlineObserved</code> 事件格式；③ orderbook 复刻格式与 Finex 现有格式逐字段对齐</td><td class="dim">第一天对齐，写成文档或直接钉在 proto / 常量里</td></tr>
       <tr><td><b>→ 任务 3</b><br>PM Perp</td><td class="dim"><code>EventQuoteObserved</code> 的 mark 语义：A-Book 市场必须严格等于币安 mark（displayed = enforced），不许任何加权混合——强平判定直接消费它</td><td class="dim">无新接口，保持现有格式；只需确认按市场门控的权重切换双方理解一致</td></tr>
     </tbody>
   </table></div>
   <div class="note">
     <h4>依赖方向总结</h4>
     <p>这个任务<b>不依赖</b> mm-connector（任务 2）和 PM Perp 的改动（任务 3），可以最先开工；E2E 验证要等任务 5 的 trading-api 就绪，放在联调阶段做。设计文档给这条流的预算是开发 3 周，与其他流并行。</p>
+  </div>
+</section>
+</article>
+
+<!-- ═══ 07 拷问结论 ═══ -->
+<article class="panel" id="p-decisions" hidden>
+<header>
+  <h1>拷问结论速查（Q1–Q16）</h1>
+  <p class="lede">设计拷问共 16 个决策点，全部落定，已合入设计文档 v1.6。本页是速查表：左列决策，右列对本任务的影响。</p>
+</header>
+
+<section>
+  <div class="tw"><table>
+    <thead><tr><th>#</th><th>决策</th><th>对本任务（quote / ledger）的影响</th></tr></thead>
+    <tbody>
+      <tr><td class="mono-c">Q1</td><td>book 标志存 <code>perps_markets</code> 列（DB 唯一真源），经工具/脚本修改</td><td class="dim">元数据结构加一个字段；冷启动先拉元数据再发布</td></tr>
+      <tr><td class="mono-c">Q2</td><td>深度镜像：diff 流 + REST 引导 + 全量本地簿，发布截断 50 档</td><td class="dim">深度不是 20 档——全量簿本地维护，发布档位是自由参数（对齐 Finex 的 50）；UI 点击挂单 / step size 聚合照常工作</td></tr>
+      <tr><td class="mono-c">Q3</td><td>K线双链定稿：两条 1m CAGG 链 + 静态 <code>ohlc_1m_all</code> union，高周期全部从 union 构建</td><td class="dim">L1 / L2 / L4 的定稿形态；切 book 历史自动拼接，无需拼接状态表</td></tr>
+      <tr><td class="mono-c">Q4</td><td>24h ticker 照抄现有批量滚动查询</td><td class="dim">L5：ext 链加 (market, bucket DESC) 索引即可，不做运行时状态</td></tr>
+      <tr><td class="mono-c">Q5</td><td>断线补数由 ledger 水位巡检兜底，quote 不参与</td><td class="dim">L3：巡检发现缺口 → REST <code>/fapi/v1/klines</code> 补，走同一 UPSERT</td></tr>
+      <tr><td class="mono-c">Q6</td><td>exchangeInfo 由 quote 发布（trading-api 不直连币安）</td><td class="dim">Q1 第五路订阅的产出形态</td></tr>
+      <tr><td class="mono-c">Q7</td><td>symbol 映射 v1 手工维护</td><td class="dim">切换 checklist 三件套：quote.yaml alias + perps_markets + 币安过滤器核对</td></tr>
+      <tr><td class="mono-c">Q8</td><td>验收用自写 mock consumer，不等任务 5</td><td class="dim">集成测试断言：格式对齐 / sequence 连续 / 删除档位 amount="0" / 水位单调</td></tr>
+      <tr><td class="mono-c">Q9</td><td>book 变更经 60s 轮询生效，不加变更事件</td><td class="dim">Q4 的分发机制，无新消费链路</td></tr>
+      <tr><td class="mono-c">Q10</td><td>镜像<b>不双写</b> legacy topic（冷启动）</td><td class="dim">Q2：只发 per-market topic</td></tr>
+      <tr><td class="mono-c">Q11</td><td>过滤器事件 <code>EventMarketFiltersObserved</code>，市场级全量快照（小时级 + 启动）</td><td class="dim">与任务 5 对齐清单第一项</td></tr>
+      <tr><td class="mono-c">Q12</td><td>ledger 对 A 市场停订 trades，用动态订阅清单</td><td class="dim">L7：trades 表干净是 union 成立的前提</td></tr>
+      <tr><td class="mono-c">Q13</td><td>无后管系统——book 切换只走工具路线，且必须做扎实</td><td class="dim">非本任务范围，但其时序要写进联调计划</td></tr>
+      <tr><td class="mono-c">Q14</td><td>切换工具 = <code>marketctl</code> CLI，归任务 1：断言零持仓 + 零挂单（含 perp_trigger 等待单）→ 翻标志 → 打印审计痕</td><td class="dim">首个市场切换前必须存在；本任务不开发</td></tr>
+      <tr><td class="mono-c">Q15</td><td>ledger 元数据轮询归<b>本任务</b>（任务 1 出字段定义）</td><td class="dim">L7：照抄 quote 的 <code>perp_market_meta.go</code> 模式，两服务行为一致</td></tr>
+      <tr><td class="mono-c">Q16</td><td>落盘：设计文档 v1.6 + 本指南（本页）</td><td class="dim">已完成</td></tr>
+    </tbody>
+  </table></div>
+  <div class="note stop">
+    <h4>两条最容易被忘的</h4>
+    <p>① <b>ledger 停订 A 市场 trades</b>（Q12）——不做的话稀疏 K 线会污染 union，图表在 A 时代显示稀疏 bar 而不是币安 K 线。</p>
+    <p>② <b>快照先 flush 增量再带相同 sequence</b>（Q2）——Finex 的既有约定，trading-api 的恢复逻辑依赖它。</p>
   </div>
 </section>
 </article>
@@ -361,7 +401,7 @@ ohlc_1m_ticker 物化视图 —— 24h ticker 的数据基础（20260528122000 �
   <h2>四周计划</h2>
   <ol class="seq">
     <li><b>第 0 天 · 建立认知（不改代码）</b><span>对着 nacos <code>quote.yaml</code> 的 <code>engine:</code> 段读三条路径：① <code>binance_perp/binance.go → client.go → websocket.go</code>（一条 markPrice 从币安 WS 到 Kafka 的完整路径）；② <code>quotes_publisher.go</code>（EventQuoteObserved 怎么发）；③ <code>ledger/event/consumer.go → consumer/trade.go</code>（一条成交怎么落 trades 表）。</span></li>
-    <li><b>第一周 · 镜像先行</b><span>book 开关进市场元数据（对齐任务 1）+ depth20 镜像 + orderbook 复刻（Q1 / Q2 / Q4）——前端最直观、联调最早要用。产出：staging 里能看到币安深度的镜像簿。</span></li>
+    <li><b>第一周 · 镜像先行</b><span>book 开关进市场元数据（对齐任务 1）+ diff 深度流镜像（全量本地簿，发布 50 档）+ orderbook 复刻（Q1 / Q2 / Q4）——前端最直观、联调最早要用。产出：staging 里能看到币安深度的镜像簿。</span></li>
     <li><b>第二周 · K 线链路</b><span><code>EventKlineObserved</code> 协议（对齐任务 5）+ ledger 源表 migration + UPSERT / 水位 + REST 补数（Q3 + L1 / L2 / L3）。产出：币安 K 线进 Timescale。</span></li>
     <li><b>第三周 · 收尾</b><span>双链路由 + 24h ticker 换源 + mark 按市场切换 + collector 停用（L4 / L5 / L6 + Q5 / Q6）。产出：集成测试（testcontainers）+ B-Book / spot 回归报告。</span></li>
   </ol>

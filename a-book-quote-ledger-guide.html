@@ -89,6 +89,7 @@ td .code,td code{white-space:nowrap}
 /* ── callout ── */
 .note{background:var(--card); border:1px solid var(--line); border-left:3px solid var(--amber);
   border-radius:0 10px 10px 0; padding:15px 20px; margin:18px 0; max-width:80ch}
+td.risk-c{color:var(--red); font-weight:500}
 .note.stop{border-left-color:var(--red)}
 .note h4{margin:0 0 6px; font-size:14px; font-weight:600}
 .note p{margin:0; font-size:13.5px; color:var(--ink-2)}
@@ -143,11 +144,12 @@ ol.seq span{display:block; font-size:13.5px; color:var(--ink-2)}
     <a href="#boundary" data-tab="boundary"><span class="no">05</span>与其他任务的接口</a>
     <a href="#plan" data-tab="plan"><span class="no">06</span>动手顺序与铁律</a>
     <a href="#decisions" data-tab="decisions"><span class="no">07</span>拷问结论速查</a>
+    <a href="#ops" data-tab="ops"><span class="no">08</span>联调与部署手册</a>
   </nav>
   <div class="foot">
     依据 <a href="a-book-perps-design.html">A-Book 设计文档 v1.6</a> 第 6 页<br>
-    2026-09-28 · 仅中文 · 未提交<br>
-    含拷问结论速查（第 07 页）
+    2026-09-30 · 仅中文<br>
+    含拷问结论速查（第 07 页）与联调部署手册（第 08 页）
   </div>
 </aside>
 
@@ -389,7 +391,6 @@ ohlc_1m_ticker 物化视图 —— 24h ticker 的数据基础（20260528122000 �
   </div>
 </section>
 </article>
-
 <!-- ═══ 06 动手顺序 ═══ -->
 <article class="panel" id="p-plan" hidden>
 <header>
@@ -444,6 +445,208 @@ ohlc_1m_ticker 物化视图 —— 24h ticker 的数据基础（20260528122000 �
   <p class="sub" style="margin-top:28px;color:var(--ink-3);font-size:12.5px">依据 <a href="a-book-perps-design.html">A-Book 设计文档 v1.5</a> 第 6 页整理，2026-09-28。设计变更以设计文档为准。</p>
 </section>
 </article>
+
+<!-- ═══ 08 联调与部署 ═══ -->
+<article class="panel" id="p-ops" hidden>
+<header>
+  <h1>联调与部署手册</h1>
+  <p class="lede">前面七页讲「怎么造」，这一页讲「怎么上线、怎么验、出问题怎么查」。三个服务、四个验证层、九类故障，全部按可直接执行的粒度写。配置项与实现期的代码一一对应，命令均为本仓库 <code>make</code> 目标。</p>
+</header>
+
+<section>
+  <h2>影响面：谁要改代码，谁只改配置</h2>
+  <div class="tw"><table>
+    <thead><tr><th>服务</th><th>代码</th><th>上线必做</th><th>不做会怎样</th></tr></thead>
+    <tbody>
+      <tr><td><b>quote</b></td><td class="dim">已含在本分支</td><td>开启 <code>orderbook.markets</code>；确认 <code>symbol_aliases_perp</code> 有该市场</td><td>无盘口、无 K 线、无过滤器事件</td></tr>
+      <tr><td><b>ledger</b></td><td class="dim">已含在本分支</td><td>跑迁移；填 <code>a_book_perp_markets</code> 与 <code>external_klines</code></td><td>图表在 A 时代无 K 线（union 侧为空）</td></tr>
+      <tr><td><b>finex（B-Book）</b></td><td class="dim">无需改动</td><td>把 A-Book 市场从该实例 <code>configured_markets</code> 移除</td><td class="risk-c">两个 producer 写同一 topic，盘口交错闪烁</td></tr>
+      <tr><td><b>trading-api</b></td><td class="dim">零改动</td><td>市场进 <code>enabled_futures_markets</code></td><td>客户端订阅不到盘口</td></tr>
+      <tr><td>portfolio_manager_perp / perp_trigger</td><td class="dim">零改动</td><td>无需动作</td><td>—</td></tr>
+    </tbody>
+  </table></div>
+  <div class="note">
+    <h4>前置条件</h4>
+    <p>① quote 容器能出网访问 <code>fapi.binance.com</code>（REST 引导）与 <code>fstream.binance.com</code>（depth + kline 流）；② 本分支镜像已构建；③ Nacos 上 <code>quote</code> / <code>ledger</code> 配置已可写。</p>
+  </div>
+</section>
+
+<section>
+  <h2>配置清单（逐字段）</h2>
+  <p>三份配置缺一不可。下面是可以直接粘贴的完整片段，字段名与代码 yaml tag 一致。</p>
+  <pre><span class="c"># ── Nacos: quote ─────────────────────────────────────────────</span>
+engine:
+  symbol_aliases_perp:            <span class="c"># 必须覆盖 A-Book 全部市场，否则 quote 启动失败</span>
+    BTCUSDT: "BTCUSDT-PERP"
+  providers:
+    binance_perp:
+      orderbook:
+        markets:                  <span class="c"># provider 格式 base/quote；空列表 = 关闭镜像</span>
+          - "btc/usdt"
+        publish_depth: 50         <span class="c"># 发布档位数，对齐 Finex</span>
+        snapshot_interval: 1s     <span class="c"># 全量快照节奏</span>
+        rest_base_url: "https://fapi.binance.com"
+      <span class="c"># klines_enabled 默认 true：与 depth 复用同一 worker 连接</span>
+      <span class="c"># exchangeinfo_poll_interval 默认 1h；显式写 0 关闭</span>
+</pre>
+  <pre><span class="c"># ── Nacos: ledger ────────────────────────────────────────────</span>
+ledger:
+  markets:                        <span class="c"># gapfill 桶：A-Book 不要放进来</span>
+    - "eth/usdt"
+  a_book_perp_markets:            <span class="c"># 内部符号；必须同时留在上面的 markets 里（24h ticker 要）</span>
+    - "BTCUSDT-PERP"
+  external_klines:
+    backfill_interval: 2m         <span class="c"># 水位巡检 + 缺口回补节奏</span>
+    backfill_lookback: 6h         <span class="c"># 缺口检测窗口；> 1000m 启动失败（币安单次上限）</span>
+</pre>
+  <pre><span class="c"># ── Nacos: finex（B-Book 实例）──────────────────────────────</span>
+configured_markets:               <span class="c"># 移除 A-Book 市场，否则与 quote 双写同一 topic</span>
+  - "eth/usdt"
+</pre>
+  <div class="note stop">
+    <h4>三条硬失败规则（启动即退出，不静默降级）</h4>
+    <p>① <b>缺 symbol alias</b> → <code>orderbook mirror market ... has no perp symbol alias</code>；宁可起不来，也不要把盘口发到错误 topic。</p>
+    <p>② <b>非法 market 条目</b> → 同上，构造阶段直接拒绝。</p>
+    <p>③ <b>backfill_lookback &gt; 1000m</b> → ledger 启动失败（不静默截断，避免误导性的「已补齐」）。</p>
+  </div>
+</section>
+
+<section>
+  <h2>部署顺序（八步，顺序有理由）</h2>
+  <div class="tw"><table>
+    <thead><tr><th>#</th><th>动作</th><th>命令</th><th>通过判据</th><th>为什么必须在这个位置</th></tr></thead>
+    <tbody>
+      <tr><td class="mono-c">1</td><td>ledger 迁移</td><td class="mono">make migrate-ledger</td><td>建出 <code>external_klines_1m</code> / <code>ohlc_*_ext</code> / <code>ohlc_*_all</code></td><td>quote 一开就有事件要写，表必须先在</td></tr>
+      <tr><td class="mono-c">2</td><td>Kafka topic</td><td class="mono">make kafka-init-topics</td><td>存在 <code>orderbook.BTCUSDT-PERP.OrderBookUpdates</code>、<code>events.BTCUSDT-PERP.EventKlineObserved</code></td><td>topic 缺失时发布静默失败，只能靠指标事后发现</td></tr>
+      <tr><td class="mono-c">3</td><td>ledger 配置</td><td class="mono">make nacos-force-init</td><td>ledger 起来且无启动报错</td><td>消费者先就位，避免开 quote 后前几根 K 线无人消费</td></tr>
+      <tr><td class="mono-c">4</td><td>quote 配置</td><td class="mono">make nacos-force-init</td><td>日志出现 <code>orderbook mirror bootstrapped</code> × 市场数</td><td>alias 缺失在这一步暴露</td></tr>
+      <tr><td class="mono-c">5</td><td>重启 quote → 验指标</td><td class="mono">见下方 L2</td><td><code>received ≈ stale + applied</code></td><td>镜像活着且在推进</td></tr>
+      <tr><td class="mono-c">6</td><td>验 ledger 落库</td><td class="mono">见下方 L3</td><td><code>external_klines_1m</code> 有行、<code>ohlc_1m_all</code> 可查</td><td>双链写入正常</td></tr>
+      <tr><td class="mono-c">7</td><td>finex 排除该市场</td><td class="mono">改 Nacos + 重启 finex</td><td>该 topic 只有 quote 一个 producer</td><td>必须在客户端开订阅<b>之前</b>完成，否则出现双写窗口</td></tr>
+      <tr><td class="mono-c">8</td><td>开客户端订阅</td><td class="mono">trading-api 加市场</td><td>前端盘口逐笔刷新</td><td>最后一步：前面任一步没通过都不该让用户看到坏数据</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <h2>四层联调验证</h2>
+
+  <div class="stage evt"><div class="who">L1 事件流<small>Kafka · 格式与序号</small></div>
+  <p>订阅 A-Book 盘口 topic，确认三件事：<b>①</b> 首条是 <code>EventOrderbookSnapshot</code>（不是增量）；<b>②</b> 增量与随后的快照共享同一 <code>sequence</code>，序号单调递增；<b>③</b> 删除档位的 <code>amount = "0"</code>。</p></div>
+  <pre>kafka-console-consumer.sh --bootstrap-server $KAFKA \
+  --topic orderbook.BTCUSDT-PERP.OrderBookUpdates --from-beginning --max-messages 5</pre>
+  <p class="dim">断链时不要指望自己补——quote 会重引导并补发快照，消费方只需按 sequence 重放。</p>
+
+  <div class="stage evt"><div class="who">L2 quote 指标<small>Prometheus · 推进性与账目平衡</small></div>
+  <p>六个指标注册在现有 <code>/metrics</code> 端点，无需任何额外运维配置。核心是一条恒等式：<code>received_total = stale_total + applied_total + 缺口重引导丢弃</code>。</p></div>
+  <pre>quote_orderbook_mirror_received_total{market="BTCUSDT-PERP"}
+quote_orderbook_mirror_applied_total{market="BTCUSDT-PERP"}
+quote_orderbook_mirror_stale_total{market="BTCUSDT-PERP"}
+quote_orderbook_mirror_gap_rebootstraps_total{market="BTCUSDT-PERP"}
+quote_orderbook_mirror_publish_errors_total{market="BTCUSDT-PERP",kind="snapshot|increment"}
+quote_orderbook_mirror_last_bootstrap_unix_seconds{market="BTCUSDT-PERP"}</pre>
+
+  <div class="stage evt"><div class="who">L3 ledger 落库<small>TimescaleDB · 写入与读取</small></div>
+  <p>确认外部链有行、union 视图能查到该市场、最后一根未收线 bar 的 <code>event_time</code> 单调前进。</p></div>
+  <pre>-- 外部链有数据？（未收盘的 bar 也在）
+SELECT market, max(open_time) AS last_bar, max(event_time) AS watermark
+FROM external_klines_1m WHERE market='BTCUSDT-PERP' GROUP BY market;
+
+-- union 视图对前端可读
+SELECT bucket, open, high, low, close, total FROM ohlc_1m_all
+WHERE market='BTCUSDT-PERP' ORDER BY bucket DESC LIMIT 5;
+
+-- 抽查 24h ticker 有覆盖
+SELECT count(*) FROM ohlc_1m_all
+WHERE market='BTCUSDT-PERP' AND bucket &gt; now() - interval '24 hours';</pre>
+
+  <div class="stage evt"><div class="who">L4 端到端<small>trading-api · 客户端视角</small></div>
+  <p>trading-api 零改动：盘口走 <code>orderbook.{MKT}.OrderBookUpdates</code>（与 B-Book 同 topic 同格式），K 线与 ticker 走 ledger gRPC 读 <code>ohlc_{{interval}}_all</code>。只要市场进了 <code>enabled_futures_markets</code>，Centrifuge 订阅即刻有数据。</p></div>
+  <pre>wsctl  # 或前端：订阅 BTCUSDT-PERP 的 orderbook + kline 频道
+<span class="c">判据：盘口 100ms 级刷新、无跳空；K 线与币安官网同一根 bar 的 OHLC 完全一致</span></pre>
+</section>
+
+<section>
+  <h2>验收放行标准</h2>
+  <div class="tw"><table>
+    <thead><tr><th>检查项</th><th>放行</th><th>不放行</th></tr></thead>
+    <tbody>
+      <tr><td><code>publish_errors_total</code></td><td>持续为 0</td><td>任何非 0 增长</td></tr>
+      <tr><td><code>received ≈ stale + applied</code></td><td>误差 0</td><td>有未归因差值</td></tr>
+      <tr><td><code>gap_rebootstraps_total</code></td><td>偶发（断网/重连）</td><td>持续增长（每分钟都在断链）</td></tr>
+      <tr><td><code>last_bootstrap_unix_seconds</code></td><td>新鲜（&lt; 5 分钟）</td><td>陈旧（镜像已死但进程还在）</td></tr>
+      <tr><td>ledger 外部链</td><td>bar 连续、watermark 单调</td><td>缺口 &gt; 1 根且回补不收敛</td></tr>
+      <tr><td>topic producer 数量</td><td>该 topic 仅 quote</td><td>finex 也在（双写）</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <h2>故障排查对照表</h2>
+  <div class="tw"><table>
+    <thead><tr><th>症状</th><th>根因</th><th>处理</th></tr></thead>
+    <tbody>
+      <tr><td>quote 启动失败：<code>has no perp symbol alias</code></td><td><code>symbol_aliases_perp</code> 缺该市场</td><td>补 alias 后重启（刻意设计，不要绕过）</td></tr>
+      <tr><td>ledger 启动失败：lookback 相关报错</td><td><code>backfill_lookback</code> &gt; 1000m</td><td>改小窗口；确需长窗口则分段多次启动</td></tr>
+      <tr><td>盘口 topic 无消息</td><td>topic 未建 / alias 指向别的市场 / 网络出不了 fstream</td><td>查 <code>publish_errors_total</code>、quote 出网、<code>make kafka-list-topics</code></td></tr>
+      <tr><td>盘口闪烁、档位忽增忽减</td><td>finex 未排除该市场，双 producer</td><td>立刻从 finex <code>configured_markets</code> 移除并重启（步骤 7）</td></tr>
+      <tr><td><code>publish_errors_total</code> 增长</td><td>topic 不存在或 broker 不可写</td><td>建 topic；查 Kafka 集群健康</td></tr>
+      <tr><td><code>gap_rebootstraps_total</code> 持续涨</td><td>币安侧断流 / 本机网络抖动 / REST 被限频</td><td>看 quote 日志的重新引导原因；确认 <code>rest_base_url</code> 可达</td></tr>
+      <tr><td><code>received</code> 与客户端收到条数对不上</td><td>trading-api 未订阅该市场 / 客户端未开频道</td><td>核对 <code>enabled_futures_markets</code> 与订阅代码</td></tr>
+      <tr><td><code>external_klines_1m</code> 无行</td><td>ledger 未列该市场 / 消费组未启动</td><td>核对 <code>a_book_perp_markets</code>；看 ledger 消费日志</td></tr>
+      <tr><td>图表在 A 时代是稀疏 bar</td><td>A-Book 市场仍在 trades 链产生数据</td><td>确认该市场已从 ledger <code>markets</code>（gapfill/成交链）移出</td></tr>
+      <tr><td>K 线同一根 bar 数值回退</td><td>旧版水位口径（用收盘时间而非事件时间）</td><td>确认镜像与 ledger 都在新版本；<code>event_time_ms</code> 为单调水位</td></tr>
+      <tr><td>过滤器缺失（挂单 step size 错）</td><td>exchangeInfo 轮询未开或被显式关掉</td><td>去掉 <code>exchangeinfo_poll_interval: 0</code>；查 <code>events.EventMarketFiltersObserved</code></td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <h2>实现期拷问修复（Q1–Q8）对运维的直接影响</h2>
+  <div class="tw"><table>
+    <thead><tr><th>#</th><th>修复</th><th>运维可见影响</th></tr></thead>
+    <tbody>
+      <tr><td class="mono-c">Q1</td><td>回补市场符号按 <code>BTCUSDT-PERP → BTCUSDT</code> 剥离后缀</td><td class="dim">不用再单独配币安符号名</td></tr>
+      <tr><td class="mono-c">Q2</td><td>gapfill 排除 A-Book 市场</td><td>union 成立的前提；否则图表被 REST 补的稀疏 bar 污染</td></tr>
+      <tr><td class="mono-c">Q3</td><td>发布清单 = 有效市场 ∪ A-Book 市场</td><td>只填一处 <code>a_book_perp_markets</code> 即可，不再两处维护</td></tr>
+      <tr><td class="mono-c">Q4</td><td>K 线水位用交易所事件时间</td><td>同 bar 内乱序不再把 final 覆盖回非 final</td></tr>
+      <tr><td class="mono-c">Q5</td><td>缺 alias 启动失败</td><td>故障从「静默发错 topic」提前到部署期暴露</td></tr>
+      <tr><td class="mono-c">Q6</td><td>过滤器轮询默认开（1h）</td><td>不配置即工作；写 0 才关闭</td></tr>
+      <tr><td class="mono-c">Q7</td><td>六个 Prometheus 指标</td><td>复用现有 <code>/metrics</code>，无需新端口或新配置</td></tr>
+      <tr><td class="mono-c">Q8</td><td>回补窗口上限 1000m</td><td>超限启动失败，避免静默截断</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <h2>回滚</h2>
+  <div class="pipe">
+    <div class="stage"><div class="who">1<small>quote 关市场</small></div><p>把 <code>orderbook.markets</code> 置空 → 停镜像与 K 线流，进程保持健康。</p></div>
+    <div class="stage"><div class="who">2<small>finex 恢复</small></div><p>若步骤 7 已执行，把市场加回 B-Book <code>configured_markets</code>（前提是币安侧已无持仓/挂单）。</p></div>
+    <div class="stage"><div class="who">3<small>ledger 可不动</small></div><p><code>a_book_perp_markets</code> 留着无害：外部链历史数据保留，切回 B-Book 后 union 自动只出 B 侧数据。</p></div>
+  </div>
+  <div class="note">
+    <h4>回滚前提</h4>
+    <p>A-Book 与 B-Book 的订单/持仓在币安真实账户上，切换必须零持仓、零挂单（含 perp_trigger 等待单）——这正是任务 1 的 <code>marketctl</code> 要断言的四件事。在它落地前，切换只能人工核对。</p>
+  </div>
+</section>
+
+<section>
+  <h2>上线检查单</h2>
+  <pre>☐ 1. make migrate-ledger 成功，ohlc_*_all 视图存在
+☐ 2. 两个 per-market topic 已创建（盘口 + K 线）
+☐ 3. quote 配置：alias 齐全、orderbook.markets 非空
+☐ 4. quote 启动日志出现 N 条 "orderbook mirror bootstrapped"
+☐ 5. 指标：publish_errors=0，received = stale + applied，last_bootstrap 新鲜
+☐ 6. ledger 启动无报错，external_klines_1m 有行且 watermark 单调
+☐ 7. ohlc_1m_all 查得到该市场，24h 内 bar 连续
+☐ 8. finex 已排除该市场（该 topic 仅一个 producer）
+☐ 9. events.EventMarketFiltersObserved 含该市场过滤器
+☐ 10. 客户端抽查：盘口刷新正常，K 线与币安官网同一 bar 一致
+☐ 11. 监控告警已覆盖六个 mirror 指标</pre>
+</section>
+</article>
+
 
 </div><!-- main -->
 </div><!-- shell -->

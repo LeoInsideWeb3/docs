@@ -1,0 +1,727 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NeoDAX · A-book New Perps Markets Rollout Runbook</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600&family=Noto+Sans+SC:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --paper:#FAF9F5; --card:#FFFFFF;
+  --ink:#1B1E24; --ink-2:#575D68; --ink-3:#9AA1AC;
+  --line:#E7E4DC; --line-2:#D2CFC5;
+  --amber:#97690A; --amber-deep:#7A5406; --amber-bg:#F6EFDC; --amber-line:#E3D3A6;
+  --green:#136F4C; --green-bg:#E7F1EA; --red:#B8433F; --red-bg:#F5E4E3;
+  --term:#16181F; --term-ink:#D7DCE5; --term-dim:#7C8494;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:"Noto Sans SC","PingFang SC","Hiragino Sans GB",-apple-system,"Segoe UI",sans-serif;
+  font-size:15.5px; line-height:1.85;
+  -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility;
+}
+.shell{max-width:1240px; margin:0 auto; padding:0 24px 90px;
+  display:grid; grid-template-columns:220px minmax(0,1fr); gap:52px; align-items:start}
+.rail{position:sticky; top:0; padding-top:40px; max-height:100vh; overflow-y:auto}
+.rail .kicker{font-family:"JetBrains Mono",monospace; font-size:10.5px; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--amber); margin-bottom:6px}
+.rail .doc{font-family:"Space Grotesk","Noto Sans SC",sans-serif; font-weight:600; font-size:16px; line-height:1.35; margin-bottom:4px}
+.rail .sub{font-size:12.5px; color:var(--ink-3); margin:0 0 22px; line-height:1.6}
+.rail nav a{display:block; padding:6px 0 6px 14px; color:var(--ink-2); text-decoration:none;
+  font-size:13.5px; line-height:1.5; border-left:2px solid var(--line)}
+.rail nav a .no{font-family:"JetBrains Mono",monospace; font-size:11px; color:var(--ink-3); margin-right:8px}
+.rail nav a:hover{color:var(--ink); text-decoration:none}
+.rail nav a.on{color:var(--amber-deep); border-left-color:var(--amber); font-weight:500}
+.rail .lang{display:inline-block; margin:22px 0 0 16px; font-size:12px; padding:3px 10px;
+  border:1px solid var(--line-2); border-radius:6px; color:var(--ink-2); text-decoration:none}
+.rail .lang:hover{border-color:var(--amber); color:var(--amber-deep); text-decoration:none}
+.rail .foot{margin-top:18px; padding-left:16px; font-size:11.5px; color:var(--ink-3); line-height:1.8}
+.main{padding-top:34px; min-width:0}
+section{margin:40px 0 0}
+h1{font-family:"Space Grotesk","Noto Sans SC",sans-serif; font-weight:600;
+  font-size:clamp(26px,3.6vw,34px); line-height:1.2; letter-spacing:.005em; margin:0 0 12px}
+.eyebrow{font-family:"JetBrains Mono",monospace; font-size:11px; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--amber); margin:0 0 8px}
+.lede{font-size:16px; color:var(--ink-2); max-width:72ch; margin:0 0 8px}
+.lede strong{color:var(--ink); font-weight:600}
+h2{font-size:18px; font-weight:600; margin:40px 0 12px; letter-spacing:.01em}
+h3{font-size:15px; font-weight:600; margin:28px 0 10px}
+p{max-width:72ch; margin:0 0 12px}
+code,.mono{font-family:"JetBrains Mono","SF Mono",monospace; font-size:.86em}
+p code,td code,li code,.note code,.card code{background:var(--amber-bg); color:var(--amber-deep);
+  padding:1px 5px; border-radius:4px; overflow-wrap:anywhere}
+a{color:var(--amber-deep); text-decoration:none}
+a:hover{text-decoration:underline}
+:focus-visible{outline:2px solid var(--amber); outline-offset:2px; border-radius:4px}
+.small{font-size:12.5px; color:var(--ink-3)}
+.lede code{white-space:nowrap; overflow-wrap:normal}
+
+/* cards */
+.cards{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; margin:20px 0; max-width:900px}
+.card{background:var(--card); border:1px solid var(--line); border-left:3px solid var(--ink-3);
+  border-radius:10px; padding:14px 18px; box-shadow:0 1px 2px rgba(27,30,36,.04);
+  font-size:13.5px; line-height:1.8; color:var(--ink-2)}
+.card b{display:block; color:var(--ink); font-family:"Space Grotesk","Noto Sans SC",sans-serif;
+  font-weight:600; font-size:15px; margin-bottom:6px}
+.card.src{border-left-color:var(--ink)} .card.hot{border-left-color:var(--amber)}
+.card.evt{border-left-color:var(--green)} .card.risk{border-left-color:var(--red)}
+
+/* tables */
+.tw{overflow-x:auto; margin:18px 0; background:var(--card); border:1px solid var(--line);
+  border-radius:10px; padding:12px 16px 4px}
+table{border-collapse:collapse; width:100%; font-size:13px; line-height:1.6}
+table.wide{min-width:1040px}
+th{text-align:left; font-weight:600; font-size:11.5px; color:var(--ink-3);
+  padding:0 14px 9px 0; border-bottom:1px solid var(--line-2); white-space:nowrap}
+td{padding:9px 14px 9px 0; border-bottom:1px solid var(--line); vertical-align:top; white-space:nowrap;
+  font-variant-numeric:tabular-nums}
+tr:last-child td{border-bottom:none}
+td.mono{font-family:"JetBrains Mono",monospace; font-size:12px; color:var(--ink)}
+tbody tr:hover td{background:#FCFBF7}
+table.wide th:first-child,table.wide td:first-child{position:sticky; left:0; z-index:1; background:var(--card);
+  box-shadow:1px 0 0 var(--line)}
+table.wide tbody tr:hover td:first-child{background:#FCFBF7}
+
+/* callouts */
+.note{background:var(--card); border:1px solid var(--line); border-left:3px solid var(--amber);
+  border-radius:0 10px 10px 0; padding:14px 20px; margin:18px 0; max-width:86ch;
+  font-size:13.5px; line-height:1.8; color:var(--ink-2)}
+.note.stop{border-left-color:var(--red); background:linear-gradient(90deg,var(--red-bg),var(--card) 60%)}
+.note.ok{border-left-color:var(--green)}
+.note h4{margin:0 0 6px; font-size:14px; font-weight:600; color:var(--ink)}
+.note p{margin:0; font-size:13.5px; color:var(--ink-2); max-width:none}
+.note p+p{margin-top:8px}
+.note b{color:var(--ink); font-weight:600}
+.note pre{margin:10px 0 8px; white-space:pre-wrap; overflow-wrap:anywhere}
+
+/* terminal */
+pre{background:var(--term); color:var(--term-ink); border-radius:10px;
+  padding:16px 20px; overflow-x:auto; margin:16px 0; max-width:100%;
+  font-family:"JetBrains Mono",monospace; font-size:12.5px; line-height:1.75}
+pre .c{color:var(--term-dim)} pre .k{color:#8FBF7A} pre .t{color:#E0B568}
+pre.tall{max-height:520px; overflow:auto}
+details.sql{margin:16px 0; border:1px solid var(--line); border-radius:10px; background:var(--card)}
+details.sql summary{cursor:pointer; padding:11px 18px; font-size:13.5px; font-weight:500; color:var(--ink);
+  list-style:none; display:flex; align-items:center; gap:10px}
+details.sql summary::-webkit-details-marker{display:none}
+details.sql summary::before{content:"+"; font-family:"JetBrains Mono",monospace; color:var(--amber); width:12px}
+details.sql[open] summary::before{content:"\2212"}
+details.sql summary .small{margin-left:auto}
+details.sql pre{margin:0; border-radius:0 0 10px 10px}
+
+/* steps */
+ol.seq{list-style:none; margin:20px 0; padding:0; counter-reset:step; max-width:86ch}
+ol.seq li{counter-increment:step; position:relative; padding:15px 0 13px 44px; border-top:1px solid var(--line)}
+ol.seq li:last-child{border-bottom:1px solid var(--line)}
+ol.seq li::before{content:counter(step,decimal-leading-zero);
+  position:absolute; left:0; top:17px; font-family:"JetBrains Mono",monospace;
+  font-size:11.5px; color:var(--amber)}
+ol.seq b{display:block; font-weight:600; margin-bottom:4px}
+ol.seq span{display:block; font-size:13.5px; color:var(--ink-2)}
+
+/* gate list */
+ul.gate{list-style:none; margin:18px 0; padding:0; max-width:86ch}
+ul.gate li{position:relative; padding:10px 0 10px 74px; border-top:1px solid var(--line);
+  font-size:13.5px; color:var(--ink-2)}
+ul.gate li:last-child{border-bottom:1px solid var(--line)}
+ul.gate li .tag{position:absolute; left:0; top:13px}
+ul.check{list-style:none; margin:18px 0; padding:0; max-width:86ch}
+ul.check li{position:relative; padding:10px 0 10px 30px; border-top:1px solid var(--line);
+  font-size:13.5px; color:var(--ink-2)}
+ul.check li:last-child{border-bottom:1px solid var(--line)}
+ul.check li::before{content:""; position:absolute; left:2px; top:16px; width:12px; height:12px;
+  border:1.5px solid var(--line-2); border-radius:3px; background:var(--card)}
+
+/* PR chips */
+.prs{display:flex; flex-wrap:wrap; gap:8px; margin-top:8px}
+a.pr{display:inline-flex; align-items:center; gap:8px; font-size:12.5px; line-height:1.4;
+  padding:4px 10px; border:1px solid var(--amber-line); border-radius:6px; background:var(--amber-bg);
+  color:var(--amber-deep); text-decoration:none}
+a.pr:hover{border-color:var(--amber); text-decoration:none}
+a.pr .n{font-family:"JetBrains Mono",monospace; font-weight:500}
+a.pr .st{font-family:"JetBrains Mono",monospace; font-size:10.5px; color:var(--ink-3)}
+span.pr-todo{display:inline-block; font-size:12.5px; padding:4px 10px; border:1px dashed var(--line-2);
+  border-radius:6px; color:var(--ink-3)}
+ol.seq span.prs{display:flex}
+.prtable td{white-space:normal; vertical-align:middle}
+td.dim{color:var(--ink-2)}
+
+/* tags */
+.tag{display:inline-block; font-family:"JetBrains Mono",monospace; font-size:10.5px; font-weight:500;
+  padding:1px 8px; border-radius:5px; vertical-align:1px; white-space:nowrap}
+.tag.a{background:var(--amber-bg); color:var(--amber-deep)}
+.tag.keep{background:var(--green-bg); color:var(--green)}
+.tag.stop{background:var(--red-bg); color:var(--red)}
+
+.pager{display:flex; justify-content:space-between; gap:16px; margin-top:56px; padding-top:18px;
+  border-top:1px solid var(--line); font-size:13.5px}
+.pager a{color:var(--ink-2)} .pager a:hover{color:var(--amber-deep)}
+.pager .no{font-family:"JetBrains Mono",monospace; font-size:11px; color:var(--ink-3); margin:0 6px}
+
+@media(max-width:900px){
+  .shell{grid-template-columns:1fr; gap:8px; padding:0 18px 60px}
+  .rail{position:static; padding-top:26px; max-height:none}
+  .rail nav{display:flex; overflow-x:auto; gap:2px; padding-bottom:4px}
+  .rail nav a{white-space:nowrap; border-left:0; border-bottom:2px solid transparent; padding:6px 10px}
+  .rail nav a.on{border-bottom-color:var(--amber)}
+  .rail .foot{display:none}
+  .cards{grid-template-columns:1fr}
+}
+@media print{
+  .rail,.pager{display:none} .shell{display:block} article.panel{display:block!important}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+
+<aside class="rail">
+  <div class="kicker">NeoDAX · A-book · 14 markets</div>
+  <div class="doc">New Perps Markets<br>Rollout Runbook</div>
+  <p class="sub">First launch · initialized directly as A_BOOK</p>
+  <nav id="tabs">
+    <a href="#scope"><span class="no">01</span>Principles</a>
+    <a href="#params"><span class="no">02</span>Binance parameters</a>
+    <a href="#preflight"><span class="no">03</span>Snapshot & gates</a>
+    <a href="#house-account"><span class="no">04</span>House account</a>
+    <a href="#seed"><span class="no">05</span>PM Perp seed</a>
+    <a href="#infra"><span class="no">06</span>End-to-end config</a>
+    <a href="#deploy"><span class="no">07</span>Deploy order</a>
+    <a href="#open"><span class="no">08</span>Open per market</a>
+    <a href="#verify"><span class="no">09</span>Acceptance</a>
+    <a href="#rollback"><span class="no">10</span>Rollback</a>
+  </nav>
+  <a class="lang" href="new-perps-rollout-plan.html" hreflang="zh-CN">中文</a>
+  <div class="foot">2026-10-14 · A-book v1<br>Snapshot: Binance USD-M<br>First launch: no marketctl</div>
+</aside>
+
+<div class="main">
+
+<!-- ═══ 01 scope ═══ -->
+<article class="panel" id="p-scope">
+<header>
+  <p class="eyebrow">First launch · A-book routed to Binance</p>
+  <h1>Rollout Runbook for 14 Perpetual Markets</h1>
+  <p class="lede">None of these markets has been <strong>launched to users</strong> yet. They are initialized in PM Perp directly as <code>A_BOOK</code>, executed by MM Connector, with Quote mirroring Binance market data. There is no existing B-book routing, so <strong>do not run <code>marketctl book-switch</code></strong> and do not add them to any Finex shard.</p>
+</header>
+<div class="note">
+  <h4>Safety boundary</h4>
+  <p>The database row may be <code>status=active</code> so services can discover the market, but the first write must be <code>operational_state=FROZEN</code>. Only after market data, connector, Kafka, risk and account checks pass, switch each market to <code>OPEN</code> through the Admin A-book state API, one at a time.</p>
+</div>
+<section>
+  <h2>Four principles</h2>
+  <div class="cards">
+    <div class="card src"><b>Execution ownership</b><code>execution_book=A_BOOK</code> and <code>desired_execution_book=A_BOOK</code>. Finex must ignore these markets when it receives MarketSync.</div>
+    <div class="card hot"><b>Price ownership</b>Mark, order book, trade tape, kline and ticker all come from the matching Binance USD-M symbol. The Binance weight of the A-book mark is 1.0.</div>
+    <div class="card risk"><b>Margin mode</b>A-book allows isolated only. Cross-margin orders must be rejected, and the default market setting must resolve to isolated.</div>
+    <div class="card evt"><b>One market at a time</b>Validate while FROZEN, then OPEN a single market; move to the next only after a full observation window.</div>
+  </div>
+  <div class="note stop">
+    <h4>Do not</h4>
+    <p>Run book-switch; add these markets to any Finex <code>configured_markets</code>; reuse generic risk tiers from older documents; use an OKX/Bybit blended price for A-book liquidation; or open a market without a Binance leverage bracket snapshot.</p>
+  </div>
+</section>
+<nav class="pager"><span></span><a href="#params"><span class="no">02</span>Binance parameters &rarr;</a></nav>
+</article>
+<!-- ═══ 02 params ═══ -->
+<article class="panel" id="p-params">
+<header>
+  <h1>Binance Parameter Baseline</h1>
+  <p class="lede">The table below comes from the official Binance <code>/fapi/v1/exchangeInfo</code>, <code>/fapi/v1/fundingInfo</code> and <code>/fapi/v1/premiumIndex</code> endpoints, captured on 2026-10-14. Keep trailing zeros in strings. Take <code>amount_precision</code> / <code>price_precision</code> straight from the Binance fields, not from manually trimmed significant decimals.</p>
+</header>
+<div class="tw"><table class="wide"><thead><tr><th>NeoDAX / Binance</th><th>Type</th><th>amount / price precision</th><th>tick size</th><th>min / step qty</th><th>LOT max / MARKET max</th><th>min notional</th><th>price down / up</th><th>funding</th><th>interest</th><th>liq fee</th></tr></thead><tbody>
+<tr><td class="mono">XAUUSDT-PERP / XAUUSDT</td><td>TRADIFI</td><td>3 / 2</td><td>0.01</td><td>0.001 / 0.001</td><td>10000 / 1000</td><td>5</td><td>0.98 / 1.02</td><td>4h · ±0.005</td><td>0</td><td>0.015</td></tr>
+<tr><td class="mono">XAGUSDT-PERP / XAGUSDT</td><td>TRADIFI</td><td>3 / 4</td><td>0.0100</td><td>0.001 / 0.001</td><td>1000000 / 100000</td><td>5</td><td>0.97 / 1.03</td><td>4h · ±0.005</td><td>0</td><td>0.015</td></tr>
+<tr><td class="mono">CLUSDT-PERP / CLUSDT</td><td>TRADIFI</td><td>2 / 5</td><td>0.01000</td><td>0.01 / 0.01</td><td>500000 / 50000</td><td>5</td><td>0.97 / 1.03</td><td>4h · ±0.005</td><td>0</td><td>0.015</td></tr>
+<tr><td class="mono">ARBUSDT-PERP / ARBUSDT</td><td>CRYPTO</td><td>1 / 6</td><td>0.000010</td><td>0.1 / 0.1</td><td>30000000 / 6000000</td><td>5</td><td>0.85 / 1.15</td><td>8h · ±0.020</td><td>0.0001</td><td>0.015</td></tr>
+<tr><td class="mono">UNIUSDT-PERP / UNIUSDT</td><td>CRYPTO</td><td>0 / 4</td><td>0.0010</td><td>1 / 1</td><td>2000000 / 100000</td><td>5</td><td>0.90 / 1.10</td><td>8h · ±0.00450</td><td>0.0001</td><td>0.015</td></tr>
+<tr><td class="mono">NEARUSDT-PERP / NEARUSDT</td><td>CRYPTO</td><td>0 / 4</td><td>0.0010</td><td>1 / 1</td><td>5000000 / 400000</td><td>5</td><td>0.90 / 1.10</td><td>8h · ±0.020</td><td>0.0001</td><td>0.015</td></tr>
+<tr><td class="mono">ADAUSDT-PERP / ADAUSDT</td><td>CRYPTO</td><td>0 / 5</td><td>0.00010</td><td>1 / 1</td><td>30000000 / 3000000</td><td>5</td><td>0.95 / 1.05</td><td>8h · ±0.00375</td><td>0.0001</td><td>0.0125</td></tr>
+<tr><td class="mono">AAVEUSDT-PERP / AAVEUSDT</td><td>CRYPTO</td><td>1 / 3</td><td>0.010</td><td>0.1 / 0.1</td><td>78000 / 9000</td><td>5</td><td>0.90 / 1.10</td><td>8h · ±0.0075</td><td>0.0001</td><td>0.015</td></tr>
+<tr><td class="mono">NVDAUSDT-PERP / NVDAUSDT</td><td>TRADIFI</td><td>2 / 5</td><td>0.01000</td><td>0.01 / 0.01</td><td>30000 / 3000</td><td>5</td><td>0.97 / 1.03</td><td>8h · ±0.020</td><td>0</td><td>0.015</td></tr>
+<tr><td class="mono">CRCLUSDT-PERP / CRCLUSDT</td><td>TRADIFI</td><td>2 / 5</td><td>0.01000</td><td>0.01 / 0.01</td><td>70000 / 7000</td><td>5</td><td>0.97 / 1.03</td><td>8h · ±0.020</td><td>0</td><td>0.015</td></tr>
+<tr><td class="mono">MSTRUSDT-PERP / MSTRUSDT</td><td>TRADIFI</td><td>2 / 5</td><td>0.01000</td><td>0.01 / 0.01</td><td>42000 / 4000</td><td>5</td><td>0.97 / 1.03</td><td>8h · ±0.020</td><td>0</td><td>0.015</td></tr>
+<tr><td class="mono">TSLAUSDT-PERP / TSLAUSDT</td><td>TRADIFI</td><td>2 / 5</td><td>0.01000</td><td>0.01 / 0.01</td><td>20000 / 2000</td><td>5</td><td>0.97 / 1.03</td><td>8h · ±0.020</td><td>0</td><td>0.015</td></tr>
+<tr><td class="mono">GOOGLUSDT-PERP / GOOGLUSDT</td><td>TRADIFI</td><td>2 / 5</td><td>0.01000</td><td>0.01 / 0.01</td><td>20000 / 2000</td><td>5</td><td>0.97 / 1.03</td><td>8h · ±0.020</td><td>0</td><td>0.015</td></tr>
+<tr><td class="mono">1000PEPEUSDT-PERP / 1000PEPEUSDT</td><td>CRYPTO</td><td>0 / 7</td><td>0.0000001</td><td>1 / 1</td><td>800000000 / 100000000</td><td>5</td><td>0.85 / 1.15</td><td>8h · ±0.020</td><td>0.0001</td><td>0.015</td></tr>
+</tbody></table></div>
+<div class="note ok">
+  <h4>Must match Binance, but not in public exchangeInfo</h4>
+  <p><code>max_allowed_leverage</code>, the first-tier <code>maintenance_margin_rate</code> and the full <code>perps_market_risk_tiers</code> must be fetched on release day with a read-only Binance key via the signed <code>GET /fapi/v1/leverageBracket</code> endpoint. Import each bracket verbatim: <code>notionalCap → max_position_qty</code>, <code>initialLeverage → max_leverage</code>, <code>maintMarginRatio → maintenance_margin_rate</code>; <code>initial_margin_rate = 1 / initialLeverage</code>. <b>No snapshot, no release.</b></p>
+</div>
+<div class="note">
+  <h4>Do not present NeoDAX parameters as Binance parameters</h4>
+  <p><code>maker_fee_rate</code>, <code>taker_fee_rate</code>, <code>depth_level</code>, <code>mm_address</code>, <code>max_net_notional</code>, timeouts and wait windows follow platform policy. <code>max_net_notional</code> must not exceed the Binance first-tier notional cap and is bounded by the connector global limit. Under the platform A-book risk policy, <code>market_order_margin_buffer</code> equals the Binance first-tier <code>maintenance_margin_rate</code>, giving the target of twice the Binance MMR.</p>
+</div>
+<nav class="pager"><a href="#scope">&larr;<span class="no">01</span>Principles</a><a href="#preflight"><span class="no">03</span>Snapshot & gates &rarr;</a></nav>
+</article>
+<!-- ═══ 03 preflight ═══ -->
+<article class="panel" id="p-preflight">
+<header>
+  <h1>Release-day Snapshot and Gates</h1>
+  <p class="lede">The static table is for review only. The actual seed must be generated from, or diffed field by field against, the release-day snapshot; external parameters can change at any time.</p>
+</header>
+<pre><span class="c"># Public parameters (keep raw responses, UTC time and SHA-256)</span>
+curl -fsS 'https://fapi.binance.com/fapi/v1/exchangeInfo' -o exchangeInfo.json
+curl -fsS 'https://fapi.binance.com/fapi/v1/fundingInfo'  -o fundingInfo.json
+curl -fsS 'https://fapi.binance.com/fapi/v1/premiumIndex' -o premiumIndex.json
+sha256sum exchangeInfo.json fundingInfo.json premiumIndex.json
+
+<span class="c"># Risk brackets (USER_DATA signed endpoint; read-only key; never post responses to public logs)</span>
+GET /fapi/v1/leverageBracket?symbol=&lt;BINANCE_SYMBOL&gt;&amp;timestamp=&lt;ms&gt;&amp;signature=&lt;HMAC&gt;</pre>
+<h2>Gates</h2>
+<ul class="gate">
+  <li><span class="tag stop">STOP</span>Any symbol is not <code>TRADING</code>, or its contract type is not as expected.</li>
+  <li><span class="tag stop">STOP</span>Seed tick / step / min / max / notional / percent-price / funding / interest / liquidation fee differs from the snapshot.</li>
+  <li><span class="tag stop">STOP</span>Any leverage bracket is missing, tiers are not contiguous, or <code>max_net_notional</code> exceeds the allowed cap.</li>
+  <li><span class="tag stop">STOP</span>The Binance execution account lacks trading permission, isolated setting or sufficient margin for the symbol.</li>
+  <li><span class="tag keep">PASS</span>Raw JSON, extracted table, SHA-256 and reviewer for all 14 symbols are recorded in the release ticket.</li>
+</ul>
+<nav class="pager"><a href="#params">&larr;<span class="no">02</span>Binance parameters</a><a href="#house-account"><span class="no">04</span>House account &rarr;</a></nav>
+</article>
+<!-- ═══ 04 house-account ═══ -->
+<article class="panel" id="p-house-account">
+<header>
+  <h1>Ensure the System House Account Exists</h1>
+  <p class="lede">The shared A-book House account must exist in both the PM Perp database and the Raft FSM. Both <code>account_id</code> and <code>app_session_id</code> are fixed to <code>00000000-0000-0000-0000-000000000009</code>, and <code>owner</code> is the zero address. <strong>Do not seed or open any market until this check passes.</strong></p>
+</header>
+<h2>4.1 Check the leader startup log</h2>
+<pre>kubectl logs -n &lt;namespace&gt; &lt;leader-pod-name&gt; | grep "\[SYSTEM_ACCOUNTS\]"</pre>
+<h3><span class="tag keep">Healthy</span></h3>
+<pre><span class="k">[SYSTEM_ACCOUNTS] account present in FSM and DB, no action needed
+[SYSTEM_ACCOUNTS] all system accounts verified present in FSM</span></pre>
+<p class="small">The first line is a Debug log. When production does not enable Debug, seeing only the final <code>all system accounts verified</code> line is also healthy.</p>
+<h3><span class="tag a">Auto-repaired</span> present in DB, missing from FSM</h3>
+<pre>[SYSTEM_ACCOUNTS] account found in DB but missing from FSM, registering into FSM
+[SYSTEM_ACCOUNTS] account registered into FSM successfully
+<span class="k">[SYSTEM_ACCOUNTS] all system accounts verified present in FSM</span></pre>
+<h3><span class="tag a">Auto-repaired</span> present in FSM, missing from DB</h3>
+<pre>[SYSTEM_ACCOUNTS] account found in FSM but missing from DB, back-filling database record
+[SYSTEM_ACCOUNTS] database record back-filled successfully
+<span class="k">[SYSTEM_ACCOUNTS] all system accounts verified present in FSM</span></pre>
+<div class="note stop">
+  <h4>Failure (startup aborts)</h4>
+  <pre><span class="t">[SYSTEM_ACCOUNTS] CRITICAL: system account missing from FSM after reconciliation</span></pre>
+  <p>If this line appears, or the final <code>all system accounts verified present in FSM</code> line is missing, stop the release immediately. Do not seed or OPEN.</p>
+</div>
+<h2>4.2 Repair system accounts without downtime</h2>
+<p>Run against the current Raft leader only. It reconciles all required system accounts (including the A-book House) and fills the DB or the FSM in whichever direction is missing. Safe to repeat.</p>
+<pre>grpcurl -plaintext \
+  -import-path . \
+  -proto internal/protocol/proto/perp_pm.proto \
+  -d '{
+    "operation": "register_system_account",
+    "operator": "ops",
+    "reason": "bootstrap_system_account_fsm",
+    "owner": "0x0000000000000000000000000000000000000000"
+  }' \
+  &lt;leader-host&gt;:50051 \
+  portfolio.PerpPortfolioService/AdminAdjustFSM</pre>
+<h3>Successful response</h3>
+<pre>{
+  "success": true,
+  "message": "system accounts synchronized"
+}</pre>
+<div class="note">
+  <h4>Post-repair gate</h4>
+  <p>Re-run the log check in 4.1 and confirm <code>all system accounts verified present in FSM</code>. If the response is <code>not leader</code>, locate the leader and retry. Any <code>success: false</code> means the repair did not succeed.</p>
+</div>
+<nav class="pager"><a href="#preflight">&larr;<span class="no">03</span>Snapshot & gates</a><a href="#seed"><span class="no">05</span>PM Perp seed &rarr;</a></nav>
+</article>
+<!-- ═══ 05 seed ═══ -->
+<article class="panel" id="p-seed">
+<header>
+  <h1>PM Perp Seed</h1>
+  <p class="lede">Each market uses one plain idempotent SQL file with the same structure as <code>20261006150000_nvdausdt_perp.sql</code>: write <code>perps_markets</code> first, then that market's Binance risk tiers. The 14 market rows are shown combined below; the actual commit can split them into 14 timestamped files, one per symbol.</p>
+</header>
+<div class="note">
+  <h4>The only remaining placeholder</h4>
+  <p><code>__MM_ADDRESS__</code> comes from environment config. MMR, max leverage and all risk tiers were filled from the signed Binance <code>/fapi/v1/leverageBracket</code> response of 2026-10-14; <code>notionalCoef</code> is 1 for all 14 markets on this execution account.</p>
+</div>
+<details class="sql" open><summary>perps_markets · 14 rows (new rows A_BOOK / FROZEN)</summary><pre class="tall">-- Pattern: YYYYMMDDHHMMSS_&lt;symbol&gt;_perp.sql
+-- Same structure as 20261006150000_nvdausdt_perp.sql.
+-- New rows start directly in A_BOOK but remain FROZEN until Admin opens them.
+
+INSERT INTO portfolio_manager_perp.perps_markets (
+    symbol, base_asset, quote_asset, status,
+    maker_fee_rate, taker_fee_rate,
+    amount_precision, price_precision,
+    price_min_ratio, price_max_ratio,
+    step_size, tick_size, min_qty, max_qty, min_notional, depth_level,
+    maintenance_margin_rate, max_allowed_leverage,
+    funding_interval_seconds, max_funding_rate_per_int,
+    interest_rate_per_interval, mark_price_min_sources_normal,
+    execution_book, binance_symbol, mm_address, max_net_notional,
+    routing_state, routing_failure_code,
+    operational_state, operational_reason, route_version, desired_execution_book,
+    market_order_margin_buffer, liquidation_timeout_seconds,
+    external_funding_wait_seconds, liquidation_fee_rate,
+    created_at, updated_at
+)
+VALUES
+-- Commodities
+('XAUUSDT-PERP','XAU','USDT','active',0.0002,0.0005,3,2,0.98,1.02,'0.001','0.01','0.001','10000','5','["0.01","0.1","1","10"]',
+ 0.005,100,14400,0.005,0,1,'A_BOOK','XAUUSDT','__MM_ADDRESS__',50000,'ACTIVE','','FROZEN','pre-launch validation',1,'A_BOOK',0.005,600,120,0.015,NOW(),NOW()),
+('XAGUSDT-PERP','XAG','USDT','active',0.0002,0.0005,3,4,0.97,1.03,'0.001','0.0100','0.001','1000000','5','["0.01","0.1","1","10"]',
+ 0.005,100,14400,0.005,0,1,'A_BOOK','XAGUSDT','__MM_ADDRESS__',50000,'ACTIVE','','FROZEN','pre-launch validation',1,'A_BOOK',0.005,600,120,0.015,NOW(),NOW()),
+('CLUSDT-PERP','CL','USDT','active',0.0002,0.0005,2,5,0.97,1.03,'0.01','0.01000','0.01','500000','5','["0.01","0.1","1","10"]',
+ 0.005,100,14400,0.005,0,1,'A_BOOK','CLUSDT','__MM_ADDRESS__',50000,'ACTIVE','','FROZEN','pre-launch validation',1,'A_BOOK',0.005,600,120,0.015,NOW(),NOW()),
+
+-- Crypto
+('ARBUSDT-PERP','ARB','USDT','active',0.0002,0.0005,1,6,0.85,1.15,'0.1','0.000010','0.1','30000000','5','["0.00001","0.0001","0.001","0.01"]',
+ 0.006,75,28800,0.020,0.0001,1,'A_BOOK','ARBUSDT','__MM_ADDRESS__',5000,'ACTIVE','','FROZEN','pre-launch validation',1,'A_BOOK',0.006,600,120,0.015,NOW(),NOW()),
+('UNIUSDT-PERP','UNI','USDT','active',0.0002,0.0005,0,4,0.90,1.10,'1','0.0010','1','2000000','5','["0.001","0.01","0.1","1"]',
+ 0.006,75,28800,0.00450,0.0001,1,'A_BOOK','UNIUSDT','__MM_ADDRESS__',10000,'ACTIVE','','FROZEN','pre-launch validation',1,'A_BOOK',0.006,600,120,0.015,NOW(),NOW()),
+('NEARUSDT-PERP','NEAR','USDT','active',0.0002,0.0005,0,4,0.90,1.10,'1','0.0010','1','5000000','5','["0.001","0.01","0.1","1"]',
+ 0.01,75,28800,0.020,0.0001,1,'A_BOOK','NEARUSDT','__MM_ADDRESS__',20000,'ACTIVE','','FROZEN','pre-launch validation',1,'A_BOOK',0.01,600,120,0.015,NOW(),NOW()),
+('ADAUSDT-PERP','ADA','USDT','active',0.0002,0.0005,0,5,0.95,1.05,'1','0.00010','1','30000000','5','["0.0001","0.001","0.01","0.1"]',
+ 0.005,75,28800,0.00375,0.0001,1,'A_BOOK','ADAUSDT','__MM_ADDRESS__',10000,'ACTIVE','','FROZEN','pre-launch validation',1,'A_BOOK',0.005,600,120,0.0125,NOW(),NOW()),
+('AAVEUSDT-PERP','AAVE','USDT','active',0.0002,0.0005,1,3,0.90,1.10,'0.1','0.010','0.1','78000','5','["0.01","0.1","1","10"]',
+ 0.01,75,28800,0.0075,0.0001,1,'A_BOOK','AAVEUSDT','__MM_ADDRESS__',50000,'ACTIVE','','FROZEN','pre-launch validation',1,'A_BOOK',0.01,600,120,0.015,NOW(),NOW()),
+('1000PEPEUSDT-PERP','1000PEPE','USDT','active',0.0002,0.0005,0,7,0.85,1.15,'1','0.0000001','1','800000000','5','["0.0000001","0.000001","0.00001","0.0001"]',
+ 0.0065,75,28800,0.020,0.0001,1,'A_BOOK','1000PEPEUSDT','__MM_ADDRESS__',20000,'ACTIVE','','FROZEN','pre-launch validation',1,'A_BOOK',0.0065,600,120,0.015,NOW(),NOW()),
+
+-- Tokenized stocks
+('NVDAUSDT-PERP','NVDA','USDT','active',0.0002,0.0005,2,5,0.97,1.03,'0.01','0.01000','0.01','30000','5','["0.01","0.1","1","10"]',
+ 0.01,50,28800,0.020,0,1,'A_BOOK','NVDAUSDT','__MM_ADDRESS__',50000,'ACTIVE','','FROZEN','pre-launch validation',1,'A_BOOK',0.01,600,120,0.015,NOW(),NOW()),
+('CRCLUSDT-PERP','CRCL','USDT','active',0.0002,0.0005,2,5,0.97,1.03,'0.01','0.01000','0.01','70000','5','["0.01","0.1","1","10"]',
+ 0.01,50,28800,0.020,0,1,'A_BOOK','CRCLUSDT','__MM_ADDRESS__',50000,'ACTIVE','','FROZEN','pre-launch validation',1,'A_BOOK',0.01,600,120,0.015,NOW(),NOW()),
+('MSTRUSDT-PERP','MSTR','USDT','active',0.0002,0.0005,2,5,0.97,1.03,'0.01','0.01000','0.01','42000','5','["0.01","0.1","1","10"]',
+ 0.01,50,28800,0.020,0,1,'A_BOOK','MSTRUSDT','__MM_ADDRESS__',50000,'ACTIVE','','FROZEN','pre-launch validation',1,'A_BOOK',0.01,600,120,0.015,NOW(),NOW()),
+('TSLAUSDT-PERP','TSLA','USDT','active',0.0002,0.0005,2,5,0.97,1.03,'0.01','0.01000','0.01','20000','5','["0.01","0.1","1","10"]',
+ 0.02,25,28800,0.020,0,1,'A_BOOK','TSLAUSDT','__MM_ADDRESS__',50000,'ACTIVE','','FROZEN','pre-launch validation',1,'A_BOOK',0.02,600,120,0.015,NOW(),NOW()),
+('GOOGLUSDT-PERP','GOOGL','USDT','active',0.0002,0.0005,2,5,0.97,1.03,'0.01','0.01000','0.01','20000','5','["0.01","0.1","1","10"]',
+ 0.01,50,28800,0.020,0,1,'A_BOOK','GOOGLUSDT','__MM_ADDRESS__',50000,'ACTIVE','','FROZEN','pre-launch validation',1,'A_BOOK',0.01,600,120,0.015,NOW(),NOW())
+ON CONFLICT (symbol) DO UPDATE SET
+    base_asset = EXCLUDED.base_asset,
+    quote_asset = EXCLUDED.quote_asset,
+    status = EXCLUDED.status,
+    maker_fee_rate = EXCLUDED.maker_fee_rate,
+    taker_fee_rate = EXCLUDED.taker_fee_rate,
+    amount_precision = EXCLUDED.amount_precision,
+    price_precision = EXCLUDED.price_precision,
+    price_min_ratio = EXCLUDED.price_min_ratio,
+    price_max_ratio = EXCLUDED.price_max_ratio,
+    step_size = EXCLUDED.step_size,
+    tick_size = EXCLUDED.tick_size,
+    min_qty = EXCLUDED.min_qty,
+    max_qty = EXCLUDED.max_qty,
+    min_notional = EXCLUDED.min_notional,
+    depth_level = EXCLUDED.depth_level,
+    maintenance_margin_rate = EXCLUDED.maintenance_margin_rate,
+    max_allowed_leverage = EXCLUDED.max_allowed_leverage,
+    funding_interval_seconds = EXCLUDED.funding_interval_seconds,
+    max_funding_rate_per_int = EXCLUDED.max_funding_rate_per_int,
+    interest_rate_per_interval = EXCLUDED.interest_rate_per_interval,
+    mark_price_min_sources_normal = EXCLUDED.mark_price_min_sources_normal,
+    binance_symbol = EXCLUDED.binance_symbol,
+    mm_address = EXCLUDED.mm_address,
+    max_net_notional = EXCLUDED.max_net_notional,
+    desired_execution_book = EXCLUDED.desired_execution_book,
+    market_order_margin_buffer = EXCLUDED.market_order_margin_buffer,
+    liquidation_timeout_seconds = EXCLUDED.liquidation_timeout_seconds,
+    external_funding_wait_seconds = EXCLUDED.external_funding_wait_seconds,
+    liquidation_fee_rate = EXCLUDED.liquidation_fee_rate,
+    updated_at = NOW();
+</pre></details>
+<details class="sql"><summary>perps_market_risk_tiers · full Binance ladders<span class="small">click to expand · 137 rows</span></summary><pre class="tall">-- Binance account snapshot: GET /fapi/v1/leverageBracket, 2026-10-14.
+-- max_position_qty uses Binance quote-notional cap; notionalCoef = 1.
+INSERT INTO portfolio_manager_perp.perps_market_risk_tiers (
+    symbol, tier_index, max_position_qty, max_leverage,
+    initial_margin_rate, maintenance_margin_rate,
+    config_version, created_at, updated_at
+)
+VALUES
+    ('XAUUSDT-PERP', 1, 50000, 100, 0.01, 0.005, 1, NOW(), NOW()),
+    ('XAUUSDT-PERP', 2, 400000, 75, 0.01333333, 0.0065, 1, NOW(), NOW()),
+    ('XAUUSDT-PERP', 3, 1000000, 50, 0.02, 0.01, 1, NOW(), NOW()),
+    ('XAUUSDT-PERP', 4, 4000000, 25, 0.04, 0.02, 1, NOW(), NOW()),
+    ('XAUUSDT-PERP', 5, 8000000, 20, 0.05, 0.025, 1, NOW(), NOW()),
+    ('XAUUSDT-PERP', 6, 40000000, 10, 0.1, 0.05, 1, NOW(), NOW()),
+    ('XAUUSDT-PERP', 7, 80000000, 5, 0.2, 0.1, 1, NOW(), NOW()),
+    ('XAUUSDT-PERP', 8, 100000000, 4, 0.25, 0.125, 1, NOW(), NOW()),
+    ('XAUUSDT-PERP', 9, 200000000, 2, 0.5, 0.25, 1, NOW(), NOW()),
+    ('XAUUSDT-PERP', 10, 400000000, 1, 1, 0.5, 1, NOW(), NOW()),
+    ('XAGUSDT-PERP', 1, 50000, 100, 0.01, 0.005, 1, NOW(), NOW()),
+    ('XAGUSDT-PERP', 2, 400000, 75, 0.01333333, 0.0065, 1, NOW(), NOW()),
+    ('XAGUSDT-PERP', 3, 1000000, 50, 0.02, 0.01, 1, NOW(), NOW()),
+    ('XAGUSDT-PERP', 4, 4000000, 25, 0.04, 0.02, 1, NOW(), NOW()),
+    ('XAGUSDT-PERP', 5, 8000000, 20, 0.05, 0.025, 1, NOW(), NOW()),
+    ('XAGUSDT-PERP', 6, 40000000, 10, 0.1, 0.05, 1, NOW(), NOW()),
+    ('XAGUSDT-PERP', 7, 80000000, 5, 0.2, 0.1, 1, NOW(), NOW()),
+    ('XAGUSDT-PERP', 8, 100000000, 4, 0.25, 0.125, 1, NOW(), NOW()),
+    ('XAGUSDT-PERP', 9, 200000000, 2, 0.5, 0.25, 1, NOW(), NOW()),
+    ('XAGUSDT-PERP', 10, 400000000, 1, 1, 0.5, 1, NOW(), NOW()),
+    ('CLUSDT-PERP', 1, 50000, 100, 0.01, 0.005, 1, NOW(), NOW()),
+    ('CLUSDT-PERP', 2, 400000, 75, 0.01333333, 0.0065, 1, NOW(), NOW()),
+    ('CLUSDT-PERP', 3, 1000000, 50, 0.02, 0.01, 1, NOW(), NOW()),
+    ('CLUSDT-PERP', 4, 4000000, 25, 0.04, 0.02, 1, NOW(), NOW()),
+    ('CLUSDT-PERP', 5, 8000000, 20, 0.05, 0.025, 1, NOW(), NOW()),
+    ('CLUSDT-PERP', 6, 40000000, 10, 0.1, 0.05, 1, NOW(), NOW()),
+    ('CLUSDT-PERP', 7, 80000000, 5, 0.2, 0.1, 1, NOW(), NOW()),
+    ('CLUSDT-PERP', 8, 100000000, 4, 0.25, 0.125, 1, NOW(), NOW()),
+    ('CLUSDT-PERP', 9, 200000000, 2, 0.5, 0.25, 1, NOW(), NOW()),
+    ('CLUSDT-PERP', 10, 400000000, 1, 1, 0.5, 1, NOW(), NOW()),
+    ('ARBUSDT-PERP', 1, 5000, 75, 0.01333333, 0.006, 1, NOW(), NOW()),
+    ('ARBUSDT-PERP', 2, 50000, 50, 0.02, 0.01, 1, NOW(), NOW()),
+    ('ARBUSDT-PERP', 3, 100000, 25, 0.04, 0.015, 1, NOW(), NOW()),
+    ('ARBUSDT-PERP', 4, 500000, 20, 0.05, 0.02, 1, NOW(), NOW()),
+    ('ARBUSDT-PERP', 5, 1000000, 10, 0.1, 0.025, 1, NOW(), NOW()),
+    ('ARBUSDT-PERP', 6, 5000000, 5, 0.2, 0.05, 1, NOW(), NOW()),
+    ('ARBUSDT-PERP', 7, 6000000, 4, 0.25, 0.1, 1, NOW(), NOW()),
+    ('ARBUSDT-PERP', 8, 7000000, 3, 0.33333333, 0.125, 1, NOW(), NOW()),
+    ('ARBUSDT-PERP', 9, 8000000, 2, 0.5, 0.25, 1, NOW(), NOW()),
+    ('ARBUSDT-PERP', 10, 9000000, 1, 1, 0.5, 1, NOW(), NOW()),
+    ('UNIUSDT-PERP', 1, 10000, 75, 0.01333333, 0.006, 1, NOW(), NOW()),
+    ('UNIUSDT-PERP', 2, 50000, 50, 0.02, 0.01, 1, NOW(), NOW()),
+    ('UNIUSDT-PERP', 3, 100000, 40, 0.025, 0.015, 1, NOW(), NOW()),
+    ('UNIUSDT-PERP', 4, 500000, 25, 0.04, 0.02, 1, NOW(), NOW()),
+    ('UNIUSDT-PERP', 5, 1000000, 20, 0.05, 0.025, 1, NOW(), NOW()),
+    ('UNIUSDT-PERP', 6, 5000000, 10, 0.1, 0.05, 1, NOW(), NOW()),
+    ('UNIUSDT-PERP', 7, 10000000, 5, 0.2, 0.1, 1, NOW(), NOW()),
+    ('UNIUSDT-PERP', 8, 12500000, 4, 0.25, 0.125, 1, NOW(), NOW()),
+    ('UNIUSDT-PERP', 9, 25000000, 2, 0.5, 0.25, 1, NOW(), NOW()),
+    ('UNIUSDT-PERP', 10, 50000000, 1, 1, 0.5, 1, NOW(), NOW()),
+    ('NEARUSDT-PERP', 1, 20000, 75, 0.01333333, 0.01, 1, NOW(), NOW()),
+    ('NEARUSDT-PERP', 2, 200000, 50, 0.02, 0.015, 1, NOW(), NOW()),
+    ('NEARUSDT-PERP', 3, 1000000, 25, 0.04, 0.02, 1, NOW(), NOW()),
+    ('NEARUSDT-PERP', 4, 2000000, 20, 0.05, 0.025, 1, NOW(), NOW()),
+    ('NEARUSDT-PERP', 5, 10000000, 10, 0.1, 0.05, 1, NOW(), NOW()),
+    ('NEARUSDT-PERP', 6, 20000000, 5, 0.2, 0.1, 1, NOW(), NOW()),
+    ('NEARUSDT-PERP', 7, 25000000, 4, 0.25, 0.125, 1, NOW(), NOW()),
+    ('NEARUSDT-PERP', 8, 30000000, 2, 0.5, 0.25, 1, NOW(), NOW()),
+    ('NEARUSDT-PERP', 9, 35000000, 1, 1, 0.5, 1, NOW(), NOW()),
+    ('ADAUSDT-PERP', 1, 10000, 75, 0.01333333, 0.005, 1, NOW(), NOW()),
+    ('ADAUSDT-PERP', 2, 50000, 50, 0.02, 0.01, 1, NOW(), NOW()),
+    ('ADAUSDT-PERP', 3, 200000, 40, 0.025, 0.015, 1, NOW(), NOW()),
+    ('ADAUSDT-PERP', 4, 1000000, 25, 0.04, 0.02, 1, NOW(), NOW()),
+    ('ADAUSDT-PERP', 5, 2000000, 20, 0.05, 0.025, 1, NOW(), NOW()),
+    ('ADAUSDT-PERP', 6, 10000000, 10, 0.1, 0.05, 1, NOW(), NOW()),
+    ('ADAUSDT-PERP', 7, 20000000, 5, 0.2, 0.1, 1, NOW(), NOW()),
+    ('ADAUSDT-PERP', 8, 25000000, 4, 0.25, 0.125, 1, NOW(), NOW()),
+    ('ADAUSDT-PERP', 9, 50000000, 2, 0.5, 0.25, 1, NOW(), NOW()),
+    ('ADAUSDT-PERP', 10, 100000000, 1, 1, 0.5, 1, NOW(), NOW()),
+    ('AAVEUSDT-PERP', 1, 50000, 75, 0.01333333, 0.01, 1, NOW(), NOW()),
+    ('AAVEUSDT-PERP', 2, 150000, 50, 0.02, 0.015, 1, NOW(), NOW()),
+    ('AAVEUSDT-PERP', 3, 500000, 25, 0.04, 0.02, 1, NOW(), NOW()),
+    ('AAVEUSDT-PERP', 4, 600000, 20, 0.05, 0.025, 1, NOW(), NOW()),
+    ('AAVEUSDT-PERP', 5, 3000000, 10, 0.1, 0.05, 1, NOW(), NOW()),
+    ('AAVEUSDT-PERP', 6, 6000000, 5, 0.2, 0.1, 1, NOW(), NOW()),
+    ('AAVEUSDT-PERP', 7, 7500000, 4, 0.25, 0.125, 1, NOW(), NOW()),
+    ('AAVEUSDT-PERP', 8, 15000000, 2, 0.5, 0.25, 1, NOW(), NOW()),
+    ('AAVEUSDT-PERP', 9, 30000000, 1, 1, 0.5, 1, NOW(), NOW()),
+    ('1000PEPEUSDT-PERP', 1, 20000, 75, 0.01333333, 0.0065, 1, NOW(), NOW()),
+    ('1000PEPEUSDT-PERP', 2, 200000, 50, 0.02, 0.01, 1, NOW(), NOW()),
+    ('1000PEPEUSDT-PERP', 3, 300000, 40, 0.025, 0.015, 1, NOW(), NOW()),
+    ('1000PEPEUSDT-PERP', 4, 1500000, 25, 0.04, 0.02, 1, NOW(), NOW()),
+    ('1000PEPEUSDT-PERP', 5, 3000000, 20, 0.05, 0.025, 1, NOW(), NOW()),
+    ('1000PEPEUSDT-PERP', 6, 15000000, 10, 0.1, 0.05, 1, NOW(), NOW()),
+    ('1000PEPEUSDT-PERP', 7, 20000000, 5, 0.2, 0.1, 1, NOW(), NOW()),
+    ('1000PEPEUSDT-PERP', 8, 25000000, 4, 0.25, 0.125, 1, NOW(), NOW()),
+    ('1000PEPEUSDT-PERP', 9, 30000000, 2, 0.5, 0.25, 1, NOW(), NOW()),
+    ('1000PEPEUSDT-PERP', 10, 35000000, 1, 1, 0.5, 1, NOW(), NOW()),
+    ('NVDAUSDT-PERP', 1, 50000, 50, 0.02, 0.01, 1, NOW(), NOW()),
+    ('NVDAUSDT-PERP', 2, 250000, 25, 0.04, 0.02, 1, NOW(), NOW()),
+    ('NVDAUSDT-PERP', 3, 1000000, 20, 0.05, 0.025, 1, NOW(), NOW()),
+    ('NVDAUSDT-PERP', 4, 2000000, 15, 0.06666667, 0.0333, 1, NOW(), NOW()),
+    ('NVDAUSDT-PERP', 5, 5000000, 10, 0.1, 0.05, 1, NOW(), NOW()),
+    ('NVDAUSDT-PERP', 6, 8000000, 5, 0.2, 0.1, 1, NOW(), NOW()),
+    ('NVDAUSDT-PERP', 7, 15000000, 4, 0.25, 0.125, 1, NOW(), NOW()),
+    ('NVDAUSDT-PERP', 8, 25000000, 3, 0.33333333, 0.1667, 1, NOW(), NOW()),
+    ('NVDAUSDT-PERP', 9, 50000000, 2, 0.5, 0.25, 1, NOW(), NOW()),
+    ('NVDAUSDT-PERP', 10, 200000000, 1, 1, 0.5, 1, NOW(), NOW()),
+    ('CRCLUSDT-PERP', 1, 50000, 50, 0.02, 0.01, 1, NOW(), NOW()),
+    ('CRCLUSDT-PERP', 2, 150000, 25, 0.04, 0.02, 1, NOW(), NOW()),
+    ('CRCLUSDT-PERP', 3, 300000, 20, 0.05, 0.025, 1, NOW(), NOW()),
+    ('CRCLUSDT-PERP', 4, 750000, 15, 0.06666667, 0.0333, 1, NOW(), NOW()),
+    ('CRCLUSDT-PERP', 5, 3000000, 10, 0.1, 0.05, 1, NOW(), NOW()),
+    ('CRCLUSDT-PERP', 6, 10000000, 5, 0.2, 0.1, 1, NOW(), NOW()),
+    ('CRCLUSDT-PERP', 7, 15000000, 4, 0.25, 0.125, 1, NOW(), NOW()),
+    ('CRCLUSDT-PERP', 8, 25000000, 3, 0.33333333, 0.1667, 1, NOW(), NOW()),
+    ('CRCLUSDT-PERP', 9, 50000000, 2, 0.5, 0.25, 1, NOW(), NOW()),
+    ('CRCLUSDT-PERP', 10, 100000000, 1, 1, 0.5, 1, NOW(), NOW()),
+    ('MSTRUSDT-PERP', 1, 50000, 50, 0.02, 0.01, 1, NOW(), NOW()),
+    ('MSTRUSDT-PERP', 2, 150000, 25, 0.04, 0.02, 1, NOW(), NOW()),
+    ('MSTRUSDT-PERP', 3, 300000, 20, 0.05, 0.025, 1, NOW(), NOW()),
+    ('MSTRUSDT-PERP', 4, 750000, 15, 0.06666667, 0.0333, 1, NOW(), NOW()),
+    ('MSTRUSDT-PERP', 5, 3000000, 10, 0.1, 0.05, 1, NOW(), NOW()),
+    ('MSTRUSDT-PERP', 6, 10000000, 5, 0.2, 0.1, 1, NOW(), NOW()),
+    ('MSTRUSDT-PERP', 7, 15000000, 4, 0.25, 0.125, 1, NOW(), NOW()),
+    ('MSTRUSDT-PERP', 8, 25000000, 3, 0.33333333, 0.1667, 1, NOW(), NOW()),
+    ('MSTRUSDT-PERP', 9, 50000000, 2, 0.5, 0.25, 1, NOW(), NOW()),
+    ('MSTRUSDT-PERP', 10, 100000000, 1, 1, 0.5, 1, NOW(), NOW()),
+    ('TSLAUSDT-PERP', 1, 150000, 25, 0.04, 0.02, 1, NOW(), NOW()),
+    ('TSLAUSDT-PERP', 2, 300000, 20, 0.05, 0.025, 1, NOW(), NOW()),
+    ('TSLAUSDT-PERP', 3, 750000, 15, 0.06666667, 0.0333, 1, NOW(), NOW()),
+    ('TSLAUSDT-PERP', 4, 3000000, 10, 0.1, 0.05, 1, NOW(), NOW()),
+    ('TSLAUSDT-PERP', 5, 10000000, 5, 0.2, 0.1, 1, NOW(), NOW()),
+    ('TSLAUSDT-PERP', 6, 15000000, 4, 0.25, 0.125, 1, NOW(), NOW()),
+    ('TSLAUSDT-PERP', 7, 25000000, 3, 0.33333333, 0.1667, 1, NOW(), NOW()),
+    ('TSLAUSDT-PERP', 8, 50000000, 2, 0.5, 0.25, 1, NOW(), NOW()),
+    ('TSLAUSDT-PERP', 9, 100000000, 1, 1, 0.5, 1, NOW(), NOW()),
+    ('GOOGLUSDT-PERP', 1, 50000, 50, 0.02, 0.01, 1, NOW(), NOW()),
+    ('GOOGLUSDT-PERP', 2, 200000, 25, 0.04, 0.02, 1, NOW(), NOW()),
+    ('GOOGLUSDT-PERP', 3, 400000, 20, 0.05, 0.025, 1, NOW(), NOW()),
+    ('GOOGLUSDT-PERP', 4, 1000000, 15, 0.06666667, 0.0333, 1, NOW(), NOW()),
+    ('GOOGLUSDT-PERP', 5, 5000000, 10, 0.1, 0.05, 1, NOW(), NOW()),
+    ('GOOGLUSDT-PERP', 6, 15000000, 5, 0.2, 0.1, 1, NOW(), NOW()),
+    ('GOOGLUSDT-PERP', 7, 20000000, 4, 0.25, 0.125, 1, NOW(), NOW()),
+    ('GOOGLUSDT-PERP', 8, 30000000, 3, 0.33333333, 0.1667, 1, NOW(), NOW()),
+    ('GOOGLUSDT-PERP', 9, 50000000, 2, 0.5, 0.25, 1, NOW(), NOW()),
+    ('GOOGLUSDT-PERP', 10, 100000000, 1, 1, 0.5, 1, NOW(), NOW())
+ON CONFLICT (symbol, tier_index) DO UPDATE SET
+    max_position_qty = EXCLUDED.max_position_qty,
+    max_leverage = EXCLUDED.max_leverage,
+    initial_margin_rate = EXCLUDED.initial_margin_rate,
+    maintenance_margin_rate = EXCLUDED.maintenance_margin_rate,
+    config_version = EXCLUDED.config_version,
+    updated_at = NOW();</pre></details>
+<div class="note ok">
+  <h4>Binance tiers are in the script</h4>
+  <p>The market row's <code>maintenance_margin_rate</code> and <code>max_allowed_leverage</code> take the first tier; the full ladder is written row by row as returned by Binance. Each market sets <code>market_order_margin_buffer = maintenance_margin_rate</code> to reach the target of twice the Binance MMR.</p>
+</div>
+<div class="note">
+  <h4>Same runtime-state protection as the NVDA seed</h4>
+  <p><code>ON CONFLICT</code> does not overwrite <code>execution_book</code>, <code>routing_state</code>, <code>route_version</code>, <code>routing_failure_code</code> or <code>operational_*</code>. New rows are initialized as A-book / FROZEN by the INSERT. If a historical 1000PEPE row already exists, its dedicated seed must explicitly confirm the market was never launched before running one targeted routing UPDATE.</p>
+</div>
+<nav class="pager"><a href="#house-account">&larr;<span class="no">04</span>House account</a><a href="#infra"><span class="no">06</span>End-to-end config &rarr;</a></nav>
+</article>
+<!-- ═══ 06 infra ═══ -->
+<article class="panel" id="p-infra">
+<header>
+  <h1>End-to-end Configuration</h1>
+  <p class="lede">All six components must be ready for the 14 markets. Missing any one of them leaves a market untradeable or unprotected after OPEN. Config changes (Kafka topics / Quote / Ledger / Trading API) link to their <code>neodax-apps-value</code> PR (production branch <code>aws</code>) so operators can review and approve directly; MM Connector / Alerts ship with the master-branch image and need no config PR.</p>
+</header>
+<div class="tw"><table class="prtable">
+  <thead><tr><th>Component</th><th>neodax-apps-value PR</th><th>Files</th></tr></thead>
+  <tbody>
+    <tr><td><b>Kafka topics</b></td><td><a class="pr" href="https://github.com/layer-3/neodax-apps-value/pull/173" target="_blank" rel="noopener"><span class="n">neodax-apps-value#173</span><span class="st">base aws</span></a></td><td><code>neodax-kafka-topic-provision/prod/values.yaml</code></td></tr>
+    <tr><td><b>Quote</b></td><td><a class="pr" href="https://github.com/layer-3/neodax-apps-value/pull/173" target="_blank" rel="noopener"><span class="n">neodax-apps-value#173</span><span class="st">base aws</span></a></td><td><code>neodax-nacos/prod/quote/quote.yaml</code></td></tr>
+    <tr><td><b>Ledger</b></td><td><a class="pr" href="https://github.com/layer-3/neodax-apps-value/pull/173" target="_blank" rel="noopener"><span class="n">neodax-apps-value#173</span><span class="st">base aws</span></a></td><td><code>neodax-nacos/prod/ledger/ledger.yaml</code></td></tr>
+    <tr><td><b>MM Connector</b></td><td><span class="pr-todo">No config PR</span></td><td class="dim">Ships with the master-branch image</td></tr>
+    <tr><td><b>Trading API</b></td><td><a class="pr" href="https://github.com/layer-3/neodax-apps-value/pull/173" target="_blank" rel="noopener"><span class="n">neodax-apps-value#173</span><span class="st">base aws</span></a></td><td><code>neodax-nacos/prod/trading_api/trading_api.yaml</code></td></tr>
+    <tr><td><b>Alerts</b></td><td><span class="pr-todo">No config PR</span></td><td class="dim">Ships with the master-branch image</td></tr>
+  </tbody>
+</table></div>
+<div class="note">
+  <h4>Merge prerequisites for #173</h4>
+  <p>Prod quote / ledger / topic provisioning run <code>release-v3.6.2-bb6fd4e6</code> and trading-api runs <code>build-perpetual-transfer-gate-1207c86d</code>; neither has A-Book code, so the new keys are ignored. Bump first to an image containing neodax <code>#1722</code>, <code>#1752</code> and <code>#1757</code>. The topic provisioning Job must finish before quote starts the mirror and before trading-api subscribes to the new topics; publishing to missing topics stalls the shared producer and freezes marks for every market (UAT incident on 2026-10-08).</p>
+</div>
+<ol class="seq">
+  <li><b>Kafka topics</b><span>Pass the 14 <code>-PERP</code> symbols to <code>tools/kafka_topic_init</code>. Besides order / trade topics, confirm the A-book margin snapshot, orderbook, <code>EventKlineObserved</code>, <code>EventTradeObserved</code> and <code>EventTickerObserved</code> topics all exist.</span><span class="prs"><a class="pr" href="https://github.com/layer-3/neodax-apps-value/pull/173" target="_blank" rel="noopener"><span class="n">neodax-apps-value#173</span><span class="st">base aws</span></a></span></li>
+  <li><b>Quote</b><span>Add the Binance symbol aliases; add the markets to <code>binance_perp.markets</code> and the orderbook mirror; enable klines / trades / ticker. The A-book mark source weight is fixed at Binance 1.0 (no OKX / Bybit / internal_perp_trade), and the Perp PM metadata poll must read <code>min_sources=1</code>.</span><span class="prs"><a class="pr" href="https://github.com/layer-3/neodax-apps-value/pull/173" target="_blank" rel="noopener"><span class="n">neodax-apps-value#173</span><span class="st">base aws</span></a></span></li>
+  <li><b>MM Connector</b><span>The production risk source is Binance and the read-only reconciliation key is configured; PM Perp / CommandMarketSync is the source of truth for the market set. Every market needs a valid <code>mm_address</code> and a positive <code>max_net_notional</code>, and the total limit must cover this rollout.</span><span class="prs"><span class="pr-todo">Ships with the master-branch image</span></span></li>
+  <li><b>Ledger</b><span>Add the markets to <code>a_book_perp_markets</code> only (do <b>not</b> also list them in <code>markets</code> / <code>perp_markets</code>, or klines / tickers are published twice), so kline / ticker come from the external Binance mirror and the internal EventTradeExecuted chain is excluded; set the <code>external_klines</code> backfill tuning. The never-launched 1000PEPE is removed from the regular lists.</span><span class="prs"><a class="pr" href="https://github.com/layer-3/neodax-apps-value/pull/173" target="_blank" rel="noopener"><span class="n">neodax-apps-value#173</span><span class="st">base aws</span></a></span></li>
+  <li><b>Trading API</b><span>Add them to enabled futures markets; confirm public market data comes from the Binance mirror while private orders / positions still come from PM Perp. trading-api uses this list to subscribe to each market's orderbook / trade / ticker topics; without it there is no public market data.</span><span class="prs"><a class="pr" href="https://github.com/layer-3/neodax-apps-value/pull/173" target="_blank" rel="noopener"><span class="n">neodax-apps-value#173</span><span class="st">base aws</span></a></span></li>
+  <li><b>Alerts</b><span>Before launch, confirm the connector disconnected, reconciliation diff, user / house invariant, liquidation timeout and prime margin ratio alerts are loaded and reach the on-call channel.</span><span class="prs"><span class="pr-todo">Ships with the master-branch image</span></span></li>
+</ol>
+<nav class="pager"><a href="#seed">&larr;<span class="no">05</span>PM Perp seed</a><a href="#deploy"><span class="no">07</span>Deploy order &rarr;</a></nav>
+</article>
+<!-- ═══ 07 deploy ═══ -->
+<article class="panel" id="p-deploy">
+<header>
+  <h1>Deployment Order</h1>
+  <p class="lede">Make every service capable of carrying the markets first, then write the markets; warm up, then validate. Stay FROZEN throughout.</p>
+</header>
+<ol class="seq">
+  <li><b>Merge and deploy config, with markets still undiscovered / closed</b><span>Deploy Kafka provisioning, Quote, Ledger, Trading API and MM Connector first. Do not run the market seed yet.</span></li>
+  <li><b>Create and verify topics</b><span>The topic provisioning Job must succeed; spot-check partition / retention settings for each A-book topic type.</span></li>
+  <li><b>Apply the PM Perp migration and seed</b><span>The 14 markets enter <code>A_BOOK + ACTIVE routing + FROZEN</code>. Confirm CommandMarketSync was published and Finex does not hold these markets.</span></li>
+  <li><b>Wait for data warm-up</b><span>Quote builds the REST depth snapshot + diff stream; Ledger receives external kline / ticker; PM Perp receives fresh Binance mark and funding; Connector starts consuming and keeps heartbeating.</span></li>
+  <li><b>Run the FROZEN acceptance</b><span>Verify parameters, route version, account permissions, risk snapshot, market data latency, order book sequence, reconciliation baseline and alerts.</span></li>
+</ol>
+<nav class="pager"><a href="#infra">&larr;<span class="no">06</span>End-to-end config</a><a href="#open"><span class="no">08</span>Open per market &rarr;</a></nav>
+</article>
+<!-- ═══ 08 open ═══ -->
+<article class="panel" id="p-open">
+<header>
+  <h1>Open Market by Market (Not a Book Switch)</h1>
+  <p class="lede">Read <code>route_version</code> through the Admin status API first, then call the A-book state API. OPEN runs the readiness gate and closes the connector circuit. <strong>An HTTP 200 still requires checking <code>code == 0</code> in the response body.</strong></p>
+</header>
+<pre>GET /perpetual/market/&lt;SYMBOL&gt;/a-book/status
+
+POST /perpetual/market/&lt;SYMBOL&gt;/a-book/state
+{
+  "operation_id": "&lt;UUID&gt;",
+  "state": "OPEN",
+  "reason": "new A-book market rollout &lt;TICKET&gt;",
+  "expected_route_version": 1
+}</pre>
+<h2>Suggested waves</h2>
+<p>Open one crypto canary first, with the best liquidity and the smallest risk limit; after it is verified, proceed in waves: crypto, commodities, stocks. <b>Change one market at a time. Never OPEN all 14 in parallel.</b></p>
+<div class="note ok">
+  <h4>After each OPEN you must see</h4>
+  <p><code>execution_book=A_BOOK</code>, <code>routing_state=ACTIVE</code>, <code>operational_state=OPEN</code>, connector <code>consuming=true</code>, <code>circuit_state=CLOSED</code>, no route version drift, and Kafka offsets advancing.</p>
+</div>
+<nav class="pager"><a href="#deploy">&larr;<span class="no">07</span>Deploy order</a><a href="#verify"><span class="no">09</span>Acceptance &rarr;</a></nav>
+</article>
+<!-- ═══ 09 verify ═══ -->
+<article class="panel" id="p-verify">
+<header>
+  <h1>Per-market Acceptance Checklist</h1>
+  <p class="lede">Check every item after each OPEN. Move to the next market only after all pass and the observation window has elapsed.</p>
+</header>
+<ul class="check">
+  <li>Tick, step, min qty, min notional, max leverage and all risk tiers shown in exchange info match the Binance snapshot field by field.</li>
+  <li>Mark is sourced from Binance with fresh timestamps; the top 50 order book levels, trade tape, 1m kline and 24h ticker keep updating.</li>
+  <li>Cross-margin orders are rejected; small isolated limit and market orders execute, with quantities on step and prices on tick.</li>
+  <li>The signed sum of NeoDAX user positions and the House position is 0; connector external fills map one-to-one to internal fills, with no reconciliation diff.</li>
+  <li>Cancel, reduce-only, trigger, funding and liquidation flows have been exercised at least on staging; no destructive liquidation tests on the production canary.</li>
+  <li>Requests with invalid precision, below min notional, above max leverage / tier, or above max net notional all fail closed.</li>
+  <li>No disconnected, stale risk, margin ratio, position invariant or liquidation timeout alerts during the observation window before opening the next market.</li>
+</ul>
+<nav class="pager"><a href="#open">&larr;<span class="no">08</span>Open per market</a><a href="#rollback"><span class="no">10</span>Rollback &rarr;</a></nav>
+</article>
+<!-- ═══ 10 rollback ═══ -->
+<article class="panel" id="p-rollback">
+<header>
+  <h1>Rollback and Incident Handling</h1>
+  <p class="lede">On failure, freeze first and preserve evidence, then repair along the A-book path. Rollback never changes execution ownership.</p>
+</header>
+<ol class="seq">
+  <li><b>FROZEN immediately</b><span>Use the same A-book state API to set the market to <code>FROZEN</code>. Do not book-switch to B-book.</span></li>
+  <li><b>Preserve evidence</b><span>Record the operation id, route version, connector offsets, orders and fills, external account snapshot, reconciliation diff, market data sequence and alert timeline.</span></li>
+  <li><b>Handle exposure</b><span>While user / House / external positions exist, stay FROZEN and repair through the A-book cancel-all / reconcile / reconcile-order paths. Never delete the market or reset the route version.</span></li>
+  <li><b>Revert config only from zero state</b><span>Only after confirming zero positions, zero orders, zero triggers, zero unsettled funding and no external exposure may the market be disabled and removed from edge / market data subscriptions.</span></li>
+  <li><b>Parameter changes</b><span>If Binance changes filters, funding or brackets during the rollout, freeze the affected markets, generate a new snapshot and a new config version, and OPEN again only after the diff is reviewed.</span></li>
+</ol>
+<div class="note stop">
+  <h4>Final rule</h4>
+  <p>When an A-book market fails, tighten admission and repair the A-book; never auto-degrade to B-book. Any operation that changes execution ownership is a separate migration task, not a rollback step of this runbook.</p>
+</div>
+<p class="small" style="margin-top:28px">Parameter source: official Binance USDⓈ-M Futures REST API, snapshot date 2026-10-14. Re-fetch before launch; the release-day snapshot is authoritative.</p>
+<nav class="pager"><a href="#verify">&larr;<span class="no">09</span>Acceptance</a><span></span></nav>
+</article>
+
+</div><!-- main -->
+</div><!-- shell -->
+
+<script>
+(function(){
+  var tabs=[].slice.call(document.querySelectorAll('#tabs a'));
+  var panels=[].slice.call(document.querySelectorAll('article.panel'));
+  var ids=tabs.map(function(a){return a.getAttribute('href').slice(1);});
+  function show(id,scroll){
+    if(ids.indexOf(id)<0) id=ids[0];
+    panels.forEach(function(p){p.hidden=p.id!=='p-'+id;});
+    tabs.forEach(function(a){a.classList.toggle('on',a.getAttribute('href')==='#'+id);});
+    if(scroll) window.scrollTo({top:0,behavior:'instant'});
+  }
+  document.addEventListener('click',function(e){
+    var a=e.target.closest('a[href^="#"]');
+    if(!a) return;
+    var id=a.getAttribute('href').slice(1);
+    if(ids.indexOf(id)<0) return;
+    e.preventDefault();
+    history.replaceState(null,'','#'+id);
+    show(id,true);
+  });
+  window.addEventListener('hashchange',function(){show(location.hash.slice(1),true);});
+  show(location.hash.slice(1),false);
+})();
+</script>
+</body>
+</html>

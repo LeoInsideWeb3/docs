@@ -586,7 +586,7 @@ POST /perpetual/market/&lt;SYMBOL&gt;/a-book/state
 <article class="panel" id="p-brackets">
 <header>
   <h1>原始响应 · Binance leverageBracket</h1>
-  <p class="lede">签名接口 <code>GET /fapi/v1/leverageBracket</code> 的<b>逐 symbol 原始响应</b>，由 staging 执行账户的只读 key 于 2026-10-15 03:13 UTC 抓取（recvWindow 10000，本机时钟偏差约 -2.5s，在窗口内）。下方 JSON 与 API 返回逐字节一致，未做任何加工；每个文件附 SHA-256。</p>
+  <p class="lede">签名接口 <code>GET /fapi/v1/leverageBracket</code> 的<b>逐 symbol 原始响应</b>，由 staging 执行账户的只读 key 于 2026-10-15 03:13 UTC 抓取（recvWindow 10000，本机时钟偏差约 -2.5s，在窗口内）。下方 JSON 为原始响应的<b>格式化显示</b>（内容未改动）；SHA-256 对应 API 返回的原始单行响应。</p>
 </header>
 <div class="note ok">
   <h4>与 seed 档位核对结果：5/5 PASS</h4>
@@ -596,23 +596,445 @@ POST /perpetual/market/&lt;SYMBOL&gt;/a-book/state
 
 <h3><span class="tag keep">PASS</span> XAUUSDT-PERP → Binance XAUUSDT</h3>
 <p class="small">抓取 2026-10-15T03:13:35Z · SHA-256 <code>a9aceb7f349473701aaa5ca2fcfe0b74a8010da0f3e877c5b9a449eaaebd7506</code></p>
-<pre class="tall">[{"symbol":"XAUUSDT","brackets":[{"bracket":1,"initialLeverage":100,"notionalCap":50000,"notionalFloor":0,"maintMarginRatio":0.005,"cum":0.0},{"bracket":2,"initialLeverage":75,"notionalCap":400000,"notionalFloor":50000,"maintMarginRatio":0.0065,"cum":75.0},{"bracket":3,"initialLeverage":50,"notionalCap":1000000,"notionalFloor":400000,"maintMarginRatio":0.01,"cum":1475.0},{"bracket":4,"initialLeverage":25,"notionalCap":4000000,"notionalFloor":1000000,"maintMarginRatio":0.02,"cum":11475.0},{"bracket":5,"initialLeverage":20,"notionalCap":8000000,"notionalFloor":4000000,"maintMarginRatio":0.025,"cum":31475.0},{"bracket":6,"initialLeverage":10,"notionalCap":40000000,"notionalFloor":8000000,"maintMarginRatio":0.05,"cum":231475.0},{"bracket":7,"initialLeverage":5,"notionalCap":80000000,"notionalFloor":40000000,"maintMarginRatio":0.1,"cum":2231475.0},{"bracket":8,"initialLeverage":4,"notionalCap":100000000,"notionalFloor":80000000,"maintMarginRatio":0.125,"cum":4231475.0},{"bracket":9,"initialLeverage":2,"notionalCap":200000000,"notionalFloor":100000000,"maintMarginRatio":0.25,"cum":16731475.0},{"bracket":10,"initialLeverage":1,"notionalCap":400000000,"notionalFloor":200000000,"maintMarginRatio":0.5,"cum":66731475.0}]}]</pre>
+<pre class="tall">[
+  {
+    "symbol": "XAUUSDT",
+    "brackets": [
+      {
+        "bracket": 1,
+        "initialLeverage": 100,
+        "notionalCap": 50000,
+        "notionalFloor": 0,
+        "maintMarginRatio": 0.005,
+        "cum": 0.0
+      },
+      {
+        "bracket": 2,
+        "initialLeverage": 75,
+        "notionalCap": 400000,
+        "notionalFloor": 50000,
+        "maintMarginRatio": 0.0065,
+        "cum": 75.0
+      },
+      {
+        "bracket": 3,
+        "initialLeverage": 50,
+        "notionalCap": 1000000,
+        "notionalFloor": 400000,
+        "maintMarginRatio": 0.01,
+        "cum": 1475.0
+      },
+      {
+        "bracket": 4,
+        "initialLeverage": 25,
+        "notionalCap": 4000000,
+        "notionalFloor": 1000000,
+        "maintMarginRatio": 0.02,
+        "cum": 11475.0
+      },
+      {
+        "bracket": 5,
+        "initialLeverage": 20,
+        "notionalCap": 8000000,
+        "notionalFloor": 4000000,
+        "maintMarginRatio": 0.025,
+        "cum": 31475.0
+      },
+      {
+        "bracket": 6,
+        "initialLeverage": 10,
+        "notionalCap": 40000000,
+        "notionalFloor": 8000000,
+        "maintMarginRatio": 0.05,
+        "cum": 231475.0
+      },
+      {
+        "bracket": 7,
+        "initialLeverage": 5,
+        "notionalCap": 80000000,
+        "notionalFloor": 40000000,
+        "maintMarginRatio": 0.1,
+        "cum": 2231475.0
+      },
+      {
+        "bracket": 8,
+        "initialLeverage": 4,
+        "notionalCap": 100000000,
+        "notionalFloor": 80000000,
+        "maintMarginRatio": 0.125,
+        "cum": 4231475.0
+      },
+      {
+        "bracket": 9,
+        "initialLeverage": 2,
+        "notionalCap": 200000000,
+        "notionalFloor": 100000000,
+        "maintMarginRatio": 0.25,
+        "cum": 16731475.0
+      },
+      {
+        "bracket": 10,
+        "initialLeverage": 1,
+        "notionalCap": 400000000,
+        "notionalFloor": 200000000,
+        "maintMarginRatio": 0.5,
+        "cum": 66731475.0
+      }
+    ]
+  }
+]</pre>
 
 <h3><span class="tag keep">PASS</span> ARBUSDT-PERP → Binance ARBUSDT</h3>
 <p class="small">抓取 2026-10-15T03:13:35Z · SHA-256 <code>8f62f06301e6869a3d8c6607598b31d47efc1a2a449849122e66676fb4aff2b8</code></p>
-<pre class="tall">[{"symbol":"ARBUSDT","brackets":[{"bracket":1,"initialLeverage":75,"notionalCap":5000,"notionalFloor":0,"maintMarginRatio":0.006,"cum":0.0},{"bracket":2,"initialLeverage":50,"notionalCap":50000,"notionalFloor":5000,"maintMarginRatio":0.01,"cum":20.0},{"bracket":3,"initialLeverage":25,"notionalCap":100000,"notionalFloor":50000,"maintMarginRatio":0.015,"cum":270.0},{"bracket":4,"initialLeverage":20,"notionalCap":500000,"notionalFloor":100000,"maintMarginRatio":0.02,"cum":770.0},{"bracket":5,"initialLeverage":10,"notionalCap":1000000,"notionalFloor":500000,"maintMarginRatio":0.025,"cum":3270.0},{"bracket":6,"initialLeverage":5,"notionalCap":5000000,"notionalFloor":1000000,"maintMarginRatio":0.05,"cum":28270.0},{"bracket":7,"initialLeverage":4,"notionalCap":6000000,"notionalFloor":5000000,"maintMarginRatio":0.1,"cum":278270.0},{"bracket":8,"initialLeverage":3,"notionalCap":7000000,"notionalFloor":6000000,"maintMarginRatio":0.125,"cum":428270.0},{"bracket":9,"initialLeverage":2,"notionalCap":8000000,"notionalFloor":7000000,"maintMarginRatio":0.25,"cum":1303270.0},{"bracket":10,"initialLeverage":1,"notionalCap":9000000,"notionalFloor":8000000,"maintMarginRatio":0.5,"cum":3303270.0}]}]</pre>
+<pre class="tall">[
+  {
+    "symbol": "ARBUSDT",
+    "brackets": [
+      {
+        "bracket": 1,
+        "initialLeverage": 75,
+        "notionalCap": 5000,
+        "notionalFloor": 0,
+        "maintMarginRatio": 0.006,
+        "cum": 0.0
+      },
+      {
+        "bracket": 2,
+        "initialLeverage": 50,
+        "notionalCap": 50000,
+        "notionalFloor": 5000,
+        "maintMarginRatio": 0.01,
+        "cum": 20.0
+      },
+      {
+        "bracket": 3,
+        "initialLeverage": 25,
+        "notionalCap": 100000,
+        "notionalFloor": 50000,
+        "maintMarginRatio": 0.015,
+        "cum": 270.0
+      },
+      {
+        "bracket": 4,
+        "initialLeverage": 20,
+        "notionalCap": 500000,
+        "notionalFloor": 100000,
+        "maintMarginRatio": 0.02,
+        "cum": 770.0
+      },
+      {
+        "bracket": 5,
+        "initialLeverage": 10,
+        "notionalCap": 1000000,
+        "notionalFloor": 500000,
+        "maintMarginRatio": 0.025,
+        "cum": 3270.0
+      },
+      {
+        "bracket": 6,
+        "initialLeverage": 5,
+        "notionalCap": 5000000,
+        "notionalFloor": 1000000,
+        "maintMarginRatio": 0.05,
+        "cum": 28270.0
+      },
+      {
+        "bracket": 7,
+        "initialLeverage": 4,
+        "notionalCap": 6000000,
+        "notionalFloor": 5000000,
+        "maintMarginRatio": 0.1,
+        "cum": 278270.0
+      },
+      {
+        "bracket": 8,
+        "initialLeverage": 3,
+        "notionalCap": 7000000,
+        "notionalFloor": 6000000,
+        "maintMarginRatio": 0.125,
+        "cum": 428270.0
+      },
+      {
+        "bracket": 9,
+        "initialLeverage": 2,
+        "notionalCap": 8000000,
+        "notionalFloor": 7000000,
+        "maintMarginRatio": 0.25,
+        "cum": 1303270.0
+      },
+      {
+        "bracket": 10,
+        "initialLeverage": 1,
+        "notionalCap": 9000000,
+        "notionalFloor": 8000000,
+        "maintMarginRatio": 0.5,
+        "cum": 3303270.0
+      }
+    ]
+  }
+]</pre>
 
 <h3><span class="tag keep">PASS</span> UNIUSDT-PERP → Binance UNIUSDT</h3>
 <p class="small">抓取 2026-10-15T03:13:36Z · SHA-256 <code>126bee007a3f94e6b50d284211f2dbaf598339f11cc29f31ceb0195da6cbe1ff</code></p>
-<pre class="tall">[{"symbol":"UNIUSDT","brackets":[{"bracket":1,"initialLeverage":75,"notionalCap":10000,"notionalFloor":0,"maintMarginRatio":0.006,"cum":0.0},{"bracket":2,"initialLeverage":50,"notionalCap":50000,"notionalFloor":10000,"maintMarginRatio":0.01,"cum":40.0},{"bracket":3,"initialLeverage":40,"notionalCap":100000,"notionalFloor":50000,"maintMarginRatio":0.015,"cum":290.0},{"bracket":4,"initialLeverage":25,"notionalCap":500000,"notionalFloor":100000,"maintMarginRatio":0.02,"cum":790.0},{"bracket":5,"initialLeverage":20,"notionalCap":1000000,"notionalFloor":500000,"maintMarginRatio":0.025,"cum":3290.0},{"bracket":6,"initialLeverage":10,"notionalCap":5000000,"notionalFloor":1000000,"maintMarginRatio":0.05,"cum":28290.0},{"bracket":7,"initialLeverage":5,"notionalCap":10000000,"notionalFloor":5000000,"maintMarginRatio":0.1,"cum":278290.0},{"bracket":8,"initialLeverage":4,"notionalCap":12500000,"notionalFloor":10000000,"maintMarginRatio":0.125,"cum":528290.0},{"bracket":9,"initialLeverage":2,"notionalCap":25000000,"notionalFloor":12500000,"maintMarginRatio":0.25,"cum":2090790.0},{"bracket":10,"initialLeverage":1,"notionalCap":50000000,"notionalFloor":25000000,"maintMarginRatio":0.5,"cum":8340790.0}]}]</pre>
+<pre class="tall">[
+  {
+    "symbol": "UNIUSDT",
+    "brackets": [
+      {
+        "bracket": 1,
+        "initialLeverage": 75,
+        "notionalCap": 10000,
+        "notionalFloor": 0,
+        "maintMarginRatio": 0.006,
+        "cum": 0.0
+      },
+      {
+        "bracket": 2,
+        "initialLeverage": 50,
+        "notionalCap": 50000,
+        "notionalFloor": 10000,
+        "maintMarginRatio": 0.01,
+        "cum": 40.0
+      },
+      {
+        "bracket": 3,
+        "initialLeverage": 40,
+        "notionalCap": 100000,
+        "notionalFloor": 50000,
+        "maintMarginRatio": 0.015,
+        "cum": 290.0
+      },
+      {
+        "bracket": 4,
+        "initialLeverage": 25,
+        "notionalCap": 500000,
+        "notionalFloor": 100000,
+        "maintMarginRatio": 0.02,
+        "cum": 790.0
+      },
+      {
+        "bracket": 5,
+        "initialLeverage": 20,
+        "notionalCap": 1000000,
+        "notionalFloor": 500000,
+        "maintMarginRatio": 0.025,
+        "cum": 3290.0
+      },
+      {
+        "bracket": 6,
+        "initialLeverage": 10,
+        "notionalCap": 5000000,
+        "notionalFloor": 1000000,
+        "maintMarginRatio": 0.05,
+        "cum": 28290.0
+      },
+      {
+        "bracket": 7,
+        "initialLeverage": 5,
+        "notionalCap": 10000000,
+        "notionalFloor": 5000000,
+        "maintMarginRatio": 0.1,
+        "cum": 278290.0
+      },
+      {
+        "bracket": 8,
+        "initialLeverage": 4,
+        "notionalCap": 12500000,
+        "notionalFloor": 10000000,
+        "maintMarginRatio": 0.125,
+        "cum": 528290.0
+      },
+      {
+        "bracket": 9,
+        "initialLeverage": 2,
+        "notionalCap": 25000000,
+        "notionalFloor": 12500000,
+        "maintMarginRatio": 0.25,
+        "cum": 2090790.0
+      },
+      {
+        "bracket": 10,
+        "initialLeverage": 1,
+        "notionalCap": 50000000,
+        "notionalFloor": 25000000,
+        "maintMarginRatio": 0.5,
+        "cum": 8340790.0
+      }
+    ]
+  }
+]</pre>
 
 <h3><span class="tag keep">PASS</span> AAVEUSDT-PERP → Binance AAVEUSDT</h3>
 <p class="small">抓取 2026-10-15T03:13:36Z · SHA-256 <code>d0efb3034a2f058c0201cb73f84ff03d664015965a86d53399a3292b59b9aa68</code></p>
-<pre class="tall">[{"symbol":"AAVEUSDT","brackets":[{"bracket":1,"initialLeverage":75,"notionalCap":50000,"notionalFloor":0,"maintMarginRatio":0.01,"cum":0.0},{"bracket":2,"initialLeverage":50,"notionalCap":150000,"notionalFloor":50000,"maintMarginRatio":0.015,"cum":250.0},{"bracket":3,"initialLeverage":25,"notionalCap":500000,"notionalFloor":150000,"maintMarginRatio":0.02,"cum":1000.0},{"bracket":4,"initialLeverage":20,"notionalCap":600000,"notionalFloor":500000,"maintMarginRatio":0.025,"cum":3500.0},{"bracket":5,"initialLeverage":10,"notionalCap":3000000,"notionalFloor":600000,"maintMarginRatio":0.05,"cum":18500.0},{"bracket":6,"initialLeverage":5,"notionalCap":6000000,"notionalFloor":3000000,"maintMarginRatio":0.1,"cum":168500.0},{"bracket":7,"initialLeverage":4,"notionalCap":7500000,"notionalFloor":6000000,"maintMarginRatio":0.125,"cum":318500.0},{"bracket":8,"initialLeverage":2,"notionalCap":15000000,"notionalFloor":7500000,"maintMarginRatio":0.25,"cum":1256000.0},{"bracket":9,"initialLeverage":1,"notionalCap":30000000,"notionalFloor":15000000,"maintMarginRatio":0.5,"cum":5006000.0}]}]</pre>
+<pre class="tall">[
+  {
+    "symbol": "AAVEUSDT",
+    "brackets": [
+      {
+        "bracket": 1,
+        "initialLeverage": 75,
+        "notionalCap": 50000,
+        "notionalFloor": 0,
+        "maintMarginRatio": 0.01,
+        "cum": 0.0
+      },
+      {
+        "bracket": 2,
+        "initialLeverage": 50,
+        "notionalCap": 150000,
+        "notionalFloor": 50000,
+        "maintMarginRatio": 0.015,
+        "cum": 250.0
+      },
+      {
+        "bracket": 3,
+        "initialLeverage": 25,
+        "notionalCap": 500000,
+        "notionalFloor": 150000,
+        "maintMarginRatio": 0.02,
+        "cum": 1000.0
+      },
+      {
+        "bracket": 4,
+        "initialLeverage": 20,
+        "notionalCap": 600000,
+        "notionalFloor": 500000,
+        "maintMarginRatio": 0.025,
+        "cum": 3500.0
+      },
+      {
+        "bracket": 5,
+        "initialLeverage": 10,
+        "notionalCap": 3000000,
+        "notionalFloor": 600000,
+        "maintMarginRatio": 0.05,
+        "cum": 18500.0
+      },
+      {
+        "bracket": 6,
+        "initialLeverage": 5,
+        "notionalCap": 6000000,
+        "notionalFloor": 3000000,
+        "maintMarginRatio": 0.1,
+        "cum": 168500.0
+      },
+      {
+        "bracket": 7,
+        "initialLeverage": 4,
+        "notionalCap": 7500000,
+        "notionalFloor": 6000000,
+        "maintMarginRatio": 0.125,
+        "cum": 318500.0
+      },
+      {
+        "bracket": 8,
+        "initialLeverage": 2,
+        "notionalCap": 15000000,
+        "notionalFloor": 7500000,
+        "maintMarginRatio": 0.25,
+        "cum": 1256000.0
+      },
+      {
+        "bracket": 9,
+        "initialLeverage": 1,
+        "notionalCap": 30000000,
+        "notionalFloor": 15000000,
+        "maintMarginRatio": 0.5,
+        "cum": 5006000.0
+      }
+    ]
+  }
+]</pre>
 
 <h3><span class="tag keep">PASS</span> GOOGLUSDT-PERP → Binance GOOGLUSDT</h3>
 <p class="small">抓取 2026-10-15T03:13:36Z · SHA-256 <code>1320370dacc2eedc57df1177f2e7371306335a7e553b85cf0d7ed8ffc4aff072</code></p>
-<pre class="tall">[{"symbol":"GOOGLUSDT","brackets":[{"bracket":1,"initialLeverage":50,"notionalCap":50000,"notionalFloor":0,"maintMarginRatio":0.01,"cum":0.0},{"bracket":2,"initialLeverage":25,"notionalCap":200000,"notionalFloor":50000,"maintMarginRatio":0.02,"cum":500.0},{"bracket":3,"initialLeverage":20,"notionalCap":400000,"notionalFloor":200000,"maintMarginRatio":0.025,"cum":1500.0},{"bracket":4,"initialLeverage":15,"notionalCap":1000000,"notionalFloor":400000,"maintMarginRatio":0.0333,"cum":4820.0},{"bracket":5,"initialLeverage":10,"notionalCap":5000000,"notionalFloor":1000000,"maintMarginRatio":0.05,"cum":21520.0},{"bracket":6,"initialLeverage":5,"notionalCap":15000000,"notionalFloor":5000000,"maintMarginRatio":0.1,"cum":271520.0},{"bracket":7,"initialLeverage":4,"notionalCap":20000000,"notionalFloor":15000000,"maintMarginRatio":0.125,"cum":646520.0},{"bracket":8,"initialLeverage":3,"notionalCap":30000000,"notionalFloor":20000000,"maintMarginRatio":0.1667,"cum":1480520.0},{"bracket":9,"initialLeverage":2,"notionalCap":50000000,"notionalFloor":30000000,"maintMarginRatio":0.25,"cum":3979520.0},{"bracket":10,"initialLeverage":1,"notionalCap":100000000,"notionalFloor":50000000,"maintMarginRatio":0.5,"cum":16479520.0}]}]</pre>
+<pre class="tall">[
+  {
+    "symbol": "GOOGLUSDT",
+    "brackets": [
+      {
+        "bracket": 1,
+        "initialLeverage": 50,
+        "notionalCap": 50000,
+        "notionalFloor": 0,
+        "maintMarginRatio": 0.01,
+        "cum": 0.0
+      },
+      {
+        "bracket": 2,
+        "initialLeverage": 25,
+        "notionalCap": 200000,
+        "notionalFloor": 50000,
+        "maintMarginRatio": 0.02,
+        "cum": 500.0
+      },
+      {
+        "bracket": 3,
+        "initialLeverage": 20,
+        "notionalCap": 400000,
+        "notionalFloor": 200000,
+        "maintMarginRatio": 0.025,
+        "cum": 1500.0
+      },
+      {
+        "bracket": 4,
+        "initialLeverage": 15,
+        "notionalCap": 1000000,
+        "notionalFloor": 400000,
+        "maintMarginRatio": 0.0333,
+        "cum": 4820.0
+      },
+      {
+        "bracket": 5,
+        "initialLeverage": 10,
+        "notionalCap": 5000000,
+        "notionalFloor": 1000000,
+        "maintMarginRatio": 0.05,
+        "cum": 21520.0
+      },
+      {
+        "bracket": 6,
+        "initialLeverage": 5,
+        "notionalCap": 15000000,
+        "notionalFloor": 5000000,
+        "maintMarginRatio": 0.1,
+        "cum": 271520.0
+      },
+      {
+        "bracket": 7,
+        "initialLeverage": 4,
+        "notionalCap": 20000000,
+        "notionalFloor": 15000000,
+        "maintMarginRatio": 0.125,
+        "cum": 646520.0
+      },
+      {
+        "bracket": 8,
+        "initialLeverage": 3,
+        "notionalCap": 30000000,
+        "notionalFloor": 20000000,
+        "maintMarginRatio": 0.1667,
+        "cum": 1480520.0
+      },
+      {
+        "bracket": 9,
+        "initialLeverage": 2,
+        "notionalCap": 50000000,
+        "notionalFloor": 30000000,
+        "maintMarginRatio": 0.25,
+        "cum": 3979520.0
+      },
+      {
+        "bracket": 10,
+        "initialLeverage": 1,
+        "notionalCap": 100000000,
+        "notionalFloor": 50000000,
+        "maintMarginRatio": 0.5,
+        "cum": 16479520.0
+      }
+    ]
+  }
+]</pre>
 
 <p class="small" style="margin-top:28px">抓取脚本：HMAC-SHA256 签名（API key + secret），未打印 secret。抓取完成后该 API key 应立即在币安后台删除/轮换。</p>
 <nav class="pager"><a href="#rollback">&larr;<span class="no">10</span>回退</a><span></span></nav>

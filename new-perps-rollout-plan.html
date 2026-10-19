@@ -600,8 +600,9 @@ ON CONFLICT (symbol, tier_index) DO UPDATE SET
   <thead><tr><th>组件</th><th>neodax-apps-value PR</th><th>改动文件</th></tr></thead>
   <tbody>
     <tr><td><b>Kafka topics</b></td><td><a class="pr" href="https://github.com/layer-3/neodax-apps-value/pull/173" target="_blank" rel="noopener"><span class="n">neodax-apps-value#173</span><span class="st">base aws</span></a></td><td><code>neodax-kafka-topic-provision/prod/values.yaml</code></td></tr>
-    <tr><td><b>Quote</b></td><td><a class="pr" href="https://github.com/layer-3/neodax-apps-value/pull/173" target="_blank" rel="noopener"><span class="n">neodax-apps-value#173</span><span class="st">base aws</span></a></td><td><code>neodax-nacos/prod/quote/quote.yaml</code></td></tr>
+    <tr><td><b>Quote</b></td><td><a class="pr" href="https://github.com/layer-3/neodax-apps-value/pull/173" target="_blank" rel="noopener"><span class="n">neodax-apps-value#173</span><span class="st">base aws</span></a></td><td><code>neodax-nacos/prod/quote/quote.yaml</code>、<code>neodax-quote/prod/values.yaml</code>（资源扩容）</td></tr>
     <tr><td><b>Ledger</b></td><td><a class="pr" href="https://github.com/layer-3/neodax-apps-value/pull/173" target="_blank" rel="noopener"><span class="n">neodax-apps-value#173</span><span class="st">base aws</span></a></td><td><code>neodax-nacos/prod/ledger/ledger.yaml</code></td></tr>
+    <tr><td><b>PM Perp</b></td><td><a class="pr" href="https://github.com/layer-3/neodax-apps-value/pull/173" target="_blank" rel="noopener"><span class="n">neodax-apps-value#173</span><span class="st">base aws</span></a></td><td><code>neodax-nacos/prod/portfolio_manager_perp/portfolio_manager_perp_common.yaml</code>（quote.base_url：leader mark seed 与 funding-rate 补/修 sweep）</td></tr>
     <tr><td><b>MM Connector</b></td><td><span class="pr-todo">无配置 PR</span></td><td class="dim">随 master 分支镜像发布</td></tr>
     <tr><td><b>Trading API</b></td><td><a class="pr" href="https://github.com/layer-3/neodax-apps-value/pull/173" target="_blank" rel="noopener"><span class="n">neodax-apps-value#173</span><span class="st">base aws</span></a></td><td><code>neodax-nacos/prod/trading_api/trading_api.yaml</code></td></tr>
     <tr><td><b>Alerts</b></td><td><span class="pr-todo">无配置 PR</span></td><td class="dim">随 master 分支镜像发布</td></tr>
@@ -609,7 +610,12 @@ ON CONFLICT (symbol, tier_index) DO UPDATE SET
 </table></div>
 <div class="note">
   <h4>#173 合并前提</h4>
-  <p>生产 quote / ledger / topic provision / trading-api 当前镜像（quote / ledger / topic provision 为 <code>release-v3.6.2-bb6fd4e6</code>，trading-api 为 <code>build-perpetual-transfer-gate-1207c86d</code>）不含 A-Book 代码，新配置会被忽略。必须先升级到包含 neodax <code>#1722</code>、<code>#1752</code>、<code>#1757</code> 的镜像；且 topic provision Job 必须在 quote 启动镜像、trading-api 订阅新 topic 之前完成，否则向不存在的 topic 发布会卡住共享 producer，冻结全部市场的 mark（UAT 2026-10-08 事故）。</p>
+  <p>镜像门槛（2026-10-19 复核）：<b>必须整体升级到 <code>release-v3.7.3-43a5a184</code> 或更新的 release</b>。生产当前镜像——quote / ledger / topic provision 为 <code>release-v3.6.2-bb6fd4e6</code>（2026-09-07）、PM Perp 为 <code>release-v3.6.2-dc6e6939</code>、trading-api 为 ad-hoc 构建 <code>build-perpetual-transfer-gate-1207c86d</code>——不含任何 A-Book 代码，新配置会被忽略。<code>release-v3.7.3-43a5a184</code> 除 A-Book 基础（<code>#1722</code> A-Book 支持、<code>#1752</code> quote 镜像流 + 每市场 topic、<code>#1757</code>）外，还包含 staging 上线后发现的四个必需修复：<code>#1779</code>（A-Book 新用户首单错误——不升即带已知 bug 上线）、<code>#1784</code>（ledger A-Book ticker topic 订阅——不升 ticker 不推送）、<code>#1777</code> / <code>#1781</code>（quote 两个 CPU 放大器；#1781 还会污染 ticker / kline 的 last_price）。<b>MM Connector 在 apps-value 之外管理、无配置 PR</b>——发布清单不要漏掉它（A-Book 执行路径）。</p>
+  <p>顺序铁律不变：topic provision Job 必须在 quote 启动新镜像、trading-api 订阅新 topic 之前完成，否则向不存在的 topic 发布会卡住共享 producer，冻结全部市场的 mark（UAT 2026-10-08 事故）。</p>
+</div>
+<div class="note">
+  <h4>Quote 资源扩容（2026-10-19 增补）</h4>
+  <p>staging 曾在 <code>500m/512Mi</code>、16 市场下 CPU 限流 94% 触发 SAFE_MODE（mark 采样丢失、funding aux 被丢）。生产本批上线后共 <b>25 个市场</b>（11 B-Book + 14 个 A-Book mirror worker：每个市场 REST depth 拉取 + diff 流 + 全量本地订单簿 + kline + aggTrade + ticker + exchangeInfo 轮询）。#173 已把生产 quote 资源改为 <b>limits <code>4000m/2Gi</code>、requests <code>1500m/1Gi</code></b>（对照：staging 16 市场为 2000m/1Gi；生产为 1.56 倍市场数，并预留 14 路 depth 流同时重连的余量）。上线后长期空闲可回调，回调前盯 container_cpu_cfs_throttled 与内存水位。</p>
 </div>
 <ol class="seq">
   <li><b>Kafka topics</b><span>将 14 个 <code>-PERP</code> symbol 交给 <code>tools/kafka_topic_init</code>。除订单 / 成交 topic 外，必须确认 A-book margin snapshot、orderbook、<code>EventKlineObserved</code>、<code>EventTradeObserved</code>、<code>EventTickerObserved</code> 均已创建。</span><span class="prs"><a class="pr" href="https://github.com/layer-3/neodax-apps-value/pull/173" target="_blank" rel="noopener"><span class="n">neodax-apps-value#173</span><span class="st">base aws</span></a></span></li>

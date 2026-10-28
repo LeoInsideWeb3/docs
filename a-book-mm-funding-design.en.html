@@ -1,0 +1,533 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#f6f3e8">
+<title>A-Book Market-Maker Top-Up Design · NeoDAX</title>
+<style>
+:root{
+  --paper:#f6f3e8; --paper-light:#fcfaf2; --panel:#edf0e2;
+  --ink:#263d32; --muted:#647065; --line:#d9ddcf;
+  --green:#315b43; --sage:#dfe7d7; --orange:#db8958; --yellow:#e7bd64; --shadow:#ccd2bc;
+  --mono:"Pixel","Courier New",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --body:Inter,-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--paper);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.75;-webkit-font-smoothing:antialiased}
+::selection{background:var(--yellow);color:var(--ink)}
+a{color:var(--green)}
+.section-wrap{max-width:1060px;margin:0 auto;padding:0 28px}
+
+.site-header{position:sticky;top:0;z-index:50;background:var(--paper);border-bottom:1px solid var(--line)}
+.header-inner{max-width:1060px;margin:0 auto;padding:14px 28px;display:flex;align-items:center;justify-content:space-between;gap:20px}
+.brand{font-family:var(--mono);font-size:14px;letter-spacing:1px;color:var(--ink);text-decoration:none;display:flex;align-items:center;gap:10px}
+.brand-icon{width:12px;height:12px;background:var(--green);display:inline-block;box-shadow:2px 2px 0 var(--shadow)}
+.brand-suffix{color:var(--muted)}
+.desktop-nav{display:flex;gap:4px;flex-wrap:wrap}
+.desktop-nav a{font-family:var(--mono);font-size:12px;letter-spacing:.5px;color:var(--muted);text-decoration:none;padding:5px 10px;border:1px solid transparent}
+.desktop-nav a:hover{color:var(--ink);border-color:var(--line);background:var(--paper-light)}
+.reading-progress{position:absolute;left:0;bottom:-1px;height:2px;width:0;background:var(--orange);transition:width .1s linear}
+@media(max-width:760px){.desktop-nav{display:none}}
+
+.hero{padding:72px 0 56px;border-bottom:1px solid var(--line)}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--orange);margin-bottom:16px}
+.hero h1{font-size:clamp(30px,4.6vw,52px);line-height:1.12;letter-spacing:-.5px;max-width:820px}
+.hero h1 .hl{background:var(--sage);padding:0 8px;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+.hero-meta{font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:18px;letter-spacing:.5px}
+.hero-intro{max-width:720px;font-size:17.5px;color:var(--ink);margin-top:22px}
+.hero-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:24px}
+.tag{font-family:var(--mono);font-size:11px;letter-spacing:.5px;background:var(--sage);border:1px solid var(--line);padding:4px 10px;color:var(--green)}
+.tag.orange{background:#f7e5d8;color:#a15c33;border-color:#e6cdba}
+.hero-buttons{display:flex;gap:14px;margin-top:30px;flex-wrap:wrap}
+.button{font-family:var(--mono);font-size:13px;letter-spacing:1px;text-decoration:none;padding:12px 22px;border:1px solid var(--ink);background:var(--paper-light);color:var(--ink);box-shadow:3px 3px 0 var(--shadow);transition:transform .15s,box-shadow .15s}
+.button:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--shadow)}
+.button.primary{background:var(--green);color:#faf7ec;border-color:var(--green)}
+
+.impact-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));border:1px solid #cbd1bd;background:var(--panel);margin:44px 0 0}
+.impact-cell{padding:22px 26px;border-right:1px solid #cbd1bd}
+.impact-cell:last-child{border-right:none}
+.impact-number{font-family:var(--mono);font-size:30px;line-height:1;color:var(--green)}
+.impact-number.orange{color:var(--orange)}
+.impact-label{display:block;font-size:13px;color:var(--muted);margin-top:8px}
+@media(max-width:760px){.impact-cell{border-right:none;border-bottom:1px solid #cbd1bd}.impact-cell:last-child{border-bottom:none}}
+
+section.doc-section{padding:64px 0;border-bottom:1px solid var(--line)}
+section.doc-section:last-of-type{border-bottom:none}
+.section-heading{display:flex;align-items:baseline;justify-content:space-between;gap:18px;margin-bottom:34px}
+.section-kicker{font-family:var(--mono);font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--orange)}
+.section-heading h2{font-size:clamp(22px,3vw,30px);letter-spacing:-.3px;margin-top:8px}
+.section-aside{font-family:var(--mono);font-size:22px;color:var(--line);flex:none}
+@media(max-width:760px){.section-heading{flex-direction:column;gap:6px}}
+
+.doc-copy{max-width:780px}
+.doc-copy p{margin-bottom:16px}
+.doc-copy p.large-copy{font-size:19px;line-height:1.65}
+.doc-copy ul,.doc-copy ol{padding-left:22px;margin-bottom:16px}
+.doc-copy li{margin-bottom:8px}
+.doc-copy strong{background:var(--sage);padding:0 4px}
+.doc-copy code{font-family:var(--mono);font-size:.86em;background:var(--paper-light);border:1px solid var(--line);padding:1px 6px}
+
+.tbl-wrap{overflow-x:auto;border:1px solid #cbd1bd;background:var(--paper-light);margin-bottom:22px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+thead th{font-family:var(--mono);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--green);text-align:left;background:var(--panel);border-bottom:1px solid #cbd1bd;padding:11px 16px;white-space:nowrap}
+tbody td{padding:11px 16px;border-bottom:1px solid var(--line);vertical-align:top}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:nth-child(even){background:#f3f0e4}
+td code{white-space:nowrap}
+
+pre.code{font-family:var(--mono);font-size:13px;line-height:1.7;background:var(--paper-light);border:1px solid #c8d0b9;border-left:4px solid var(--green);padding:18px 22px;overflow-x:auto;margin-bottom:22px}
+pre.code .cm{color:var(--muted)}
+pre.code .bad{color:#b34a3a}
+pre.code .ok{color:var(--green)}
+
+.callout{display:flex;gap:14px;border:1px solid #c8d0b9;background:var(--paper-light);padding:16px 20px;margin-bottom:22px;max-width:860px}
+.callout-icon{font-family:var(--mono);font-size:12px;flex:none;padding:2px 8px;height:fit-content}
+.callout.note{border-left:4px solid var(--green)} .callout.note .callout-icon{background:var(--sage);color:var(--green)}
+.callout.warn{border-left:4px solid var(--orange)} .callout.warn .callout-icon{background:#f7e5d8;color:#a15c33}
+.callout.alarm{border-left:4px solid #b34a3a} .callout.alarm .callout-icon{background:#f3dbd6;color:#8f3629}
+.callout p{font-size:14.5px}
+.callout p+p{margin-top:8px}
+
+.card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px;margin-bottom:22px}
+.card{background:var(--paper-light);border:1px solid #c8d0b9;padding:22px 20px;position:relative;transition:transform .2s,box-shadow .2s}
+.card:hover{transform:translate(-2px,-2px);box-shadow:4px 4px 0 var(--shadow)}
+.card-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.card-index{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.card h3{font-size:17px;margin-bottom:8px}
+.card p{font-size:14px;color:var(--muted)}
+.card-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px}
+.card-footer{display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding-top:12px;border-top:1px dashed var(--line);font-family:var(--mono);font-size:11px;color:var(--muted)}
+.status-dot{width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block}
+.status-dot.warn{background:var(--orange)}
+.status-dot.bad{background:#b34a3a}
+
+.quest-list{border-top:1px solid #bcc7ad}
+details.quest{border-bottom:1px solid #bcc7ad;background:var(--paper-light)}
+.quest-head{display:grid;grid-template-columns:130px 92px 1fr 28px;gap:14px;align-items:center;padding:16px 18px;cursor:pointer;list-style:none}
+.quest-head::-webkit-details-marker{display:none}
+.quest-index{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.quest-type{font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#faf7ec;background:var(--green);padding:3px 0;text-align:center}
+.quest-type.warn{background:var(--orange)}
+.quest-type.bad{background:#b34a3a}
+.quest-head h3{font-size:15.5px;font-weight:600}
+.quest-expand{font-family:var(--mono);color:var(--muted)}
+details.quest[open] .quest-expand::before{content:"-"}
+.quest-content{padding:4px 18px 22px 66px;font-size:14.5px;color:var(--ink)}
+.quest-content p{margin-bottom:12px}
+.quest-note{font-family:var(--mono);font-size:12px;color:var(--muted);border-left:3px solid var(--yellow);padding:8px 14px;background:var(--paper);margin:14px 0}
+@media(max-width:640px){.quest-head{grid-template-columns:90px 1fr 24px}.quest-type{display:none}.quest-content{padding-left:18px}}
+
+.site-footer{border-top:1px solid var(--line);padding:34px 0;background:var(--panel)}
+.footer-inner{max-width:1060px;margin:0 auto;padding:0 28px;display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap}
+.footer-meta{font-family:var(--mono);font-size:11px;letter-spacing:.5px;color:var(--muted)}
+.back-top{font-family:var(--mono);font-size:12px;letter-spacing:1px;color:var(--ink);text-decoration:none;border:1px solid var(--ink);padding:8px 16px;background:var(--paper-light);box-shadow:3px 3px 0 var(--shadow)}
+.back-top:hover{transform:translate(-1px,-1px)}
+@media print{.site-header,.hero-buttons,.back-top,.reading-progress{display:none!important}body{background:#fff}section.doc-section{padding:20px 0}}
+</style>
+</head>
+<body>
+
+<header class="site-header">
+  <div class="header-inner">
+    <a class="brand" href="#main"><span class="brand-icon"></span>NEODAX / A-BOOK<span class="brand-suffix">· treasury</span></a>
+    <nav class="desktop-nav">
+      <a href="#s1">01 Objective</a><a href="#s2">02 Roles</a><a href="#s3">03 Trust</a><a href="#s4">04 Policy</a><a href="#s5">05 Flow</a><a href="#s6">06 State</a><a href="#s7">07 Failure</a><a href="#s8">08 Risk</a><a href="#s9">09 Rollout</a>
+    </nav>
+  </div>
+  <div class="reading-progress" id="progress"></div>
+</header>
+
+<main id="main">
+
+<section class="hero section-wrap">
+  <div class="eyebrow">● TREASURY · DESIGN DOC · v1.0 · 2026-10-28</div>
+  <h1>A-Book Market-Maker Top-Up<br><span class="hl">one-direction fund loop</span></h1>
+  <div class="hero-meta">v1.0 · 2026-10-28 · NeoDAX team · Status: review</div>
+  <p class="hero-intro">When the Binance market-making account runs low on available balance or margin risk rises, the system automatically transfers USDT from a dedicated treasury wallet to the approved Binance deposit address. After Binance credits the deposit, the MM program verifies it and moves funds into the Futures wallet. No human intervention on the happy path — every step auditable, recoverable, and pausable.</p>
+  <div class="hero-tags">
+    <span class="tag">mm_connector</span><span class="tag">Cage</span><span class="tag">MM program</span><span class="tag">Binance</span><span class="tag orange">treasury funds</span>
+  </div>
+  <div class="hero-buttons">
+    <a class="button primary" href="#s1">Read ↓</a>
+    <a class="button" href="#s9">Jump to rollout</a>
+  </div>
+  <div class="impact-strip">
+    <div class="impact-cell"><span class="impact-number">1</span><span class="impact-label">fund direction (in only, no out)</span></div>
+    <div class="impact-cell"><span class="impact-number">14</span><span class="impact-label">state machine terminal states</span></div>
+    <div class="impact-cell"><span class="impact-number orange">0</span><span class="impact-label">human touchpoints (happy path)</span></div>
+    <div class="impact-cell"><span class="impact-number">6</span><span class="impact-label">rollout phases (incl. shadow)</span></div>
+    <div class="impact-cell"><span class="impact-number">20</span><span class="impact-label">config parameters</span></div>
+  </div>
+</section>
+
+<section class="doc-section section-wrap" id="s1">
+  <div class="section-heading">
+    <div><div class="section-kicker">Objective</div><h2>Objective & Fund Direction</h2></div>
+    <div class="section-aside">01</div>
+  </div>
+  <div class="doc-copy">
+    <p class="large-copy">One supported fund direction: from the Cage market-making treasury wallet, through the Binance Spot wallet, into the USDⓈ-M Futures wallet. No reverse flow.</p>
+    <div class="callout alarm">
+      <span class="callout-icon">ALARM</span>
+      <p><strong>Not in scope:</strong>withdrawing from Binance, sweeping excess funds back, reusing customer deposit/withdrawal/balance flows, or auto-changing Binance API-key permissions.</p>
+    </div>
+    <div class="code-title">The only fund direction</div>
+    <pre class="code"><span class="cm">Cage treasury wallet (on-chain USDT)</span>
+    → Binance deposit address (fixed, managed by Cage allowlist)
+    → MM Spot wallet (credited by Binance on arrival)
+    → MM USDⓈ-M Futures wallet (internal transfer initiated by MM program)</pre>
+    <div class="callout note">
+      <span class="callout-icon">NOTE</span>
+      <p><strong>Separation of trust:</strong>Binance API keys live only in the MM program. <code>mm_connector</code> does not read Binance wallets, store Binance credentials, or call Binance private APIs. It only consumes MM-program-signed account snapshots.</p>
+    </div>
+  </div>
+</section>
+
+<section class="doc-section section-wrap" id="s2">
+  <div class="section-heading">
+    <div><div class="section-kicker">Roles</div><h2>Component Responsibilities</h2></div>
+    <div class="section-aside">02</div>
+  </div>
+  <div class="card-grid">
+    <article class="card">
+      <div class="card-top"><span class="card-index">MC</span></div>
+      <h3>mm_connector</h3>
+      <p>Consumes MM snapshots → evaluates policy → creates requests → drives the state machine → correlates Cage and MM evidence → publishes risk state. The coordinator; never touches chain or Binance directly.</p>
+      <div class="card-footer"><span class="status-dot"></span> Coordinator</div>
+    </article>
+    <article class="card">
+      <div class="card-top"><span class="card-index">MM</span></div>
+      <h3>MM Program</h3>
+      <p>Holds Binance credentials, reads the Futures account balance and margin, queries deposit history, executes Spot-to-Futures transfers, and retains Binance evidence. Multi-replica: shared idempotency or leader-elected execution.</p>
+      <div class="card-footer"><span class="status-dot"></span> Sole Binance gateway</div>
+    </article>
+    <article class="card">
+      <div class="card-top"><span class="card-index">CG</span></div>
+      <h3>Cage</h3>
+      <p>Manages the dedicated treasury wallet, stores fixed Binance deposit addresses, enforces allowlist and limits, signs and broadcasts on-chain transactions, tracks confirmations, and publishes transfer events.</p>
+      <div class="card-footer"><span class="status-dot"></span> Sole on-chain gateway</div>
+    </article>
+    <article class="card">
+      <div class="card-top"><span class="card-index">PM</span></div>
+      <h3>PM Perp</h3>
+      <p>Enforces A-Book risk snapshots for order admission. Does not participate in treasury transfers — it only consumes risk conclusions.</p>
+      <div class="card-footer"><span class="status-dot warn"></span> Downstream consumer</div>
+    </article>
+    <article class="card">
+      <div class="card-top"><span class="card-index">AD</span></div>
+      <h3>Admin Tooling</h3>
+      <p>Configure policy, approve large requests, pause automation, inspect evidence, and resolve manual reviews. Every manual state change records actor, time, reason, and evidence.</p>
+      <div class="card-footer"><span class="status-dot warn"></span> Intervention point</div>
+    </article>
+  </div>
+  <div class="callout note">
+    <span class="callout-icon">NOTE</span>
+    <p><strong>Policy granularity:</strong>one Binance account may serve several A-Book markets. Policy runs on <code>venue_account_id + asset</code>, not per-market — no duplicate requests for the same account.</p>
+  </div>
+</section>
+
+<section class="doc-section section-wrap" id="s3">
+  <div class="section-heading">
+    <div><div class="section-kicker">Trust</div><h2>Trust Boundaries</h2></div>
+    <div class="section-aside">03</div>
+  </div>
+  <div class="doc-copy">
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>Boundary</th><th>Constraint</th></tr></thead>
+        <tbody>
+          <tr><td>Binance credentials</td><td>Only in the MM program; neither mm_connector nor Cage holds them</td></tr>
+          <tr><td>Cage signing keys</td><td>Only inside Cage's signing boundary; KMS/HSM recommended</td></tr>
+          <tr><td>Transfer target</td><td>Cage-managed allowlist; business commands carry <code>destination_id</code>, never a raw address</td></tr>
+          <tr><td>Fixed address & network</td><td>Stored only in Cage; mm_connector never queries the MM program for a deposit address</td></tr>
+          <tr><td>Fund isolation</td><td>Treasury wallet is isolated from customer custody funds, with separate accounting and limits</td></tr>
+          <tr><td>Database isolation</td><td>Services never write each other's databases; cross-service via Kafka events</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout warn">
+      <span class="callout-icon">WARN</span>
+      <p><strong>Must not reuse:</strong>optional direct Binance access in <code>binance/client.go</code> (no prod credentials, keep disabled); customer withdrawal events (PM-lock semantics differ); <code>EventABookExternalFunding</code> (that is a funding-fee result, not a top-up); existing <code>margin_snapshots</code> (they do not prove the Binance wallet balance).</p>
+    </div>
+  </div>
+</section>
+
+<section class="doc-section section-wrap" id="s4">
+  <div class="section-heading">
+    <div><div class="section-kicker">Policy</div><h2>Top-Up Policy & Amount Calculation</h2></div>
+    <div class="section-aside">04</div>
+  </div>
+  <div class="doc-copy">
+    <p class="large-copy">The policy answers one question: <strong>how much should we top up right now?</strong>The answer is the max of three deficit dimensions, minus in-flight amounts.</p>
+    <div class="code-title">Amount formula</div>
+    <pre class="code"><span class="cm">// A = available balance;  M = margin balance;  MM = maintenance margin
+// F = forecast demand + reserve;  P = in-flight amount
+// T = target available balance;  R = target margin ratio</span>
+
+available_deficit = max(0, T - A)
+ratio_deficit     = max(0, MM / R - M)
+forecast_deficit  = max(0, F - A)
+gross_amount      = max(available_deficit, ratio_deficit, forecast_deficit)
+requested_amount  = max(0, gross_amount - P)</pre>
+    <p>The result is checked against asset precision, minimum amount, per-request limit, daily limit, Cage wallet balance, and Gas reserve.</p>
+    <div class="callout note">
+      <span class="callout-icon">NOTE</span>
+      <p><strong>Why not just look at balance:</strong>margin ratio is an earlier risk indicator than balance — balance can still be adequate while maintenance-margin percentage is already critical. Taking the max across three dimensions covers the "balance is fine but risk has elevated" case.</p>
+    </div>
+    <div class="callout warn">
+      <span class="callout-icon">WARN</span>
+      <p><strong>Preventing duplicate top-ups:</strong>only one active request per <code>venue_account_id + asset</code>. In-flight amount <code>P</code> must be included in later evaluations — chain confirmation and Binance crediting each take minutes to hours, and ignoring in-flight would fire multiple transfers for the same deficit.</p>
+    </div>
+  </div>
+</section>
+
+<section class="doc-section section-wrap" id="s5">
+  <div class="section-heading">
+    <div><div class="section-kicker">Flow</div><h2>End-to-End Flow (10 steps)</h2></div>
+    <div class="section-aside">05</div>
+  </div>
+  <div class="quest-list">
+    <details class="quest" open>
+      <summary class="quest-head">
+        <span class="quest-index">STEP 1–2</span>
+        <span class="quest-type">OK</span>
+        <h3>Read snapshot and evaluate policy</h3>
+        <span class="quest-expand">+</span>
+      </summary>
+      <div class="quest-content">
+        <p><code>mm_connector</code> periodically calls MM's <code>GetTreasuryAccount</code>, obtaining a source-timestamped, versioned, health-flagged account snapshot. On policy match, it writes the request and Outbox record in one transaction (reusing mm_connector's existing Inbox/Outbox/Worker Lease patterns).</p>
+        <div class="quest-note">Invalid snapshots (stale, version regression, wrong account/asset, invalid amounts, source_healthy=false, inconsistent margin ratio) → rejected, treated as no valid data.</div>
+      </div>
+    </details>
+    <details class="quest">
+      <summary class="quest-head">
+        <span class="quest-index">STEP 3</span>
+        <span class="quest-type warn">WARN</span>
+        <h3>Over limit → manual approval</h3>
+        <span class="quest-expand">+</span>
+      </summary>
+      <div class="quest-content">
+        <p>If the amount exceeds the automatic limit, the request enters <code>APPROVAL_PENDING</code>. No on-chain action until approved.</p>
+      </div>
+    </details>
+    <details class="quest">
+      <summary class="quest-head">
+        <span class="quest-index">STEP 4–5</span>
+        <span class="quest-type">OK</span>
+        <h3>Send command to Cage; Cage validates and reserves limits</h3>
+        <span class="quest-expand">+</span>
+      </summary>
+      <div class="quest-content">
+        <p><code>mm_connector</code> sends <code>CommandTreasuryTransferRequested</code> with only the configured <code>destination_id</code>. Cage resolves the fixed address, network, and optional tag/memo from its allowlist, validates the target is enabled and matches, then atomically reserves the daily limit.</p>
+        <div class="quest-note">A separate command, not a reused customer-withdrawal event. Address rotation requires a new Cage version, dual review, and a small verification transfer before activation.</div>
+      </div>
+    </details>
+    <details class="quest">
+      <summary class="quest-head">
+        <span class="quest-index">STEP 6–7</span>
+        <span class="quest-type">OK</span>
+        <h3>Cage broadcasts and confirms on-chain</h3>
+        <span class="quest-expand">+</span>
+      </summary>
+      <div class="quest-content">
+        <p>Cage sends the on-chain transaction, tracks confirmation depth, and publishes <code>EventTreasuryTransferConfirmed</code>. After confirmation, <code>mm_connector</code> calls the MM program's <code>ObserveTopUp</code>.</p>
+        <div class="quest-note">Once broadcast, the on-chain transaction cannot be cancelled. Pausing only stops subsequent automatic actions; already-broadcast transactions continue to reconcile.</div>
+      </div>
+    </details>
+    <details class="quest">
+      <summary class="quest-head">
+        <span class="quest-index">STEP 8</span>
+        <span class="quest-type">OK</span>
+        <h3>MM verifies Binance credit and transfers</h3>
+        <span class="quest-expand">+</span>
+      </summary>
+      <div class="quest-content">
+        <p>The MM program queries Binance deposit history by asset, network, amount, address, and tx hash, confirms the Spot wallet was credited, then executes the Spot-to-Futures internal transfer, storing the Binance deposit ID and transfer ID.</p>
+        <div class="quest-note">Same idempotency key returns the original operation; never double-transfers. Multi-replica: shared idempotency or leader-elected execution.</div>
+      </div>
+    </details>
+    <details class="quest">
+      <summary class="quest-head">
+        <span class="quest-index">STEP 9–10</span>
+        <span class="quest-type">OK</span>
+        <h3>Final verification and completion</h3>
+        <span class="quest-expand">+</span>
+      </summary>
+      <div class="quest-content">
+        <p><code>mm_connector</code> obtains a snapshot newer than the internal transfer, confirms the Futures account increase and complete evidence. Only then does the request enter <code>COMPLETED</code>.</p>
+        <div class="quest-note">Completion = Cage event evidence + MM operation evidence + new snapshot showing the increase. Missing any one → not complete.</div>
+      </div>
+    </details>
+  </div>
+</section>
+
+<section class="doc-section section-wrap" id="s6">
+  <div class="section-heading">
+    <div><div class="section-kicker">State</div><h2>State Machine (14 states, forward-only)</h2></div>
+    <div class="section-aside">06</div>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>State</th><th>Meaning</th><th>Reversible</th></tr></thead>
+      <tbody>
+        <tr><td><code>DETECTED</code></td><td>A valid snapshot triggered policy</td><td>—</td></tr>
+        <tr><td><code>APPROVAL_PENDING</code></td><td>Waiting for operator approval</td><td>No</td></tr>
+        <tr><td><code>REQUESTED</code></td><td>Durable Cage command published</td><td>No</td></tr>
+        <tr><td><code>CAGE_ACCEPTED</code></td><td>Cage stored intent and reserved limits</td><td>No</td></tr>
+        <tr><td><code>ONCHAIN_SUBMITTED</code></td><td>Transaction hash obtained</td><td>No</td></tr>
+        <tr><td><code>ONCHAIN_CONFIRMED</code></td><td>Required confirmation depth reached</td><td>No</td></tr>
+        <tr><td><code>MM_OBSERVING</code></td><td>MM waiting for Binance credit</td><td>No</td></tr>
+        <tr><td><code>BINANCE_CREDITED</code></td><td>Binance Spot wallet credited</td><td>No</td></tr>
+        <tr><td><code>INTERNAL_TRANSFERRED</code></td><td>Spot-to-Futures transfer completed</td><td>No</td></tr>
+        <tr><td><code>COMPLETED</code></td><td>New snapshot proves the Futures increase</td><td>Terminal</td></tr>
+        <tr><td><code>FAILED_RETRYABLE</code></td><td>A bounded retry is allowed</td><td>Yes</td></tr>
+        <tr><td><code>FAILED_TERMINAL</code></td><td>Allowlist, limit, permission, or validation failure</td><td>Terminal</td></tr>
+        <tr><td><code>MANUAL_REVIEW</code></td><td>External state is uncertain</td><td>Terminal</td></tr>
+        <tr><td><code>CANCELLED</code></td><td>Only before chain broadcast</td><td>Terminal</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="callout note">
+    <span class="callout-icon">NOTE</span>
+    <p><strong>Forward-only:</strong>duplicate events return the current state without repeating side effects. Out-of-order Kafka events are ignored by state version.</p>
+  </div>
+</section>
+
+<section class="doc-section section-wrap" id="s7">
+  <div class="section-heading">
+    <div><div class="section-kicker">Failure</div><h2>Failure Handling Matrix</h2></div>
+    <div class="section-aside">07</div>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>Scenario</th><th>Handling</th><th>Risk Impact</th></tr></thead>
+      <tbody>
+        <tr><td>MM snapshot stale / unavailable</td><td>Do not initiate</td><td>At least <code>REDUCE_ONLY</code>; <code>HALTED</code> after timeout</td></tr>
+        <tr><td>Cage balance or Gas insufficient</td><td>Fail and alert</td><td>Keep <code>HALTED</code> if critical</td></tr>
+        <tr><td><code>destination_id</code> missing / disabled / asset mismatch</td><td>Terminate, require manual review</td><td>Per deficit severity</td></tr>
+        <tr><td>Cage accepted but did not broadcast</td><td>Safe to retry same request</td><td>None</td></tr>
+        <tr><td>Broadcast response timed out</td><td>Reconcile on-chain first; no new request</td><td>None</td></tr>
+        <tr><td>Chain confirmed but Binance credit delayed</td><td>Keep polling; timeout → manual review; no duplicate top-up</td><td>Per margin ratio</td></tr>
+        <tr><td>Spot credited but internal transfer failed</td><td>MM bounded retry</td><td>Critical: A-Book stays no-add-exposure</td></tr>
+        <tr><td>MM reports complete but snapshot unchanged</td><td>Manual review</td><td>Not treated as success</td></tr>
+        <tr><td>Kafka event out of order</td><td>Ignore state regressions by version</td><td>None</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="callout note">
+    <span class="callout-icon">NOTE</span>
+    <p><strong>Idempotency & retry:</strong><code>request_id</code> is stable from creation to completion. Same idempotency key and payload hash returns the original; same ID with different payload is rejected. Uncertain Cage broadcasts are reconciled by nonce and history before any resend. Retries use bounded exponential backoff; exhausted deadlines enter <code>MANUAL_REVIEW</code>.</p>
+  </div>
+</section>
+
+<section class="doc-section section-wrap" id="s8">
+  <div class="section-heading">
+    <div><div class="section-kicker">Risk</div><h2>Risk Integration</h2></div>
+    <div class="section-aside">08</div>
+  </div>
+  <div class="doc-copy">
+    <p class="large-copy">The top-up workflow never modifies observed financial values. Risk can only recover after a fresh MM account snapshot.</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>State</th><th>Meaning</th><th>Trigger</th></tr></thead>
+        <tbody>
+          <tr><td><code>WARNING</code></td><td>Normal trading continues</td><td>Warning threshold reached (early top-up in progress)</td></tr>
+          <tr><td><code>REDUCE_ONLY</code></td><td>Reject orders that increase exposure</td><td>Stale MM data, or critical margin ratio reached</td></tr>
+          <tr><td><code>HALTED</code></td><td>Reject A-Book orders (per existing PM Perp logic)</td><td>Cage terminal failure with critical deficit; or funds in Spot but stuck</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout note">
+      <span class="callout-icon">NOTE</span>
+      <p><strong>Recovery condition:</strong>several consecutive healthy snapshots after completion, then step down gradually (<code>HALTED</code> → <code>REDUCE_ONLY</code> → <code>WARNING</code> → normal). Never simply re-enable because one top-up finished.</p>
+    </div>
+  </div>
+</section>
+
+<section class="doc-section section-wrap" id="s9">
+  <div class="section-heading">
+    <div><div class="section-kicker">Rollout</div><h2>Rollout (6 phases)</h2></div>
+    <div class="section-aside">09</div>
+  </div>
+  <div class="quest-list">
+    <details class="quest" open>
+      <summary class="quest-head">
+        <span class="quest-index">Phase 1</span>
+        <span class="quest-type">OK</span>
+        <h3>Observation (no transfers)</h3>
+        <span class="quest-expand">+</span>
+      </summary>
+      <div class="quest-content"><p>Extend the MM account API, record snapshots and calculations. Verify data quality; no fund actions.</p></div>
+    </details>
+    <details class="quest">
+      <summary class="quest-head">
+        <span class="quest-index">Phase 2</span>
+        <span class="quest-type">OK</span>
+        <h3>Shadow policy</h3>
+        <span class="quest-expand">+</span>
+      </summary>
+      <div class="quest-content"><p>Run the policy and generate alerts; compare against operator judgment to calibrate thresholds. Iterate if shadow decisions diverge from experienced operators.</p></div>
+    </details>
+    <details class="quest">
+      <summary class="quest-head">
+        <span class="quest-index">Phase 3</span>
+        <span class="quest-type">OK</span>
+        <h3>Cage path (test network)</h3>
+        <span class="quest-expand">+</span>
+      </summary>
+      <div class="quest-content"><p>Deploy the dedicated wallet, allowlist, limits, and transfer contract; verify end-to-end on a test network.</p></div>
+    </details>
+    <details class="quest">
+      <summary class="quest-head">
+        <span class="quest-index">Phase 4</span>
+        <span class="quest-type warn">WARN</span>
+        <h3>Manual approval (all requests)</h3>
+        <span class="quest-expand">+</span>
+      </summary>
+      <div class="quest-content"><p>Every production top-up requires approval while validating the state machine and reconciliation. This is the longest phase — building confidence through real operations.</p></div>
+    </details>
+    <details class="quest">
+      <summary class="quest-head">
+        <span class="quest-index">Phase 5</span>
+        <span class="quest-type warn">WARN</span>
+        <h3>Limited automation</h3>
+        <span class="quest-expand">+</span>
+      </summary>
+      <div class="quest-content"><p>Enable small amounts, one asset, one network, low daily limit. Observe failure rate and manual-review frequency.</p></div>
+    </details>
+    <details class="quest">
+      <summary class="quest-head">
+        <span class="quest-index">Phase 6</span>
+        <span class="quest-type">OK</span>
+        <h3>Controlled expansion</h3>
+        <span class="quest-expand">+</span>
+      </summary>
+      <div class="quest-content"><p>Gradually adjust limits based on failure rates, latency, and manual-review records. Every phase retains a kill switch.</p></div>
+    </details>
+  </div>
+  <div class="callout alarm">
+    <span class="callout-icon">ALARM</span>
+    <p><strong>9 items required before implementation:</strong>Binance account type & collateral asset · chain and token contract · fixed deposit address verified and registered in Cage · MM deposit-history and transfer endpoints · funding source, approvers, and daily limit · warning/critical/halt thresholds · automatic approval amount and manual SLA · deadlines for chain/Binance/internal transfer · MM multi-replica idempotency scheme.<strong>Production automatic transfers remain disabled until all items are confirmed.</strong></p>
+  </div>
+</section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <span class="footer-meta">NEODAX · A-BOOK MM TOP-UP · v1.0 · 2026-10-28 · CONFIDENTIAL</span>
+    <a class="back-top" href="#main">↑ BACK TO TOP</a>
+  </div>
+</footer>
+
+<script>
+const bar=document.getElementById('progress');
+addEventListener('scroll',()=>{
+  const h=document.documentElement;
+  bar.style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight)*100)+'%';
+},{passive:true});
+</script>
+</body>
+</html>

@@ -90,6 +90,8 @@ table.wide tbody tr:hover td:first-child{background:#FCFBF7}
   border-radius:0 10px 10px 0; padding:14px 20px; margin:18px 0; max-width:86ch;
   font-size:13.5px; line-height:1.8; color:var(--ink-2)}
 .note.stop{border-left-color:var(--red); background:linear-gradient(90deg,var(--red-bg),var(--card) 60%)}
+.note.warn{border-left-color:var(--amber); background:linear-gradient(90deg,var(--amber-bg),var(--card) 60%)}
+.rev{font-family:var(--mono);font-size:11px;letter-spacing:1px;color:var(--amber);border:1px solid var(--amber-line);background:var(--amber-bg);padding:2px 8px;border-radius:2px;white-space:nowrap}
 .note.ok{border-left-color:var(--green)}
 .note h4{margin:0 0 6px; font-size:14px; font-weight:600; color:var(--ink)}
 .note p{margin:0; font-size:13.5px; color:var(--ink-2); max-width:none}
@@ -336,11 +338,15 @@ GET /fapi/v1/leverageBracket?symbol=&lt;BINANCE_SYMBOL&gt;&amp;timestamp=&lt;ms&
 <article class="panel" id="p-seed">
 <header>
   <h1>PM Perp Seed</h1>
-  <p class="lede">Each market uses one plain idempotent SQL file with the same structure as <code>20261006150000_nvdausdt_perp.sql</code>: write <code>perps_markets</code> first, then that market's Binance risk tiers. The 14 market rows are shown combined below; the actual commit can split them into 14 timestamped files, one per symbol.</p>
+  <p class="lede">Two equivalent carriers per market: the <b>primary path is the Admin API (<code>UpsertPerpetualsMarket</code>)</b> — one atomic call writes the row through the Raft FSM <i>and</i> broadcasts <code>CommandMarketSync</code>. The SQL files below remain the reviewed artifact and the fallback.</p>
 </header>
 <div class="note">
   <h4>The only remaining placeholder</h4>
   <p><code>__MM_ADDRESS__</code> comes from environment config. MMR, max leverage and all risk tiers were filled from the signed Binance <code>/fapi/v1/leverageBracket</code> response of 2026-10-14; <code>notionalCoef</code> is 1 for all 14 markets on this execution account.</p>
+</div>
+<div class="note stop">
+  <h4>Iron rule — never finish with SQL alone (2026-10-27 ARB incident)</h4>
+  <p>Direct SQL bypasses the Raft FSM: the <code>perps_markets</code> row lands, but <code>CommandMarketSync</code> is never published, so every sync-driven component stays unaware the market exists. If SQL is used, you <b>must</b> re-apply the same row through the Admin API and verify <code>"A-Book market sync processed" added=1</code> in the mm_connector log before moving on.</p>
 </div>
 <details class="sql" open><summary>perps_markets · 14 rows (new rows A_BOOK / FROZEN)</summary><pre class="tall">-- Pattern: YYYYMMDDHHMMSS_&lt;symbol&gt;_perp.sql
 -- Same structure as 20261006150000_nvdausdt_perp.sql.
@@ -631,15 +637,21 @@ ON CONFLICT (symbol, tier_index) DO UPDATE SET
 <article class="panel" id="p-deploy">
 <header>
   <h1>Deployment Order</h1>
-  <p class="lede">Make every service capable of carrying the markets first, then write the markets; warm up, then validate. Stay FROZEN throughout.</p>
+  <p class="lede">Seed the markets (still FROZEN) <b>before</b> the consumers that must learn them; then warm up, then validate. Stay FROZEN throughout. <span class="rev">Rev 2 — 2026-10-27 post-incident fixes</span></p>
 </header>
 <ol class="seq">
-  <li><b>Merge and deploy config, with markets still undiscovered / closed</b><span>Deploy Kafka provisioning, Quote, Ledger, Trading API and MM Connector first. Do not run the market seed yet.</span></li>
+  <li><b>Merge and deploy config, with markets still hidden</b><span>Deploy Kafka provisioning, Quote, Ledger and MM Connector (Trading API and PM Perp may pre-deploy). Per market, all four quote-oracle entries must land together: <code>mark_price_oracle.symbols</code>, <code>market_source_weights</code> (A-Book single source <code>binance: 1.0</code>), <code>engine.symbol_aliases_perp</code> and <code>mark_oracle.symbol_mappings</code> — a missing weights entry kept 1000PEPE in SAFE_MODE for weeks.</span></li>
   <li><b>Create and verify topics</b><span>The topic provisioning Job must succeed; spot-check partition / retention settings for each A-book topic type.</span></li>
-  <li><b>Apply the PM Perp migration and seed</b><span>The 14 markets enter <code>A_BOOK + ACTIVE routing + FROZEN</code>. Confirm CommandMarketSync was published and Finex does not hold these markets.</span></li>
+  <li><b>Seed via the Admin API — not raw SQL</b><span><code>UpsertPerpetualsMarket</code> per market lands the row as <code>A_BOOK + ACTIVE routing + FROZEN</code> and publishes <code>CommandMarketSync</code>. Verify <code>"A-Book market sync processed" added=1</code> per market in the mm_connector log; confirm Finex does not hold these markets.</span></li>
+  <li><b>Rolling-restart PM Perp (one node at a time) and Trading API</b><span><b>Non-negotiable.</b> Per-market Kafka subscriptions are built once, at process start, from the then-active market list. A process that started before the seed never subscribes to the new markets' <code>events.*</code> / <code>orderbook.*</code> topics — this exact gap produced both 2026-10-27 incidents (empty order books on Trading API; margin-locking orders vanishing on PM Perp). PM Perp is a Raft cluster: restart node by node, letting each rejoin before the next.</span></li>
+  <li><b>Verify consumer readiness</b><span>Per new market: its consumer groups have active members; <code>GET /orderbook?symbol=&lt;M&gt;</code> returns data through the edge; Trading API and PM Perp logs flow in Loki (Trading API was a total blind spot in the incident — zero log streams).</span></li>
   <li><b>Wait for data warm-up</b><span>Quote builds the REST depth snapshot + diff stream; Ledger receives external kline / ticker; PM Perp receives fresh Binance mark and funding; Connector starts consuming and keeps heartbeating.</span></li>
   <li><b>Run the FROZEN acceptance</b><span>Verify parameters, route version, account permissions, risk snapshot, market data latency, order book sequence, reconciliation baseline and alerts.</span></li>
 </ol>
+<div class="note warn">
+  <h4>Stranded-events invariant</h4>
+  <p>New consumer groups start at <code>initial_offset=-1</code> (newest), so any event published <b>before</b> its consumer group exists is skipped forever — on 2026-10-27 an order locked margin and its completion events were never applied. Keep every market FROZEN (no orders → no events) until consumer readiness is verified; if events are ever stranded, replay them per <code>docs/2026-10-27-arb-order-event-replay-runbook.md</code>.</p>
+</div>
 <nav class="pager"><a href="#infra">&larr;<span class="no">06</span>End-to-end config</a><a href="#open"><span class="no">08</span>Open per market &rarr;</a></nav>
 </article>
 <!-- ═══ 08 open ═══ -->
@@ -663,18 +675,26 @@ POST /perpetual/market/&lt;SYMBOL&gt;/a-book/state
   <h4>After each OPEN you must see</h4>
   <p><code>execution_book=A_BOOK</code>, <code>routing_state=ACTIVE</code>, <code>operational_state=OPEN</code>, connector <code>consuming=true</code>, <code>circuit_state=CLOSED</code>, no route version drift, and Kafka offsets advancing.</p>
 </div>
+<div class="note warn">
+  <h4>OPEN may need retries (readiness race)</h4>
+  <p>The connector publishes its risk snapshot every 30 s while the readiness gate rejects snapshots older than <code>a_book_connector_status_max_age_sec</code> (15 s in prod) — roughly half of OPEN attempts fail with a stale-snapshot error. Simply retry; if it fails repeatedly, raise the limit to 60 s in the prod PM Perp config first.</p>
+</div>
+<h2>Frontend release is a separate, gated track</h2>
+<p>The hidden-markets list <code>NEXT_PUBLIC_HIDDEN_SYMBOLS</code> is inlined at <b>build time</b>: editing it has no effect without a frontend rebuild and redeploy. The gate order is fixed — <b>acceptance passes (including canary orders) → remove the symbol from the hidden list → rebuild → deploy → the market appears.</b> ARB went public before this gate existed and the first real user order hit the broken chain.</p>
 <nav class="pager"><a href="#deploy">&larr;<span class="no">07</span>Deploy order</a><a href="#verify"><span class="no">09</span>Acceptance &rarr;</a></nav>
 </article>
 <!-- ═══ 09 verify ═══ -->
 <article class="panel" id="p-verify">
 <header>
   <h1>Per-market Acceptance Checklist</h1>
-  <p class="lede">Check every item after each OPEN. Move to the next market only after all pass and the observation window has elapsed.</p>
+  <p class="lede">Check every item after each OPEN. <b>The frontend release and any public announcement are gated on this checklist passing</b> — move to the next market only after all pass and the observation window has elapsed.</p>
 </header>
 <ul class="check">
   <li>Tick, step, min qty, min notional, max leverage and all risk tiers shown in exchange info match the Binance snapshot field by field.</li>
   <li>Mark is sourced from Binance with fresh timestamps; the top 50 order book levels, trade tape, 1m kline and 24h ticker keep updating.</li>
   <li>Cross-margin orders are rejected; small isolated limit and market orders execute, with quantities on step and prices on tick.</li>
+  <li><b>Canary orders before public release:</b> with an internal account, place one small isolated market order and one limit order, then close them — the first real user order on ARB is the one that hit the broken event chain. A public market must never receive its first order from a user.</li>
+  <li>Consumer groups for the market's <code>events.*</code> and <code>orderbook.*</code> topics have active members with advancing offsets — re-verify after any service restart; never OPEN a market whose consumers were not restarted after its seed.</li>
   <li>The signed sum of NeoDAX user positions and the House position is 0; connector external fills map one-to-one to internal fills, with no reconciliation diff.</li>
   <li>Cancel, reduce-only, trigger, funding and liquidation flows have been exercised at least on staging; no destructive liquidation tests on the production canary.</li>
   <li>Requests with invalid precision, below min notional, above max leverage / tier, or above max net notional all fail closed.</li>
@@ -692,6 +712,7 @@ POST /perpetual/market/&lt;SYMBOL&gt;/a-book/state
   <li><b>FROZEN immediately</b><span>Use the same A-book state API to set the market to <code>FROZEN</code>. Do not book-switch to B-book.</span></li>
   <li><b>Preserve evidence</b><span>Record the operation id, route version, connector offsets, orders and fills, external account snapshot, reconciliation diff, market data sequence and alert timeline.</span></li>
   <li><b>Handle exposure</b><span>While user / House / external positions exist, stay FROZEN and repair through the A-book cancel-all / reconcile / reconcile-order paths. Never delete the market or reset the route version.</span></li>
+  <li><b>Recover orphaned margin locks</b><span>Orders that locked margin but never produced an order row (broken event chain) are reaped by the lock-reconciler daily at 02:00 UTC; for an immediate release run <code>perpctl lock-reconciler --from &lt;RFC3339&gt; --to &lt;RFC3339&gt; --dry-run</code>, then without <code>--dry-run</code>. Stranded completion events are replayed per <code>docs/2026-10-27-arb-order-event-replay-runbook.md</code>.</span></li>
   <li><b>Revert config only from zero state</b><span>Only after confirming zero positions, zero orders, zero triggers, zero unsettled funding and no external exposure may the market be disabled and removed from edge / market data subscriptions.</span></li>
   <li><b>Parameter changes</b><span>If Binance changes filters, funding or brackets during the rollout, freeze the affected markets, generate a new snapshot and a new config version, and OPEN again only after the diff is reviewed.</span></li>
 </ol>

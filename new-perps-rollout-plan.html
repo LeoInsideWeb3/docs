@@ -90,6 +90,8 @@ table.wide tbody tr:hover td:first-child{background:#FCFBF7}
   border-radius:0 10px 10px 0; padding:14px 20px; margin:18px 0; max-width:86ch;
   font-size:13.5px; line-height:1.8; color:var(--ink-2)}
 .note.stop{border-left-color:var(--red); background:linear-gradient(90deg,var(--red-bg),var(--card) 60%)}
+.note.warn{border-left-color:var(--amber); background:linear-gradient(90deg,var(--amber-bg),var(--card) 60%)}
+.rev{font-family:var(--mono);font-size:11px;letter-spacing:1px;color:var(--amber);border:1px solid var(--amber-line);background:var(--amber-bg);padding:2px 8px;border-radius:2px;white-space:nowrap}
 .note.ok{border-left-color:var(--green)}
 .note h4{margin:0 0 6px; font-size:14px; font-weight:600; color:var(--ink)}
 .note p{margin:0; font-size:13.5px; color:var(--ink-2); max-width:none}
@@ -336,11 +338,15 @@ GET /fapi/v1/leverageBracket?symbol=&lt;BINANCE_SYMBOL&gt;&amp;timestamp=&lt;ms&
 <article class="panel" id="p-seed">
 <header>
   <h1>PM Perp Seed</h1>
-  <p class="lede">每个市场使用一个普通的幂等 SQL 文件，结构与 <code>20261006150000_nvdausdt_perp.sql</code> 一致：先写 <code>perps_markets</code>，再写该市场的 Binance risk tiers。下面把 14 个 market row 合并展示，实际提交时可按 symbol 拆成 14 个时间戳文件。</p>
+  <p class="lede">每个市场有两个等价载体：<b>首选 Admin API（<code>UpsertPerpetualsMarket</code>）</b>——一次原子调用即通过 Raft FSM 落库并广播 <code>CommandMarketSync</code>。下面的 SQL 文件保留为<b>评审工件与回退路径</b>。</p>
 </header>
 <div class="note">
   <h4>唯一保留的占位符</h4>
   <p><code>__MM_ADDRESS__</code> 来自环境配置。MMR、最大杠杆和全部 risk tiers 已从 2026-10-14 Binance 签名 <code>/fapi/v1/leverageBracket</code> 响应写入；该执行账户的 14 个市场 <code>notionalCoef</code> 均为 1。</p>
+</div>
+<div class="note stop">
+  <h4>铁律——禁止只跑 SQL 就收工（2026-10-27 ARB 事故）</h4>
+  <p>直接 SQL 绕过 Raft FSM：<code>perps_markets</code> 行落库了，但 <code>CommandMarketSync</code> 永远不会发布，所有依赖 sync 事件的组件都不会知道市场存在。若使用 SQL，事后<b>必须</b>通过 Admin API 重新 upsert 同一行，并在 mm_connector 日志确认 <code>"A-Book market sync processed" added=1</code> 后才能继续。</p>
 </div>
 <details class="sql" open><summary>perps_markets · 14 行（新行 A_BOOK / FROZEN）</summary><pre class="tall">-- Pattern: YYYYMMDDHHMMSS_&lt;symbol&gt;_perp.sql
 -- Same structure as 20261006150000_nvdausdt_perp.sql.
@@ -631,15 +637,21 @@ ON CONFLICT (symbol, tier_index) DO UPDATE SET
 <article class="panel" id="p-deploy">
 <header>
   <h1>部署顺序</h1>
-  <p class="lede">先让所有服务具备承载能力，再写入市场；写入后先预热、再验收，全程保持 FROZEN。</p>
+  <p class="lede">先种市场（保持 FROZEN），<b>再让必须认识它们的消费者上线</b>；然后预热、再验收，全程保持 FROZEN。 <span class="rev">Rev 2 — 2026-10-27 事故后修订</span></p>
 </header>
 <ol class="seq">
-  <li><b>合并并部署配置，但保持市场未发现 / 未开放</b><span>先部署 Kafka provision、Quote、Ledger、Trading API、MM Connector；不要先执行市场 seed。</span></li>
+  <li><b>合并并部署配置，市场保持隐藏</b><span>部署 Kafka provision、Quote、Ledger、MM Connector（Trading API 与 PM Perp 可先行部署）。每个市场的 quote oracle 四处配置必须齐备：<code>mark_price_oracle.symbols</code>、<code>market_source_weights</code>（A-Book 单源 <code>binance: 1.0</code>）、<code>engine.symbol_aliases_perp</code>、<code>mark_oracle.symbol_mappings</code>——1000PEPE 曾因缺 weights 条目在 SAFE_MODE 里卡了数周。</span></li>
   <li><b>创建并验证 topics</b><span>topic provision Job 必须成功；随机抽查每类 A-book topic 的 partition / retention 配置。</span></li>
-  <li><b>应用 PM Perp migration 与 seed</b><span>14 个市场进入 <code>A_BOOK + ACTIVE routing + FROZEN</code>。确认 CommandMarketSync 已发布，Finex 不持有这些市场。</span></li>
+  <li><b>通过 Admin API 种市场——不要裸跑 SQL</b><span>逐市场 <code>UpsertPerpetualsMarket</code>：行为 <code>A_BOOK + ACTIVE routing + FROZEN</code>，同时发布 <code>CommandMarketSync</code>。在 mm_connector 日志逐市场确认 <code>"A-Book market sync processed" added=1</code>；确认 Finex 不持有这些市场。</span></li>
+  <li><b>滚动重启 PM Perp（逐台）与 Trading API</b><span><b>不可跳过。</b>每市场 Kafka 订阅在进程启动时一次性构建；seed 之前启动的进程永远不会订阅新市场的 <code>events.*</code> / <code>orderbook.*</code> topic——正是这个缺口造成 2026-10-27 的两起事故（Trading API 盘口全空；PM Perp 订单锁保证金后蒸发）。PM Perp 是 Raft 集群：逐台重启，每台重新入列后再下一台。</span></li>
+  <li><b>验证消费者就绪</b><span>每个新市场：consumer group 有活跃成员；<code>GET /orderbook?symbol=&lt;M&gt;</code> 从边缘返回数据；Trading API 与 PM Perp 在 Loki 有日志流（事故中 Trading API 是彻底盲区——零日志流）。</span></li>
   <li><b>等待数据预热</b><span>Quote 建立 REST depth snapshot + diff stream；Ledger 收到 external kline / ticker；PM Perp 收到新鲜 Binance Mark 与 funding；Connector 开始消费并持续心跳。</span></li>
   <li><b>执行 FROZEN 验收</b><span>核对参数、路由版本、账户权限、风险快照、行情延迟、订单簿 sequence、对账基线和告警。</span></li>
 </ol>
+<div class="note warn">
+  <h4>搁浅事件不变量</h4>
+  <p>新建 consumer group 以 <code>initial_offset=-1</code>（newest）起步，<b>组存在之前</b>发布的任何事件会被永久跳过——2026-10-27 那笔订单锁了保证金、完成事件却从未被应用。消费者验证完成前保持每个市场 FROZEN（无订单即无事件）；一旦发生搁浅，按 <code>docs/2026-10-27-arb-order-event-replay-runbook.md</code> 重放。</p>
+</div>
 <nav class="pager"><a href="#infra">&larr;<span class="no">06</span>全链路配置</a><a href="#open"><span class="no">08</span>逐市场开放 &rarr;</a></nav>
 </article>
 <!-- ═══ 08 open ═══ -->
@@ -663,18 +675,26 @@ POST /perpetual/market/&lt;SYMBOL&gt;/a-book/state
   <h4>每个市场 OPEN 后必须看到</h4>
   <p><code>execution_book=A_BOOK</code>、<code>routing_state=ACTIVE</code>、<code>operational_state=OPEN</code>、connector <code>consuming=true</code>、<code>circuit_state=CLOSED</code>、route version 未漂移、Kafka offset 持续前进。</p>
 </div>
+<div class="note warn">
+  <h4>OPEN 可能需要重试（readiness 竞态）</h4>
+  <p>connector 每 30 s 发布一次风险快照，而 readiness gate 拒绝超过 <code>a_book_connector_status_max_age_sec</code>（prod 为 15 s）的快照——约一半的 OPEN 会以 stale snapshot 被拒。直接重试即可；频繁失败时先把 prod PM Perp 配置中该值调到 60 s。</p>
+</div>
+<h2>前端放开是独立轨道，且设闸</h2>
+<p>隐藏清单 <code>NEXT_PUBLIC_HIDDEN_SYMBOLS</code> 是<b>构建期内联</b>的：只改配置不重新构建、部署，前端不会有任何变化。闸门顺序固定——<b>验收通过（含 canary 下单）→ 从隐藏清单移除该 symbol → 重新构建 → 部署 → 市场出现。</b>ARB 在这道闸门存在之前就对外放开，第一笔真实用户订单直接撞上了断链。</p>
 <nav class="pager"><a href="#deploy">&larr;<span class="no">07</span>部署顺序</a><a href="#verify"><span class="no">09</span>验收 &rarr;</a></nav>
 </article>
 <!-- ═══ 09 verify ═══ -->
 <article class="panel" id="p-verify">
 <header>
   <h1>单市场验收清单</h1>
-  <p class="lede">每个市场 OPEN 后逐项核对；全部通过并度过观察窗口，才进入下一市场。</p>
+  <p class="lede">每个市场 OPEN 后逐项核对；<b>前端放开与对外公告以本清单通过为闸门</b>——全部通过并度过观察窗口，才进入下一市场。</p>
 </header>
 <ul class="check">
   <li>Exchange info 展示的 tick、step、min qty、min notional、最大杠杆和全部风险档位与 Binance 快照逐项一致。</li>
   <li>Mark 与 Binance 同源，时间戳新鲜；order book 前 50 档、trade tape、1m kline、24h ticker 均持续更新。</li>
   <li>Cross-margin 下单被拒绝；isolated 小额限价单与市价单可执行，成交量满足 step，价格满足 tick。</li>
+  <li><b>公开前 canary 下单：</b>用内部账号在每个市场下一笔小额 isolated 市价单 + 一笔限价单，然后平仓——ARB 的第一笔真实用户订单就是撞上断链的那笔。公开市场绝不能让第一笔订单来自用户。</li>
+  <li>该市场 <code>events.*</code> 与 <code>orderbook.*</code> topic 的 consumer group 有活跃成员且 offset 前进——任何服务重启后都要复查；消费者未在种子之后重启过的市场不得 OPEN。</li>
   <li>NeoDAX user position 与 House position 的有符号和为 0；Connector 外部成交与内部成交一一对应，无 reconciliation diff。</li>
   <li>撤单、reduce-only、trigger、资金费和强平链路至少在 staging 完成；生产 canary 不做破坏性强平测试。</li>
   <li>非法精度、低于 min notional、超过 max leverage / 档位、超过 max net notional 的请求均 fail closed。</li>
@@ -692,6 +712,7 @@ POST /perpetual/market/&lt;SYMBOL&gt;/a-book/state
   <li><b>立即 FROZEN</b><span>使用同一个 A-book state API，把目标市场改为 <code>FROZEN</code>；不要 book-switch 到 B-book。</span></li>
   <li><b>保留证据</b><span>记录 operation id、route version、connector offsets、订单与成交、外部账户快照、reconciliation diff、行情序列和告警时间线。</span></li>
   <li><b>处理敞口</b><span>有用户 / House / 外部仓位时保持 FROZEN，按 A-book cancel-all / reconcile / reconcile-order 路径修复。禁止直接删市场或重置 route version。</span></li>
+  <li><b>回收孤儿保证金锁</b><span>锁了保证金但从未生成订单行的订单（事件链断裂）由 lock-reconciler 每日 02:00 UTC 自动回收；需要立即释放时先跑 <code>perpctl lock-reconciler --from &lt;RFC3339&gt; --to &lt;RFC3339&gt; --dry-run</code> 预览，再去掉 <code>--dry-run</code> 执行。搁浅的完成事件按 <code>docs/2026-10-27-arb-order-event-replay-runbook.md</code> 重放。</span></li>
   <li><b>仅零状态可撤销配置</b><span>确认零仓位、零订单、零 trigger、零未结资金费且外部账户无敞口后，才可停用市场并从 edge / 行情订阅移除。</span></li>
   <li><b>参数变化</b><span>若 Binance 在 rollout 中修改 filter、funding 或 bracket，冻结受影响市场，生成新快照与新 config version，完成 diff 审核后再 OPEN。</span></li>
 </ol>

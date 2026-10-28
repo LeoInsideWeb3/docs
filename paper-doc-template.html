@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#f6f3e8">
+<title>文档标题 · Paper Doc Template</title>
+<!--
+  Paper-Ink 文档模板 —— 提取自 Matrix 工程师档案站点(2026-10)的设计语言
+  组件: hero / impact-strip / section+kicker / card-grid / timeline / table / code / callout / tag
+  单文件、零外部依赖;若在同目录放置 pixel.ttf 可启用像素字体,否则回退 Courier New
+  用法: 复制本文件,替换各 <!-- SLOT --> 标记处的内容
+-->
+<style>
+:root{
+  --paper:#f6f3e8; --paper-light:#fcfaf2; --panel:#edf0e2;
+  --ink:#263d32; --muted:#647065; --line:#d9ddcf;
+  --green:#315b43; --sage:#dfe7d7; --orange:#db8958; --yellow:#e7bd64; --shadow:#ccd2bc;
+  --mono:"Pixel","Courier New",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --body:Inter,-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif;
+}
+@font-face{font-family:Pixel;src:url('pixel.ttf') format('truetype');font-weight:400 900;font-display:swap}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{background:var(--paper);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.75;-webkit-font-smoothing:antialiased}
+::selection{background:var(--yellow);color:var(--ink)}
+a{color:var(--green)}
+.section-wrap{max-width:1060px;margin:0 auto;padding:0 28px}
+
+/* ── header / 阅读进度 ─────────────────────── */
+.site-header{position:sticky;top:0;z-index:50;background:var(--paper);border-bottom:1px solid var(--line)}
+.header-inner{max-width:1060px;margin:0 auto;padding:14px 28px;display:flex;align-items:center;justify-content:space-between;gap:20px}
+.brand{font-family:var(--mono);font-size:14px;letter-spacing:1px;color:var(--ink);text-decoration:none;display:flex;align-items:center;gap:10px}
+.brand-icon{width:12px;height:12px;background:var(--green);display:inline-block;box-shadow:2px 2px 0 var(--shadow)}
+.brand-suffix{color:var(--muted)}
+.desktop-nav{display:flex;gap:4px;flex-wrap:wrap}
+.desktop-nav a{font-family:var(--mono);font-size:12px;letter-spacing:.5px;color:var(--muted);text-decoration:none;padding:5px 10px;border:1px solid transparent}
+.desktop-nav a:hover{color:var(--ink);border-color:var(--line);background:var(--paper-light)}
+.reading-progress{position:absolute;left:0;bottom:-1px;height:2px;width:0;background:var(--orange);transition:width .1s linear}
+@media(max-width:760px){.desktop-nav{display:none}}
+
+/* ── hero ─────────────────────────────────── */
+.hero{padding:72px 0 56px;border-bottom:1px solid var(--line)}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--orange);margin-bottom:16px}
+.hero h1{font-size:clamp(30px,4.6vw,52px);line-height:1.12;letter-spacing:-.5px;max-width:820px}
+.hero h1 .hl{background:var(--sage);padding:0 8px;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+.hero-meta{font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:18px;letter-spacing:.5px}
+.hero-intro{max-width:720px;font-size:17.5px;color:var(--ink);margin-top:22px}
+.hero-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:24px}
+.tag{font-family:var(--mono);font-size:11px;letter-spacing:.5px;background:var(--sage);border:1px solid var(--line);padding:4px 10px;color:var(--green)}
+.tag.orange{background:#f7e5d8;color:#a15c33;border-color:#e6cdba}
+.hero-buttons{display:flex;gap:14px;margin-top:30px;flex-wrap:wrap}
+.button{font-family:var(--mono);font-size:13px;letter-spacing:1px;text-decoration:none;padding:12px 22px;border:1px solid var(--ink);background:var(--paper-light);color:var(--ink);box-shadow:3px 3px 0 var(--shadow);transition:transform .15s,box-shadow .15s}
+.button:hover{transform:translate(-1px,-1px);box-shadow:4px 4px 0 var(--shadow)}
+.button.primary{background:var(--green);color:#faf7ec;border-color:var(--green)}
+
+/* ── impact-strip(KPI 条) ──────────────────── */
+.impact-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));border:1px solid #cbd1bd;background:var(--panel);margin:44px 0 0}
+.impact-cell{padding:22px 26px;border-right:1px solid #cbd1bd}
+.impact-cell:last-child{border-right:none}
+.impact-number{font-family:var(--mono);font-size:30px;line-height:1;color:var(--green)}
+.impact-number.orange{color:var(--orange)}
+.impact-label{display:block;font-size:13px;color:var(--muted);margin-top:8px}
+@media(max-width:760px){.impact-cell{border-right:none;border-bottom:1px solid #cbd1bd}.impact-cell:last-child{border-bottom:none}}
+
+/* ── section 骨架 ─────────────────────────── */
+section.doc-section{padding:64px 0;border-bottom:1px solid var(--line)}
+section.doc-section:last-of-type{border-bottom:none}
+.section-heading{display:flex;align-items:baseline;justify-content:space-between;gap:18px;margin-bottom:34px}
+.section-kicker{font-family:var(--mono);font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--orange)}
+.section-heading h2{font-size:clamp(22px,3vw,30px);letter-spacing:-.3px;margin-top:8px}
+.section-aside{font-family:var(--mono);font-size:22px;color:var(--line);flex:none}
+@media(max-width:760px){.section-heading{flex-direction:column;gap:6px}}
+
+/* ── 正文 / 列表 ─────────────────────────── */
+.doc-copy{max-width:780px}
+.doc-copy p{margin-bottom:16px}
+.doc-copy p.large-copy{font-size:19px;line-height:1.65}
+.doc-copy ul,.doc-copy ol{padding-left:22px;margin-bottom:16px}
+.doc-copy li{margin-bottom:8px}
+.doc-copy strong{background:var(--sage);padding:0 4px}
+.doc-copy code{font-family:var(--mono);font-size:.86em;background:var(--paper-light);border:1px solid var(--line);padding:1px 6px}
+.mini-toc{border:1px solid var(--line);background:var(--paper-light);padding:18px 24px;margin-bottom:22px;max-width:520px}
+.mini-toc-title{font-family:var(--mono);font-size:11px;letter-spacing:2px;color:var(--muted);text-transform:uppercase;margin-bottom:10px}
+.mini-toc a{display:block;text-decoration:none;font-size:14px;padding:3px 0;color:var(--ink)}
+.mini-toc a:hover{color:var(--orange)}
+
+/* ── card-grid ───────────────────────────── */
+.card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:18px}
+.card{background:var(--paper-light);border:1px solid #c8d0b9;padding:22px 20px;position:relative;transition:transform .2s,box-shadow .2s}
+.card:hover{transform:translate(-2px,-2px);box-shadow:4px 4px 0 var(--shadow)}
+.card-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.card-index{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.card h3{font-size:17px;margin-bottom:8px}
+.card p{font-size:14px;color:var(--muted)}
+.card-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px}
+.card-footer{display:flex;justify-content:space-between;align-items:center;margin-top:16px;padding-top:12px;border-top:1px dashed var(--line);font-family:var(--mono);font-size:11px;color:var(--muted)}
+.status-dot{width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block}
+.status-dot.warn{background:var(--orange)}
+.status-dot.bad{background:#b34a3a}
+
+/* ── timeline(时间线/事件链) ─────────────── */
+.quest-list{border-top:1px solid #bcc7ad}
+details.quest{border-bottom:1px solid #bcc7ad;background:var(--paper-light)}
+details.quest[open]{background:var(--paper-light)}
+.quest-head{display:grid;grid-template-columns:52px 92px 1fr 28px;gap:14px;align-items:center;padding:16px 18px;cursor:pointer;list-style:none}
+.quest-head::-webkit-details-marker{display:none}
+.quest-index{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.quest-type{font-family:var(--mono);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#faf7ec;background:var(--green);padding:3px 0;text-align:center}
+.quest-type.warn{background:var(--orange)}
+.quest-type.bad{background:#b34a3a}
+.quest-head h3{font-size:15.5px;font-weight:600}
+.quest-expand{font-family:var(--mono);color:var(--muted)}
+details.quest[open] .quest-expand::before{content:"-"}
+.quest-content{padding:4px 18px 22px 66px;font-size:14.5px;color:var(--ink)}
+.quest-content p{margin-bottom:12px}
+.quest-note{font-family:var(--mono);font-size:12px;color:var(--muted);border-left:3px solid var(--yellow);padding:8px 14px;background:var(--paper);margin:14px 0}
+@media(max-width:640px){.quest-head{grid-template-columns:44px 1fr 24px}.quest-type{display:none}.quest-content{padding-left:18px}}
+
+/* ── 表格 ────────────────────────────────── */
+.tbl-wrap{overflow-x:auto;border:1px solid #cbd1bd;background:var(--paper-light);margin-bottom:22px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+thead th{font-family:var(--mono);font-size:11px;letter-spacing:1px;text-transform:uppercase;color:var(--green);text-align:left;background:var(--panel);border-bottom:1px solid #cbd1bd;padding:11px 16px;white-space:nowrap}
+tbody td{padding:11px 16px;border-bottom:1px solid var(--line);vertical-align:top}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:nth-child(even){background:#f3f0e4}
+td code{white-space:nowrap}
+
+/* ── 代码块 ──────────────────────────────── */
+pre.code{font-family:var(--mono);font-size:13px;line-height:1.7;background:var(--paper-light);border:1px solid #c8d0b9;border-left:4px solid var(--green);padding:18px 22px;overflow-x:auto;margin-bottom:22px}
+pre.code .cm{color:var(--muted)}
+pre.code .bad{color:#b34a3a}
+pre.code .ok{color:var(--green)}
+.code-title{font-family:var(--mono);font-size:11px;letter-spacing:1px;color:var(--muted);text-transform:uppercase;margin-bottom:-14px;position:relative;top:-8px}
+
+/* ── callout ─────────────────────────────── */
+.callout{display:flex;gap:14px;border:1px solid #c8d0b9;background:var(--paper-light);padding:16px 20px;margin-bottom:22px;max-width:860px}
+.callout-icon{font-family:var(--mono);font-size:12px;flex:none;padding:2px 8px;height:fit-content}
+.callout.note{border-left:4px solid var(--green)}  .callout.note .callout-icon{background:var(--sage);color:var(--green)}
+.callout.warn{border-left:4px solid var(--orange)}   .callout.warn .callout-icon{background:#f7e5d8;color:#a15c33}
+.callout.alarm{border-left:4px solid #b34a3a}        .callout.alarm .callout-icon{background:#f3dbd6;color:#8f3629}
+.callout p{font-size:14.5px}
+.callout p+p{margin-top:8px}
+
+/* ── footer ──────────────────────────────── */
+.site-footer{border-top:1px solid var(--line);padding:34px 0;background:var(--panel)}
+.footer-inner{max-width:1060px;margin:0 auto;padding:0 28px;display:flex;justify-content:space-between;align-items:center;gap:20px;flex-wrap:wrap}
+.footer-meta{font-family:var(--mono);font-size:11px;letter-spacing:.5px;color:var(--muted)}
+.back-top{font-family:var(--mono);font-size:12px;letter-spacing:1px;color:var(--ink);text-decoration:none;border:1px solid var(--ink);padding:8px 16px;background:var(--paper-light);box-shadow:3px 3px 0 var(--shadow)}
+.back-top:hover{transform:translate(-1px,-1px)}
+@media print{
+  .site-header,.hero-buttons,.back-top,.reading-progress{display:none!important}
+  body{background:#fff}
+  section.doc-section{padding:20px 0}
+}
+</style>
+</head>
+<body>
+
+<!-- ══ header + 目录导航 ════════════════════════════ -->
+<header class="site-header">
+  <div class="header-inner">
+    <a class="brand" href="#main"><span class="brand-icon"></span>PROJECT / DOC<span class="brand-suffix">· v1.0</span></a>
+    <nav class="desktop-nav">
+      <a href="#s1">01 背景</a><a href="#s2">02 现状</a><a href="#s3">03 方案</a><a href="#s4">04 时间线</a><a href="#s5">05 附录</a>
+    </nav>
+  </div>
+  <div class="reading-progress" id="progress"></div>
+</header>
+
+<main id="main">
+
+<!-- ══ hero: 标题区 ════════════════════════════════ -->
+<section class="hero section-wrap">
+  <div class="eyebrow">● SLOT: 分类 · 日期 · 状态</div>
+  <h1>SLOT: 文档主标题<br><span class="hl">高亮短语可放在色块里</span></h1>
+  <div class="hero-meta">更新于 2026-10-27 · 作者 · 评审人 · 机密等级</div>
+  <p class="hero-intro">SLOT: 一到三句话的执行摘要。这段会出现在所有邮件摘录里,写给"只读这一段就要能决策"的人。</p>
+  <div class="hero-tags">
+    <span class="tag">SLOT: 标签</span><span class="tag">领域</span><span class="tag orange">状态: 草稿</span>
+  </div>
+  <div class="hero-buttons">
+    <a class="button primary" href="#s1">阅读正文 ↓</a>
+    <a class="button" href="#s5">跳到附录</a>
+  </div>
+  <!-- impact-strip: KPI 数字条 -->
+  <div class="impact-strip">
+    <div class="impact-cell"><span class="impact-number">16</span><span class="impact-label">SLOT: 指标说明</span></div>
+    <div class="impact-cell"><span class="impact-number orange">5</span><span class="impact-label">SLOT: 需要注意的量</span></div>
+    <div class="impact-cell"><span class="impact-number">99.9%</span><span class="impact-label">SLOT: 比例</span></div>
+    <div class="impact-cell"><span class="impact-number">2</span><span class="impact-label">SLOT: 待办</span></div>
+  </div>
+</section>
+
+<!-- ══ section: 带目录卡的背景章节 ═══════════════════ -->
+<section class="doc-section section-wrap" id="s1">
+  <div class="section-heading">
+    <div><div class="section-kicker">Background</div><h2>背景</h2></div>
+    <div class="section-aside">01</div>
+  </div>
+  <div class="doc-copy">
+    <div class="mini-toc">
+      <div class="mini-toc-title">本节速览</div>
+      <a href="#s1">1. 问题是什么</a>
+      <a href="#s2">2. 影响了谁</a>
+      <a href="#s3">3. 为什么现在处理</a>
+    </div>
+    <p class="large-copy">SLOT: 章节的第一段用大字号,把本节最重要的结论先说完。</p>
+    <p>SLOT: 普通正文。行内代码用 <code>some_function()</code>,重点用 <strong>色块强调</strong>,普通链接去 <a href="#">这里</a>。</p>
+    <ul>
+      <li>SLOT: 列表项一</li>
+      <li>SLOT: 列表项二,可嵌套
+        <ul><li>SLOT: 子项</li></ul>
+      </li>
+    </ul>
+    <div class="callout note">
+      <span class="callout-icon">NOTE</span>
+      <p>SLOT: note 型提示框 —— 补充说明、参考信息。</p>
+    </div>
+    <div class="callout warn">
+      <span class="callout-icon">WARN</span>
+      <p>SLOT: warn 型提示框 —— 注意事项、易错点。</p>
+    </div>
+    <div class="callout alarm">
+      <span class="callout-icon">ALARM</span>
+      <p>SLOT: alarm 型提示框 —— 阻断项、必须先做的事。</p>
+    </div>
+  </div>
+</section>
+
+<!-- ══ section: 卡片网格 ═════════════════════════════ -->
+<section class="doc-section section-wrap" id="s2">
+  <div class="section-heading">
+    <div><div class="section-kicker">Snapshot</div><h2>现状盘点</h2></div>
+    <div class="section-aside">02</div>
+  </div>
+  <div class="card-grid">
+    <article class="card">
+      <div class="card-top"><span class="card-index">01</span></div>
+      <h3>SLOT: 卡片标题</h3>
+      <p>SLOT: 卡片描述,两到三行。悬停会有像素风硬阴影。</p>
+      <div class="card-tags"><span class="tag">组件A</span><span class="tag">组件B</span></div>
+      <div class="card-footer"><span class="status-dot"></span> 正常</div>
+    </article>
+    <article class="card">
+      <div class="card-top"><span class="card-index">02</span></div>
+      <h3>SLOT: 卡片标题</h3>
+      <p>SLOT: 状态用右下角圆点表达。</p>
+      <div class="card-tags"><span class="tag">组件C</span></div>
+      <div class="card-footer"><span class="status-dot warn"></span> 观察</div>
+    </article>
+    <article class="card">
+      <div class="card-top"><span class="card-index">03</span></div>
+      <h3>SLOT: 卡片标题</h3>
+      <p>SLOT: 红点表示异常项。</p>
+      <div class="card-tags"><span class="tag orange">风险</span></div>
+      <div class="card-footer"><span class="status-dot bad"></span> 异常</div>
+    </article>
+  </div>
+</section>
+
+<!-- ══ section: 表格 + 代码 ══════════════════════════ -->
+<section class="doc-section section-wrap" id="s3">
+  <div class="section-heading">
+    <div><div class="section-kicker">Design</div><h2>方案</h2></div>
+    <div class="section-aside">03</div>
+  </div>
+  <div class="tbl-wrap">
+    <table>
+      <thead><tr><th>项目</th><th>当前值</th><th>目标值</th><th>影响</th></tr></thead>
+      <tbody>
+        <tr><td>SLOT: 参数名</td><td><code>200</code></td><td><code>1000</code></td><td>正向</td></tr>
+        <tr><td>SLOT: 参数名</td><td>未配置</td><td><code>1.0</code></td><td>正向</td></tr>
+        <tr><td>SLOT: 参数名</td><td>—</td><td>保持</td><td class="doc-copy">—</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="code-title">命令 / 配置片段</div>
+  <pre class="code"><span class="cm"># SLOT: 注释用灰色,好/坏结果用绿/红</span>
+$ some-command --flag value
+<span class="ok">✓ 成功输出</span>
+$ some-command --bad-flag
+<span class="bad">✗ 失败原因</span></pre>
+</section>
+
+<!-- ══ section: 可折叠时间线 ═════════════════════════ -->
+<section class="doc-section section-wrap" id="s4">
+  <div class="section-heading">
+    <div><div class="section-kicker">Timeline</div><h2>事件链 / 实施步骤</h2></div>
+    <div class="section-aside">04</div>
+  </div>
+  <div class="quest-list">
+    <details class="quest" open>
+      <summary class="quest-head">
+        <span class="quest-index">03:03:45</span>
+        <span class="quest-type">OK</span>
+        <h3>SLOT: 事件标题(点击折叠)</h3>
+        <span class="quest-expand">+</span>
+      </summary>
+      <div class="quest-content">
+        <p>SLOT: 展开后的正文。时间线序号列放时间戳或序号;徽章列用 <code>OK / WARN / BAD</code> 区分性质。</p>
+        <div class="quest-note">SLOT: 引用日志/原文时用黄色竖线的引用块。</div>
+      </div>
+    </details>
+    <details class="quest">
+      <summary class="quest-head">
+        <span class="quest-index">03:03:46</span>
+        <span class="quest-type warn">WARN</span>
+        <h3>SLOT: 第二个事件(默认折叠)</h3>
+        <span class="quest-expand">+</span>
+      </summary>
+      <div class="quest-content"><p>SLOT: 折叠内容,长事件链不会把页面撑爆。</p></div>
+    </details>
+    <details class="quest">
+      <summary class="quest-head">
+        <span class="quest-index">03:03:47</span>
+        <span class="quest-type bad">BAD</span>
+        <h3>SLOT: 第三个事件</h3>
+        <span class="quest-expand">+</span>
+      </summary>
+      <div class="quest-content"><p>SLOT: 内容。</p></div>
+    </details>
+  </div>
+</section>
+
+<!-- ══ section: 附录 ═════════════════════════════════ -->
+<section class="doc-section section-wrap" id="s5">
+  <div class="section-heading">
+    <div><div class="section-kicker">Appendix</div><h2>附录 · 组件速查</h2></div>
+    <div class="section-aside">05</div>
+  </div>
+  <div class="doc-copy">
+    <p>本模板可用的组件(本页即全部演示):</p>
+    <div class="tbl-wrap">
+      <table>
+        <thead><tr><th>组件</th><th>用途</th><th>关键类名</th></tr></thead>
+        <tbody>
+          <tr><td>hero</td><td>标题区+执行摘要+标签</td><td><code>.hero .eyebrow .hero-tags</code></td></tr>
+          <tr><td>impact-strip</td><td>KPI 数字条</td><td><code>.impact-strip .impact-cell</code></td></tr>
+          <tr><td>mini-toc</td><td>节内小目录</td><td><code>.mini-toc</code></td></tr>
+          <tr><td>card-grid</td><td>卡片网格+状态点</td><td><code>.card-grid .card .status-dot</code></td></tr>
+          <tr><td>quest-list</td><td>可折叠时间线</td><td><code>.quest-list details.quest</code></td></tr>
+          <tr><td>table</td><td>数据表</td><td><code>.tbl-wrap table</code></td></tr>
+          <tr><td>code</td><td>命令/配置块</td><td><code>pre.code .cm .ok .bad</code></td></tr>
+          <tr><td>callout</td><td>三级提示框</td><td><code>.callout .note/.warn/.alarm</code></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="callout note">
+      <span class="callout-icon">TIP</span>
+      <p>配色/字体全部收口在 <code>:root</code> 变量;打印样式已内置(自动隐藏导航与按钮)。中文标题避免使用 <code>text-transform</code> 组件(kicker 类),混排英文时保持大写。</p>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="site-footer">
+  <div class="footer-inner">
+    <span class="footer-meta">SLOT: 项目名 · 文档编号 · 2026-10-27 · CONFIDENTIAL</span>
+    <a class="back-top" href="#main">↑ BACK TO TOP</a>
+  </div>
+</footer>
+
+<script>
+// 阅读进度条
+const bar=document.getElementById('progress');
+addEventListener('scroll',()=>{
+  const h=document.documentElement;
+  bar.style.width=(h.scrollTop/(h.scrollHeight-h.clientHeight)*100)+'%';
+},{passive:true});
+</script>
+</body>
+</html>
